@@ -1,4 +1,8 @@
+legacy_tools/
 node_modules/
+dist/
+build/
+backend/uploads/
 
 # Database files
 *.sqlite

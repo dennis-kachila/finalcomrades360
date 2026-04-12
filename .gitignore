@@ -1,6 +1,9 @@
 legacy_tools/
 node_modules/
+# build output
 dist/
+# but allow frontend/dist specifically for cPanel deployment
+!frontend/dist/
 build/
 backend/uploads/
 

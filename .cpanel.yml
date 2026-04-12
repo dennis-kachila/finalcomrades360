@@ -1,5 +1,10 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/vdranjxy/public_html/
-    - /bin/cp -R frontend/dist/* $DEPLOYPATH
+    - export FRONTEND_PATH=/home/vdranjxy/public_html/
+    - export BACKEND_PATH=/home/vdranjxy/comrades-backend/
+    - /bin/mkdir -p $BACKEND_PATH
+    - /bin/cp -R frontend/dist/* $FRONTEND_PATH
+    - /bin/cp -R backend/* $BACKEND_PATH
+    - /bin/cp .htaccess $FRONTEND_PATH
+    - /bin/cp backend/.env.production $BACKEND_PATH/.env

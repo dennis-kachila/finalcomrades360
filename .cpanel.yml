@@ -1,8 +1,8 @@
 ---
 deployment:
   tasks:
-    - /bin/mkdir -p /home/vdranjxy/comrades-backend
-    - /bin/cp -R backend/. /home/vdranjxy/comrades-backend/
-    - /bin/cp -R frontend/dist/. /home/vdranjxy/public_html/
-    - /bin/cp .htaccess /home/vdranjxy/public_html/
-    - /bin/cp backend/.env.production /home/vdranjxy/comrades-backend/.env
+    - /bin/mkdir -p ~/comrades-backend
+    - /bin/cp -R backend/. ~/comrades-backend/
+    - /bin/cp -R frontend/dist/. ~/public_html/
+    - /bin/cp .htaccess ~/public_html/
+    - /bin/cp backend/.env.production ~/comrades-backend/.env

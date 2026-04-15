@@ -114,7 +114,15 @@ const requestPhoneOtp = async (req, res) => {
     if (user.phone === norm && user.phoneVerified) return res.json({ message: 'This is already your current phone number.' });
 
     const exists = await User.findOne({ where: { phone: norm, id: { [Op.ne]: userId } } });
-    if (exists) return res.status(400).json({ message: 'Phone already in use.' });
+    if (exists) {
+      const email = exists.email || '';
+      const maskedEmail = email.includes('@') 
+        ? email.replace(/(.{2})(.*)(@.*)/, "$1***$3")
+        : 'another account';
+      return res.status(400).json({ 
+        message: `This phone number is already registered to ${maskedEmail}. Please log in with that account instead.` 
+      });
+    }
 
     const otp = `${Math.floor(100000 + Math.random() * 900000)}`;
     user.pendingPhone = norm;

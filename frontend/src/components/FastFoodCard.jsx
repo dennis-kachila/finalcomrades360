@@ -211,13 +211,6 @@ export default function FastFoodCard({
           </div>
         )}
 
-        {!hideImageBadges && item.kitchenVendor && (
-          <div className="absolute bottom-3 left-3 z-[15] max-w-[140px]">
-            <div className="px-2 py-1 bg-black/60 text-white backdrop-blur-sm rounded-md flex flex-col shadow-sm border border-white/10 overflow-hidden">
-              <span className="text-[9px] font-black uppercase tracking-wider truncate">{item.kitchenVendor}</span>
-            </div>
-          </div>
-        )}
 
         {!hideImageBadges && !renderActions && (
           <button

@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
@@ -20,8 +21,30 @@ const app = express();
 app.set('timeout', 60000);
 
 // Security Middleware
-// app.use(helmet({ ... })); // Disabled for CSP debugging
+app.use(helmet({
+  contentSecurityPolicy: false, // Disabled to avoid breaking the SPA/CDN assets
+  crossOriginEmbedderPolicy: false // Allow external images/videos
+}));
 app.use(compression());
+
+// Rate Limiting — protect against brute-force and abuse
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300, // 300 requests per 15min per IP for general routes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 login/register attempts per 15min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts, please try again in 15 minutes.' }
+});
+app.use('/api', globalLimiter); // Apply global rate limit to all API routes
+app.use('/api/auth/login', authLimiter); // Stricter limit on login
+app.use('/api/auth/register', authLimiter); // Stricter limit on register
 
 // CORS Configuration
 app.use(cors({
@@ -56,7 +79,7 @@ app.use(cors({
       callback(null, true);
     } else {
       console.warn(`[CORS] Blocked request from: ${origin}`);
-      callback(null, true); // Fallback to allow during setup transition but log it
+      callback(new Error(`CORS policy: origin '${origin}' is not allowed.`));
     }
   },
   credentials: true,
@@ -101,6 +124,8 @@ const serviceRoutes = require('./routes/serviceRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const socialMediaAccountRoutes = require('./routes/socialMediaAccountRoutes');
+const contactRoutes = require('./routes/contactRoutes');
+const productInquiryRoutes = require('./routes/productInquiryRoutes');
 const fastFoodRoutes = require('./routes/fastFoodRoutes');
 const marketingRoutes = require('./routes/marketingRoutes');
 const imageRoutes = require('./routes/imageRoutes');
@@ -248,7 +273,8 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/profile', profileRoutes); // Changed from /api/users to avoid conflict with userRoutes
 app.use('/api/social-media-accounts', socialMediaAccountRoutes);
-app.use('/api/warehouses', warehouseRoutes);
+app.use('/api/contact', contactRoutes);
+app.use('/api/product-inquiries', productInquiryRoutes);
 app.use('/api/pickup-stations', pickupStationRoutes);
 app.use('/api/station-manager', stationManagerRoutes);
 
@@ -298,7 +324,19 @@ app.use('/uploads', (req, res, next) => {
   }
 
   next();
-}, express.static(path.join(__dirname, 'uploads')));
+}, express.static(path.join(__dirname, 'uploads')), (req, res) => {
+  // Fallback: serve SVG placeholder for missing upload files (dev-friendly)
+  const placeholderSvg = `<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="400" fill="#f3f4f6"/>
+  <rect x="140" y="120" width="120" height="100" rx="8" fill="#d1d5db"/>
+  <circle cx="200" cy="155" r="20" fill="#9ca3af"/>
+  <path d="M140 220 L175 175 L200 200 L230 165 L260 220 Z" fill="#9ca3af"/>
+  <text x="200" y="270" font-family="sans-serif" font-size="16" text-anchor="middle" fill="#9ca3af">No Image</text>
+</svg>`;
+  res.set('Content-Type', 'image/svg+xml');
+  res.set('Cache-Control', 'public, max-age=60');
+  res.send(placeholderSvg);
+});
 
 // Serve Frontend Static Files
 // Priority 1: Local 'public' folder (Production/Deployment)
@@ -413,9 +451,23 @@ async function startServer() {
     // Heavy initializations moved to server.listen callback below
 
     // Initialize Socket.IO with CORS
+    const socketAllowedOrigins = [
+      process.env.FRONTEND_URL,
+      'https://' + (new URL(process.env.FRONTEND_URL?.startsWith('http') ? process.env.FRONTEND_URL : `https://${process.env.FRONTEND_URL || 'localhost'}`)).hostname,
+      'http://localhost:4000',
+      'http://127.0.0.1:4000',
+      'http://localhost:3000'
+    ].filter(Boolean);
     const io = new Server(server, {
       cors: {
-        origin: ['http://localhost:4000', 'http://127.0.0.1:4000'],
+        origin: (origin, callback) => {
+          if (!origin || socketAllowedOrigins.some(o => origin.startsWith(o))) {
+            callback(null, true);
+          } else {
+            console.warn(`[Socket.IO CORS] Blocked: ${origin}`);
+            callback(new Error(`Socket.IO CORS: origin '${origin}' is not allowed.`));
+          }
+        },
         methods: ['GET', 'POST'],
         credentials: true
       }

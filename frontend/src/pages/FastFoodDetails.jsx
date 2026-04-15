@@ -125,6 +125,13 @@ const FastFoodDetails = () => {
   const [activeImage, setActiveImage] = useState(null);
   const [inquiryModalOpen, setInquiryModalOpen] = useState(false);
   const [showStickyBar, setShowStickyBar] = useState(false);
+  
+  // New: Batch System states
+  const [batchSystemEnabled, setBatchSystemEnabled] = useState(false);
+  const [activeBatches, setActiveBatches] = useState([]);
+  const [selectedBatchId, setSelectedBatchId] = useState(null);
+  const [loadingBatches, setLoadingBatches] = useState(false);
+
   const mainCtaRef = useRef(null);
   const [visibleReviewsCount, setVisibleReviewsCount] = useState(3);
   const [activePickupPoints, setActivePickupPoints] = useState([]);
@@ -168,6 +175,38 @@ const FastFoodDetails = () => {
     fetchFastFoodById,
     persistentFetchOptions
   );
+
+  // Fetch Batch System Settings and Active Batches
+  useEffect(() => {
+    const initBatchSystem = async () => {
+      try {
+        setLoadingBatches(true);
+        // 1. Check if batch system is enabled platform-wide
+        const configRes = await fastFoodService.getPublicBatchSystemConfig();
+        const enabled = configRes.enabled === true || configRes.value === 'true';
+        setBatchSystemEnabled(enabled);
+
+        if (enabled) {
+          // 2. Fetch actually active batches
+          const batchRes = await fastFoodService.getActiveBatches();
+          if (batchRes.success && Array.isArray(batchRes.batches)) {
+            setActiveBatches(batchRes.batches);
+            
+            // Auto-select first batch if none selected and in cart
+            if (batchRes.batches.length > 0) {
+              // We might want to see if any item already in cart has a batch, 
+              // but usually for a new item we want a fresh selection.
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to initialize batch system info:', err);
+      } finally {
+        setLoadingBatches(false);
+      }
+    };
+    initBatchSystem();
+  }, []);
 
   useEffect(() => {
     const fetchActivePickupPoints = async () => {
@@ -421,9 +460,10 @@ const FastFoodDetails = () => {
     return normalizeOptionId(id);
   };
 
-  const isFastFoodOptionInCart = (variantId = null, comboId = null) => {
+  const isFastFoodOptionInCart = (variantId = null, comboId = null, batchId = null) => {
     const vId = normalizeOptionId(variantId);
     const cId = normalizeOptionId(comboId);
+    const bId = batchId ? String(batchId) : null;
 
     const cartItems = Array.isArray(cart?.items) ? cart.items : [];
     
@@ -439,15 +479,9 @@ const FastFoodDetails = () => {
       // Check specific options using STRICT equality
       const cartVariantId = normalizeOptionId(cartItem?.variantId);
       const cartComboId = normalizeOptionId(cartItem?.comboId);
-
-      // If we are checking for a variant, it must match EXACTLY.
-      // If vId is empty, it only matches a cart item that also has an empty variant.
-      if (vId !== cartVariantId) return false;
+      const cartBatchId = cartItem?.batchId ? String(cartItem.batchId) : null;
       
-      // If we are checking for a combo, it must match EXACTLY.
-      if (cId !== cartComboId) return false;
-      
-      return true;
+      return cartVariantId === vId && cartComboId === cId && cartBatchId === bId;
     });
   };
 
@@ -487,7 +521,8 @@ const FastFoodDetails = () => {
 
   const isPrimarySelectionInCart = isFastFoodOptionInCart(
     primaryButtonSelection.variantId,
-    primaryButtonSelection.comboId
+    primaryButtonSelection.comboId,
+    selectedBatchId
   );
 
   const buildDebugSnapshot = useCallback(() => {
@@ -755,9 +790,22 @@ const FastFoodDetails = () => {
       return;
     }
 
+    if (batchSystemEnabled && !selectedBatchId) {
+      pushDebugEvent('submit-blocked-no-batch', {
+        source,
+        itemId: item.id
+      });
+      toast({
+        title: 'Batch Selection Required',
+        description: 'Please select a delivery batch before adding to cart.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     const payload = {
       type: 'fastfood',
-      batchId: null
+      batchId: selectedBatchId
     };
 
     // Clean the product object to avoid sending all variants/combos
@@ -1015,7 +1063,7 @@ const FastFoodDetails = () => {
                             await removeFromCart(item.id, 'fastfood', {
                               variantId: primaryButtonSelection.variantId || undefined,
                               comboId: primaryButtonSelection.comboId || undefined,
-                              batchId: null
+                              batchId: selectedBatchId
                             });
                             return;
                           }
@@ -1039,7 +1087,7 @@ const FastFoodDetails = () => {
                         }
                       }}
                       disabled={!isOpen || primaryButtonBusy}
-                      className={`h-11 md:h-10 min-w-[118px] px-6 md:px-5 rounded-xl text-sm font-black md:font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center shrink-0 ${isPrimarySelectionInCart ? 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200' : 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-200 shadow-sm'}`}
+                      className={`h-11 md:h-10 min-w-[130px] px-6 md:px-5 rounded-xl text-sm font-black md:font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center shrink-0 border-2 ${isPrimarySelectionInCart ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200' : 'bg-orange-600 hover:bg-orange-700 text-white border-transparent shadow-sm'}`}
                     >
                       <ShoppingBag className="h-4 w-4 mr-1.5" />
                       {primaryButtonLabel}
@@ -1116,6 +1164,61 @@ const FastFoodDetails = () => {
                   <p className="font-bold text-sm text-gray-900 truncate">{item.kitchenVendor || item.vendorDetail?.name || item.seller?.name || 'Comrades Kitchen'}</p>
                 </div>
               </div>
+
+              {/* Batch Selection Section */}
+              {batchSystemEnabled && (
+                <div className="mt-4 p-4 rounded-2xl bg-orange-50/30 border border-orange-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-tight">
+                      <Shield className="h-4 w-4 text-orange-600" /> Select Delivery Batch
+                    </h3>
+                    <span className="text-[10px] font-bold text-orange-600 bg-orange-100/50 px-2 py-0.5 rounded-full uppercase">Required</span>
+                  </div>
+
+                  {loadingBatches ? (
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                       {[1, 2].map(i => <div key={i} className="flex-shrink-0 w-32 h-20 bg-gray-100 animate-pulse rounded-xl" />)}
+                    </div>
+                  ) : activeBatches.length > 0 ? (
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x">
+                      {activeBatches.map((batch) => (
+                        <button
+                          key={batch.id}
+                          type="button"
+                          onClick={() => setSelectedBatchId(batch.id)}
+                          className={`flex-shrink-0 w-44 h-[72px] p-3 rounded-xl border-2 transition-colors snap-start text-left select-none ${
+                            selectedBatchId === batch.id
+                              ? 'bg-white border-orange-600 ring-4 ring-orange-50'
+                              : 'bg-white border-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${selectedBatchId === batch.id ? 'border-orange-600' : 'border-gray-300'}`}>
+                              {selectedBatchId === batch.id && <div className="w-1.5 h-1.5 bg-orange-600 rounded-full" />}
+                            </div>
+                            <span className="text-xs font-black text-gray-900 truncate">{batch.name}</span>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 text-gray-500">
+                              <Clock className="h-3 w-3" />
+                              <span className="text-[10px] font-bold">Orders Period: {batch.startTime} - {batch.endTime}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-orange-600">
+                              <Truck className="h-3 w-3" />
+                              <span className="text-[10px] font-black uppercase tracking-tighter">Delivery ~ {batch.expectedDelivery}</span>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-white/50 rounded-xl border border-dashed border-orange-200 text-center">
+                       <p className="text-xs font-bold text-orange-700 italic">No delivery batches currently available.</p>
+                       <p className="text-[10px] text-gray-500 mt-1">Please check back later during operating hours.</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
 
 
@@ -1326,23 +1429,7 @@ const FastFoodDetails = () => {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-gray-100 p-4 sm:p-5 mx-3 md:mx-0">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2"><Clock className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" /> Weekly Availability</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5 sm:gap-2">
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
-                  const dayInfo = schedule.find((entry) => entry.day === day) || schedule.find((entry) => entry.day === 'All Days');
-                  const available = dayInfo ? dayInfo.available !== false : day !== 'Sunday';
-                  const from = dayInfo?.from || item.availableFrom || '08:00';
-                  const to = dayInfo?.to || item.availableTo || '21:00';
-                  return (
-                    <div key={day} className={`rounded-lg border p-2 text-center ${available ? 'border-emerald-100 bg-emerald-50' : 'border-gray-200 bg-gray-50'}`}>
-                      <p className="text-[11px] font-semibold text-gray-600">{day.slice(0, 3)}</p>
-                      <p className="text-xs font-bold mt-1">{available ? `${from}-${to}` : 'Closed'}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
+
 
             {reviews.length > 0 && (
               <section className="max-w-4xl mx-auto px-3 md:px-0">
@@ -1441,6 +1528,24 @@ const FastFoodDetails = () => {
                 )}
               </section>
             )}
+
+            <section className="rounded-2xl border border-gray-100 p-4 sm:p-5 mx-3 md:mx-0">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2"><Clock className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" /> Weekly Availability</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5 sm:gap-2">
+                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
+                  const dayInfo = schedule.find((entry) => entry.day === day) || schedule.find((entry) => entry.day === 'All Days');
+                  const available = dayInfo ? dayInfo.available !== false : day !== 'Sunday';
+                  const from = dayInfo?.from || item.availableFrom || '08:00';
+                  const to = dayInfo?.to || item.availableTo || '21:00';
+                  return (
+                    <div key={day} className={`rounded-lg border p-2 text-center ${available ? 'border-emerald-100 bg-emerald-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <p className="text-[11px] font-semibold text-gray-600">{day.slice(0, 3)}</p>
+                      <p className="text-xs font-bold mt-1">{available ? `${from}-${to}` : 'Closed'}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -1466,7 +1571,7 @@ const FastFoodDetails = () => {
                   await removeFromCart(item.id, 'fastfood', {
                     variantId: primaryButtonSelection.variantId || undefined,
                     comboId: primaryButtonSelection.comboId || undefined,
-                    batchId: null
+                    batchId: selectedBatchId
                   });
                   return;
                 }
@@ -1480,11 +1585,13 @@ const FastFoodDetails = () => {
                 setPrimaryButtonBusy(false);
               }
             }}
-            disabled={!isOpen || primaryButtonBusy}
-            className={`flex-1 h-12 rounded-xl text-sm font-black flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 disabled:opacity-50 ${isPrimarySelectionInCart ? 'bg-red-50 text-red-600 border-2 border-red-200' : 'bg-orange-600 text-white shadow-orange-100'}`}
+            disabled={!isOpen || primaryButtonBusy || (batchSystemEnabled && !selectedBatchId && !isPrimarySelectionInCart)}
+            className={`flex-1 h-12 rounded-xl text-sm font-black flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 disabled:opacity-50 border-2 ${isPrimarySelectionInCart ? 'bg-red-50 text-red-600 border-red-200' : 'bg-orange-600 text-white border-transparent'}`}
           >
-            <ShoppingBag className="h-5 w-5" />
-            {primaryButtonLabel}
+            <div className="flex items-center gap-2 px-2">
+              <ShoppingBag className="h-5 w-5 shrink-0" />
+              <span className="whitespace-nowrap inline-block text-center">{primaryButtonLabel}</span>
+            </div>
           </button>
         </div>
       </div>

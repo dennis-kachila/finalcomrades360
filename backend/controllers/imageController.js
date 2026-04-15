@@ -35,8 +35,17 @@ exports.resizeImage = async (req, res) => {
         // }
 
         if (!fs.existsSync(originalFilePath)) {
-            // console.log('[ImageResize] File not found:', originalFilePath);
-            return res.status(404).json({ message: 'Image not found' });
+            // Serve a proper SVG placeholder so <img> tags show something instead of broken icon
+            const placeholderSvg = `<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="400" fill="#f3f4f6"/>
+  <rect x="140" y="120" width="120" height="100" rx="8" fill="#d1d5db"/>
+  <circle cx="200" cy="155" r="20" fill="#9ca3af"/>
+  <path d="M140 220 L175 175 L200 200 L230 165 L260 220 Z" fill="#9ca3af"/>
+  <text x="200" y="270" font-family="sans-serif" font-size="16" text-anchor="middle" fill="#9ca3af">No Image</text>
+</svg>`;
+            res.set('Content-Type', 'image/svg+xml');
+            res.set('Cache-Control', 'public, max-age=60'); // Short cache so real images load once uploaded
+            return res.send(placeholderSvg);
         }
 
         // Generate a cache key

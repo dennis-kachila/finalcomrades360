@@ -46,6 +46,7 @@ export default function Customer() {
     { to: "/customer/wishlist", label: "Wishlist", icon: "❤️" },
     { to: "/customer/wallet", label: "Wallet", icon: "💰" },
     { to: "/customer/applications", label: "Applications", icon: "📄" },
+    { to: "/customer/inquiries", label: "Support Inquiries", icon: "🎧" },
     { to: "/customer/settings", label: "Settings", icon: "⚙️" },
     { to: "/customer/work-with-us", label: "Work with Us", icon: "💼", color: "green", onClick: handleWorkWithUsClick },
   ];

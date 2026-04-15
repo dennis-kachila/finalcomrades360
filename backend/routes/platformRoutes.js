@@ -1,11 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { getConfig, getWhatsAppStatus, handleRestartWhatsApp } = require('../controllers/PlatformConfigController');
+const { getConfig, updateConfig, getWhatsAppStatus, handleRestartWhatsApp } = require('../controllers/PlatformConfigController');
 const { PlatformConfig } = require('../models');
 const { authenticate, adminOnly } = require('../middleware/auth');
 
 // Public route to fetch platform config
 router.get('/config/:key', getConfig);
+
+// Admin route to update platform config
+router.post('/config/:key', authenticate, adminOnly, updateConfig);
 
 // Protected WhatsApp Management
 router.get('/whatsapp/status', authenticate, adminOnly, getWhatsAppStatus);

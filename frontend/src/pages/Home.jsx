@@ -621,25 +621,24 @@ function Home({ isMarketingMode: propMarketingMode = false }) {
     // 1. Set Categories
     setCategories(categories || []);
 
-    // 2. Set Services (with marketing filter if needed) - Limit to 3 rows
+    // 2. Set Services (with marketing filter if needed) - Limit to 2 rows initially to ensure Load More button shows
     const filteredServices = filterMarketingItems(batchServices || [], 'service');
-    const initialServices = filteredServices.slice(0, initialDisplayLimit);
+    const servicesLimit = Math.min(filteredServices.length, itemsPerRow * 2);
+    const initialServices = filteredServices.slice(0, Math.max(servicesLimit, 12));
 
     const totalServices = data.pagination?.totalServices || filteredServices.length;
 
     setServices(initialServices);
-    // Be more permissive: Show Load More if we have more than initialDisplayLimit OR if filteredServices.length is exactly the backend return count (48)
-    // This handles cases where totalServices might be stale or missing.
-    const hasMore = filteredServices.length < totalServices || 
-                    filteredServices.length > initialDisplayLimit || 
-                    filteredServices.length >= 24; // If we got at least 2 rows (xl), there is likely more
+    // Show Load More if total count in DB > currently shown initial items
+    const hasMore = totalServices > initialServices.length;
     
     setHasMoreServices(hasMore);
     setServicesPage(1);
 
-    // 3. Set Fast Food (with marketing filter if needed) - Limit to 3 rows
+    // 3. Set Fast Food (with marketing filter if needed) - Limit to 2 rows initially to ensure Load More button shows
     const filteredFastFood = filterMarketingItems(fastFood || [], 'fastfood');
-    const initialFastFood = filteredFastFood.slice(0, initialDisplayLimit);
+    const fastFoodLimit = Math.min(filteredFastFood.length, itemsPerRow * 2);
+    const initialFastFood = filteredFastFood.slice(0, Math.max(fastFoodLimit, 12));
     setFastFoodData(initialFastFood);
 
     // 4. Set Hero Promotions — allow those with marketing-eligible products OR those with a custom banner image

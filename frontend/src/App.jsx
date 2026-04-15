@@ -12,6 +12,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ReferrerBanner from './components/ReferrerBanner';
 import ForcePasswordChangeModal from './components/ForcePasswordChangeModal';
 import api from './services/api';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import RealtimeSync from './components/RealtimeSync';
 import DashboardGuard from './components/DashboardGuard';
 // import VerificationRequired from './components/VerificationRequired'; // Removed as per user request
@@ -55,6 +57,11 @@ const FastFoodDetails = lazy(() => import('./pages/FastFoodDetails'));
 const Products = lazy(() => import('./pages/Products'));
 const ComradesMenu = lazy(() => import('./pages/ComradesMenu'));
 const ServicesManagement = lazy(() => import('./pages/dashboard/ServicesManagement'));
+
+// Public Footer Pages
+const StaticContentPage = lazy(() => import('./pages/public/StaticContentPage'));
+const AppContentManager = lazy(() => import('./pages/dashboard/settings/AppContentManager'));
+
 // Marketing components
 const MarketingDashboard = lazy(pages['./pages/marketing/MarketerDashboard.jsx']);
 const MarketingOverview = lazy(pages['./pages/marketing/MarketingOverview.jsx']);
@@ -129,6 +136,7 @@ import ScrollToTop from './components/ScrollToTop';
 const Customer = lazy(() => import('./pages/Customer'));
 const CustomerOverview = lazy(() => import('./pages/customer/CustomerOverview'));
 const CustomerOrders = lazy(() => import('./pages/customer/CustomerOrders'));
+const MyInquiries = lazy(() => import('./pages/customer/MyInquiries'));
 const CancelOrder = lazy(() => import('./pages/CancelOrder'));
 const UpdateOrderAddress = lazy(() => import('./pages/UpdateOrderAddress'));
 const OrderTracking = lazy(() => import('./pages/OrderTracking'));
@@ -193,6 +201,7 @@ const DeliveryAuditing = lazy(() => import('./pages/dashboard/delivery/DeliveryA
 const BatchSystem = lazy(() => import('./pages/dashboard/BatchSystem'));
 const CustomerReturnsList = lazy(() => import('./pages/customer/CustomerReturnsList'));
 const FastFoodPickupPoints = lazy(() => import('./pages/dashboard/FastFoodPickupPoints'));
+const ContactMessages = lazy(() => import('./pages/dashboard/ContactMessages'));
 
 // Delivery Agent Sub-components
 const DeliveryAgentOrders = lazy(() => import('./pages/dashboard/delivery/Orders'));
@@ -410,6 +419,17 @@ const AppContent = () => {
                 <Route path="/menu" element={<ComradesMenu />} />
                 <Route path="/products" element={<Products />} />
 
+                {/* Public Footer Pages */}
+                <Route path="/about" element={<StaticContentPage pageKey="content_page_about" title="About Us" />} />
+                <Route path="/contact" element={<StaticContentPage pageKey="content_page_contact" title="Contact Us" />} />
+                <Route path="/terms" element={<StaticContentPage pageKey="content_page_terms" title="Terms of Service" />} />
+                <Route path="/privacy" element={<StaticContentPage pageKey="content_page_privacy" title="Privacy Policy" />} />
+                <Route path="/help" element={<StaticContentPage pageKey="content_page_help" title="Help Center" />} />
+                <Route path="/faq" element={<StaticContentPage pageKey="content_page_faq" title="Frequently Asked Questions" />} />
+                <Route path="/shipping" element={<StaticContentPage pageKey="content_page_shipping" title="Shipping & Returns" />} />
+                <Route path="/payments" element={<StaticContentPage pageKey="content_page_payments" title="Payment Options" />} />
+                <Route path="/size-guide" element={<StaticContentPage pageKey="content_page_size_guide" title="Size Guide" />} />
+
                 {/* Authentication Routes */}
                 {/* Authentication Routes - Now handled via Modals over Home */}
                 <Route path="/login" element={!user ? <><Home /><AuthModal /></> : <Navigate to="/" />} />
@@ -499,9 +519,11 @@ const AppContent = () => {
                   <Route path="marketing/hero-promotions/create" element={<AdminCreateHeroPromotion />} />
                   <Route path="marketing/fastfood-promotions" element={<AdminFastFoodPromotions />} />
                   <Route path="settings/platform" element={<SystemSettings />} />
+                  <Route path="settings/app-content" element={<AppContentManager />} />
                   <Route path="settings/security" element={<SecuritySettings />} />
                   <Route path="products/deletion-requests" element={<ProductDeletionRequests />} />
                   <Route path="support" element={<SupportTickets />} />
+                  <Route path="contact-messages" element={<ContactMessages />} />
                   <Route path="support/service" element={<CustomerService />} />
                   <Route path="delivery/live-map" element={<AdminLiveMap />} />
                   <Route path="delivery/auditing" element={<DeliveryAuditing />} />
@@ -595,6 +617,7 @@ const AppContent = () => {
                 {/* Customer Routes */}
                 <Route path="/customer/*" element={<Customer />}>
                   <Route index element={<CustomerOverview />} />
+                  <Route path="inquiries" element={<MyInquiries />} />
                   <Route path="orders" element={<CustomerOrders />} />
                   <Route path="orders/:orderId/track" element={<OrderTracking />} />
                   <Route path="orders/:orderId/cancel" element={<CancelOrder />} />
@@ -677,9 +700,23 @@ const AppContent = () => {
         <ForcePasswordChangeModal isOpen={true} user={user} />
       )}
 
-      {/* Global Marketing Mode Bottom Nav (Mobile Only inside component) */}
-      {isMarketingMode && <MarketingBottomNav />}
-    </PageLayout>
+        {/* Global Marketing Mode Bottom Nav (Mobile Only inside component) */}
+        {isMarketingMode && <MarketingBottomNav />}
+        
+        {/* Global Toast Notifications */}
+        <ToastContainer 
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
+      </PageLayout>
 
   );
 };

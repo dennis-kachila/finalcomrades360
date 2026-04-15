@@ -1102,7 +1102,7 @@ function Checkout() {
                           return (
                             <label
                               key={batch.id}
-                              className={`flex items-start gap-3 p-3 border rounded-md cursor-pointer transition-colors ${checked ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'}`}
+                              className={`flex items-start gap-3 p-3 border-2 rounded-md cursor-pointer transition-colors select-none ${checked ? 'border-orange-500 bg-orange-50' : 'border-gray-100 bg-white hover:bg-gray-50'}`}
                             >
                               <input
                                 type="radio"
@@ -1113,9 +1113,12 @@ function Checkout() {
                               />
                               <div className="flex-1">
                                 <div className="font-semibold text-sm text-gray-900">{batch.name || `Batch #${batch.id}`}</div>
-                                {batch.expectedDelivery ? (
-                                  <div className="text-xs text-gray-600">Expected delivery: {batch.expectedDelivery}</div>
-                                ) : null}
+                                <div className="flex flex-col gap-0.5 mt-1">
+                                  <div className="text-[11px] text-gray-500 font-medium">Orders within: {batch.startTime} - {batch.endTime}</div>
+                                  {batch.expectedDelivery && (
+                                    <div className="text-[11px] text-orange-600 font-bold uppercase tracking-tight">Delivery by {batch.expectedDelivery}</div>
+                                  )}
+                                </div>
                               </div>
                             </label>
                           );

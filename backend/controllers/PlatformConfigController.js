@@ -67,7 +67,26 @@ exports.getConfig = async (req, res) => {
                     fastfood: { enabled: false, hideFromPublic: true }
                 }
             },
-            system_env: { server: { port: 4000, nodeEnv: 'development', baseUrl: 'http://localhost:4000', apiUrl: '/api' }, app: { frontendUrl: 'http://localhost:3000', supportEmail: 'support@comrades360.com' }, database: { dialect: 'sqlite', storage: './database.sqlite' } }
+            system_env: { server: { port: 4000, nodeEnv: 'development', baseUrl: 'http://localhost:4000', apiUrl: '/api' }, app: { frontendUrl: 'http://localhost:3000', supportEmail: 'support@comrades360.com' }, database: { dialect: 'sqlite', storage: './database.sqlite' } },
+            
+            // Informational Page Templates (Original site content)
+            content_page_about: `<h2>Our Story</h2><p>Comrades360 was founded by students, for students. We understand the unique challenges of campus life, from tight budgets to busy schedules. We saw a need for a unified platform where students could easily buy, sell, and discover goods and services securely within their campus ecosystem.</p><p>What started as an idea in a dorm room has evolved into a comprehensive digital marketplace. Our goal has always been simple: create a trusted environment where "comrades" can thrive together.</p><h2>Our Mission</h2><p>To build a seamless, secure, and vibrant digital marketplace that connects university students with local vendors, fellow student entrepreneurs, and essential services in real-time.</p><h2>Why Choose Us?</h2><ul><li><strong>Secure:</strong> Verified student and seller profiles ensure a trusted community.</li><li><strong>By Students:</strong> Tailored specifically to the needs and rhythms of university life.</li><li><strong>Fast:</strong> Ultra-fast delivery and real-time communication with sellers.</li></ul>`,
+            
+            content_page_contact: `<h2>Get In Touch</h2><p>Our support team is available from 8am to 8pm (EAT), Monday through Saturday. We strive to respond to all inquiries within 24 hours.</p><h3>Support Channels</h3><ul><li><strong>Email:</strong> support@comrades360.shop</li><li><strong>Phone:</strong> +254 757 588 395</li><li><strong>Location:</strong> University Way, Nairobi, Kenya</li></ul><p>For order-related inquiries, please include your Order ID for faster assistance.</p>`,
+            
+            content_page_terms: `<h2>1. Acceptance of Terms</h2><p>By accessing and using Comrades360, you accept and agree to be bound by the terms and provision of this agreement. In addition, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services.</p><h2>2. Description of Service</h2><p>Comrades360 provides a marketplace platform ("Service") for university students to buy, sell, and discover goods and services. We act solely as a facilitator connecting buyers and sellers.</p><h2>3. User Conduct</h2><ul><li>You must be a current student or verified vendor to use certain active selling features.</li><li>You agree not to post false, inaccurate, misleading, or defamatory content.</li><li>You are responsible for maintaining the confidentiality of your account password.</li></ul><h2>4. Transactions between Users</h2><p>Comrades360 is not a party to the transactions between buyers and sellers. The actual contract for sale is directly between the buyer and seller.</p>`,
+            
+            content_page_privacy: `<h2>1. Information We Collect</h2><ul><li><strong>Personal Data:</strong> Name, student email address, phone number, and campus location.</li><li><strong>Transaction Data:</strong> Details about payments and items purchased.</li><li><strong>Usage Data:</strong> Information about how you interact with our platform.</li></ul><h2>2. How We Use Your Information</h2><p>We use the information we collect to facilitate marketplace transactions, verify student status, and send order updates.</p><h2>3. Data Sharing</h2><p>We share necessary information (like delivery location) with your delivery agent specifically to fulfill an order. We do not sell your personal data.</p>`,
+            
+            content_page_faq: `<h2>Buying</h2><h3>How do I make a purchase?</h3><p>Simply browse the marketplace, add items to your cart, and proceed to checkout. You can choose whether to pick up your order or have it delivered directly to your hostel.</p><h3>Are the sellers verified?</h3><p>Yes. All sellers must go through a student or vendor verification process before they can list items.</p><h2>Selling</h2><h3>How much does it cost to sell?</h3><p>Listing items is free! We only take a small commission when an item is successfully sold.</p><h3>How do I get paid?</h3><p>Funds are released into your Comrades360 Wallet once the item is delivered. You can withdraw to M-Pesa directly.</p>`,
+            
+            content_page_shipping: `<h2>1. Delivery Service</h2><p>We pride ourselves on an ultra-fast campus delivery network powered by student agents.</p><ul><li><strong>Campus Deliveries:</strong> Usually delivered within 1-2 hours.</li><li><strong>Fast Food:</strong> Prioritized and fulfilled within 20-45 minutes.</li></ul><h2>2. Return Policy</h2><ul><li><strong>Valid Returns:</strong> Request within 48 hours if item is not as described or damaged.</li><li><strong>Food Items:</strong> For safety reasons, fast food items cannot be returned.</li></ul>`,
+            
+            content_page_payments: `<h2>M-Pesa Express (STK Push)</h2><p>Simply select M-Pesa at checkout, enter your Safaricom number, and a prompt will appear on your phone to enter your PIN.</p><h2>Comrades360 Wallet</h2><p>Top up your internal wallet or use your earnings to pay for new purchases instantly. Zero transaction fees!</p><h2>Cash on Delivery (Limited)</h2><p>Only available for specific sellers who explicitly enable it for campus pickups.</p>`,
+            
+            content_page_size_guide: `<h2>Perfomance Sizing</h2><p>Sizes vary depending on the brand and the seller's source. Always read the seller's specific product description for exact measurements.</p><h2>Women's Sizing (General)</h2><ul><li><strong>Small (S):</strong> UK 8-10, Bust 32-34"</li><li><strong>Medium (M):</strong> UK 12-14, Bust 36-38"</li><li><strong>Large (L):</strong> UK 16, Bust 40"</li></ul><h2>Men's Sizing (General)</h2><ul><li><strong>Small (S):</strong> Chest 34-36", Waist 28-30"</li><li><strong>Medium (M):</strong> Chest 38-40", Waist 32-34"</li><li><strong>Large (L):</strong> Chest 42-44", Waist 36-38"</li></ul>`,
+            
+            content_page_help: `<h2>Need Help?</h2><p>If you're experiencing issues with an order or your account, please check our FAQ first. If you still need help, use one of the channels below:</p><ul><li><strong>Direct Support:</strong> Use the "Support & Tickets" section in your dashboard.</li><li><strong>WhatsApp:</strong> Reach us at +254 757 588 395 for quick queries.</li><li><strong>Email:</strong> support@comrades360.shop</li></ul>`,
         };
 
         const config = await PlatformConfig.findOne({ where: { key } });
@@ -77,34 +96,42 @@ exports.getConfig = async (req, res) => {
             return res.json({ success: true, data: baseDefaults, isDefault: true });
         }
 
+        // Final result: Start with base defaults, overlay DB values
         // Attempt to parse JSON value if possible
-        let dbValue = {};
+        let dbValue = null;
         try {
-            dbValue = typeof config.value === 'string' ? JSON.parse(config.value) : config.value;
+            dbValue = config.value && typeof config.value === 'string' ? JSON.parse(config.value) : config.value;
         } catch (e) {
-            // If not JSON, use as literal if string, else ignore
-            dbValue = typeof config.value === 'string' ? config.value : {};
+            // If not JSON, use as literal if string
+            dbValue = typeof config.value === 'string' ? config.value : null;
         }
 
         // Final result: Start with base defaults, overlay DB values
         let finalData = baseDefaults;
 
-        if (dbValue && typeof dbValue === 'object' && !Array.isArray(dbValue)) {
-            // Deep merge for known structures
-            finalData = { ...baseDefaults, ...dbValue };
-            
-            // Nested merge for templates
-            if (baseDefaults.templates && dbValue.templates && typeof dbValue.templates === 'object') {
-                finalData.templates = { ...baseDefaults.templates, ...dbValue.templates };
-            }
-            
-            // Nested merge for minPayout in finance_settings
-            if (baseDefaults.minPayout && dbValue.minPayout && typeof dbValue.minPayout === 'object') {
-                finalData.minPayout = { ...baseDefaults.minPayout, ...dbValue.minPayout };
+        const isObject = (val) => val && typeof val === 'object' && !Array.isArray(val);
+
+        if (isObject(dbValue)) {
+            if (isObject(baseDefaults)) {
+                // Deep merge for known structures
+                finalData = { ...baseDefaults, ...dbValue };
+                
+                // Nested merge for templates
+                if (baseDefaults.templates && dbValue.templates && isObject(dbValue.templates)) {
+                    finalData.templates = { ...baseDefaults.templates, ...dbValue.templates };
+                }
+                
+                // Nested merge for minPayout in finance_settings
+                if (baseDefaults.minPayout && dbValue.minPayout && isObject(dbValue.minPayout)) {
+                    finalData.minPayout = { ...baseDefaults.minPayout, ...dbValue.minPayout };
+                }
+            } else {
+                // baseDefaults is likely a string or null, but dbValue is an object.
+                // Prioritize DB object.
+                finalData = dbValue;
             }
         } else if (dbValue !== undefined && dbValue !== null && dbValue !== '') {
-            // If DB value is a primitive but we have defaults, prioritize DB value if it's not empty,
-            // but for keys with defaults we expect objects, so this is a fallback.
+            // dbValue is a primitive (like a string of HTML)
             finalData = dbValue;
         }
 

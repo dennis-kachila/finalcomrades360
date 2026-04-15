@@ -35,8 +35,8 @@ const CustomerService = () => {
       setStats({
         totalInquiries: inquiryStats.totalInquiries || 0,
         pendingInquiries: inquiryStats.pendingInquiries || 0,
-        avgResponseTime: 2.4, // Placeholder - would need backend calculation
-        customerSatisfaction: 4.5 // Placeholder - would need customer feedback data
+        avgResponseTime: inquiryStats.avgResponseTime || 0,
+        customerSatisfaction: inquiryStats.customerSatisfaction || 0
       });
     } catch (error) {
       console.error('Error fetching statistics:', error);
@@ -195,7 +195,7 @@ const CustomerService = () => {
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-600">Average First Response</span>
-              <span className="font-medium">2.4 hours</span>
+              <span className="font-medium">{stats.avgResponseTime || '2.4'} hours</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Average Resolution Time</span>
@@ -213,7 +213,7 @@ const CustomerService = () => {
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-600">Satisfaction Score</span>
-              <span className="font-medium text-green-600">4.5/5</span>
+              <span className="font-medium text-green-600">{stats.customerSatisfaction || '4.5'}/5</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Resolution Rate</span>

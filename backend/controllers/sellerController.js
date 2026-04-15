@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Product, Category, Order, OrderItem, User, FastFood, DeliveryTask, Warehouse, PickupStation } = require('../models/index');
+const { Product, Category, Order, OrderItem, User, FastFood, DeliveryTask, Warehouse, PickupStation, Batch } = require('../models/index');
 
 const getMyProducts = async (req, res) => {
   console.log(`[getMyProducts] User: ${req?.user?.id} Query: ${JSON.stringify(req.query)}`);
@@ -433,7 +433,8 @@ const getMyOrders = async (req, res) => {
         { model: PickupStation, as: 'PickupStation', attributes: ['id', 'name'] },
         // Admin routing destinations
         { model: Warehouse, as: 'DestinationWarehouse', attributes: ['id', 'name', 'address', 'landmark', 'contactPhone'] },
-        { model: PickupStation, as: 'DestinationPickStation', attributes: ['id', 'name', 'location', 'contactPhone'] }
+        { model: PickupStation, as: 'DestinationPickStation', attributes: ['id', 'name', 'location', 'contactPhone'] },
+        { model: Batch, as: 'batch' }
       ]
     });
 
@@ -611,7 +612,8 @@ const getOverview = async (req, res) => {
             include: [{ model: User, as: 'deliveryAgent', attributes: ['id', 'name', 'phone', 'businessName'] }]
           },
           { model: Warehouse, as: 'Warehouse', attributes: ['id', 'name', 'address', 'contactPhone'] },
-          { model: PickupStation, as: 'PickupStation', attributes: ['id', 'name'] }
+          { model: PickupStation, as: 'PickupStation', attributes: ['id', 'name'] },
+          { model: Batch, as: 'batch' }
         ]
       }),
       Product.count({ where: { sellerId: userId, stock: { [Op.lte]: 3 } } }),

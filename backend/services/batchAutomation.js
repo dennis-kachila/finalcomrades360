@@ -28,7 +28,13 @@ const startBatchAutomation = () => {
 
             for (const batch of automatedBatches) {
                 // Check if this batch has "ended" (currentTime matched or exceeded endTime)
-                if (currentTimeStr >= batch.endTime) {
+                // Handling midnight rollover: a batch has ended if currently past endTime 
+                // but (if it spans midnight) not yet back to startTime.
+                const hasEnded = (batch.startTime < batch.endTime) 
+                    ? (currentTimeStr >= batch.endTime)
+                    : (currentTimeStr >= batch.endTime && currentTimeStr < batch.startTime);
+
+                if (hasEnded) {
                     await handleBatchCycle(batch);
                 }
             }

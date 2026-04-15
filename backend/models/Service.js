@@ -125,7 +125,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'Subcategories', // Match actual database table name (plural)
+        model: 'Subcategory', // Corrected to match actual database table name (singular)
         key: 'id'
       }
     },
@@ -238,6 +238,11 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 'AUTO',
       allowNull: false,
       comment: 'Manual status override: AUTO follows schedule, OPEN forces open, CLOSED forces closed'
+    },
+    coverImage: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: '/uploads/default-service.jpg'
     },
     isFeatured: {
       type: DataTypes.BOOLEAN,

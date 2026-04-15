@@ -145,6 +145,7 @@ const adminMenuItems = [
     roles: ['admin', 'superadmin', 'super_admin'],
     children: [
       { name: 'Platform Settings', path: '/dashboard/settings/platform', icon: <FaTools className="mr-2" /> },
+      { name: 'App Content', path: '/dashboard/settings/app-content', icon: <FaFileAlt className="mr-2" /> },
       { name: 'Security Settings', path: '/dashboard/settings/security', icon: <FaLock className="mr-2" />, roles: ['super_admin'] }
     ]
   },
@@ -155,6 +156,7 @@ const adminMenuItems = [
     roles: ['admin', 'superadmin', 'super_admin', 'support', 'ops_manager'],
     children: [
       { name: 'Support Tickets', path: '/dashboard/support', icon: <FaTicketAlt className="mr-2" /> },
+      { name: 'Contact Messages', path: '/dashboard/contact-messages', icon: <FaHeadset className="mr-2" /> },
       { name: 'Customer Service', path: '/dashboard/support/service', icon: <FaHeadset className="mr-2" /> }
     ]
   },
@@ -221,6 +223,12 @@ const customerMenuItems = [
     name: 'Work with Comrades360',
     path: '/work-with-us', // Will be overridden dynamically based on verification
     icon: <FaUserTie className="mr-3" />,
+    roles: ['customer']
+  },
+  {
+    name: 'Support Inquiries',
+    path: '/customer/inquiries',
+    icon: <FaHeadset className="mr-3" />,
     roles: ['customer']
   },
   {

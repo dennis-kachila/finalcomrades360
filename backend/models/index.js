@@ -30,6 +30,7 @@ const ServiceImage = require('./ServiceImage')(sequelize, Sequelize.DataTypes);
 const ProductDeletionRequest = require('./ProductDeletionRequest')(sequelize, Sequelize.DataTypes);
 const DeletedProduct = require('./DeletedProduct')(sequelize, Sequelize.DataTypes);
 const ProductInquiry = require('./ProductInquiry')(sequelize, Sequelize.DataTypes);
+const ProductInquiryReply = require('./ProductInquiryReply')(sequelize, Sequelize.DataTypes);
 const ProductView = require('./ProductView')(sequelize, Sequelize.DataTypes);
 const FastFood = require('./FastFood')(sequelize, Sequelize.DataTypes);
 const PlatformConfig = require('./PlatformConfig')(sequelize, Sequelize.DataTypes);
@@ -56,6 +57,8 @@ const Batch = require('./Batch')(sequelize, Sequelize.DataTypes);
 const FastFoodPickupPoint = require('./FastFoodPickupPoint')(sequelize, Sequelize.DataTypes);
 const HandoverCode = require('./HandoverCode')(sequelize, Sequelize.DataTypes);
 const Otp = require('./Otp')(sequelize, Sequelize.DataTypes);
+const ContactMessage = require('./ContactMessage')(sequelize, Sequelize.DataTypes);
+const ContactReply = require('./ContactReply')(sequelize, Sequelize.DataTypes);
 
 const models = {
   User,
@@ -112,7 +115,10 @@ const models = {
   Batch,
   FastFoodPickupPoint,
   HandoverCode,
-  Otp
+  Otp,
+  ContactMessage,
+  ContactReply,
+  ProductInquiryReply
 };
 
 // Set up associations
@@ -131,6 +137,7 @@ module.exports = {
   ProductDeletionRequest,
   DeletedProduct,
   ProductInquiry,
+  ProductInquiryReply,
   RoleApplication,
   Order,
   OrderItem,
@@ -179,6 +186,8 @@ module.exports = {
   FastFoodPickupPoint,
   HandoverCode,
   Otp,
+  ContactMessage,
+  ContactReply,
   sequelize,
   Sequelize,
   Op: Sequelize.Op

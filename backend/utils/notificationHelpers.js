@@ -201,7 +201,7 @@ async function notifyCustomerOrderPlaced(order, customer, itemsCount, itemNames)
     const customerInfo = `${customer.name || order.customerName || 'Customer'}${customer.phone || order.customerPhone ? (', ' + (customer.phone || order.customerPhone)) : ''}`;
     const deliveryLocation = order.deliveryMethod === 'pick_station' 
         ? (order.pickStation || 'N/A') 
-        : `${customerInfo}, ${order.deliveryAddress || order.marketingDeliveryAddress || 'N/A'}`;
+        : (order.deliveryAddress || order.marketingDeliveryAddress || 'N/A');
 
     const paymentMethod = order.paymentType === 'cash_on_delivery' ? 'Cash on Delivery' : 'Paid';
 

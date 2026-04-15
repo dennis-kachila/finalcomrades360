@@ -101,12 +101,10 @@ module.exports = (sequelize, DataTypes) => {
   // Define associations
   ProductInquiry.associate = function(models) {
     // Temporarily comment out Product association until Product model is available
-    /*
     ProductInquiry.belongsTo(models.Product, {
       foreignKey: 'productId',
       as: 'Product'
     });
-    */
 
     ProductInquiry.belongsTo(models.User, {
       foreignKey: 'userId',
@@ -116,6 +114,10 @@ module.exports = (sequelize, DataTypes) => {
     ProductInquiry.belongsTo(models.User, {
       foreignKey: 'assignedTo',
       as: 'AssignedAdmin'
+    });
+    ProductInquiry.hasMany(models.ProductInquiryReply, {
+      foreignKey: 'productInquiryId',
+      as: 'replies'
     });
   };
 

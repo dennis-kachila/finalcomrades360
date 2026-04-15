@@ -80,12 +80,37 @@ const SupportTickets = () => {
   };
 
   // Handle response submission
-  const handleResponseSubmit = () => {
+  const handleResponseSubmit = async () => {
     if (!responseData.response.trim()) {
       alert('Response is required');
       return;
     }
-    updateInquiry(selectedInquiry.id, responseData);
+    
+    try {
+      setLoading(true);
+      // Send the reply
+      await api.post(`/product-inquiries/${selectedInquiry.id}/reply`, {
+        content: responseData.response
+      });
+
+      // Update status and priority if changed
+      if (responseData.status !== selectedInquiry.status || responseData.priority !== selectedInquiry.priority) {
+        await api.put(`/product-inquiries/admin/${selectedInquiry.id}`, {
+          status: responseData.status,
+          priority: responseData.priority
+        });
+      }
+
+      alert('Response sent successfully');
+      fetchInquiries();
+      setShowResponseModal(false);
+      setResponseData({ status: 'in_progress', priority: 'medium', response: '' });
+    } catch (error) {
+      console.error('Error sending response:', error);
+      alert('Failed to send response');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Get status icon
@@ -413,13 +438,25 @@ const SupportTickets = () => {
                 Respond to Inquiry #{selectedInquiry.id}
               </h3>
               
-              {/* Inquiry Details */}
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <div className="text-sm">
-                  <p><strong>Subject:</strong> {selectedInquiry.subject}</p>
-                  <p><strong>Customer:</strong> {selectedInquiry.Customer?.name} ({selectedInquiry.Customer?.email})</p>
-                  <p><strong>Product:</strong> {selectedInquiry.Product?.name}</p>
-                  <p><strong>Message:</strong> {selectedInquiry.message}</p>
+              {/* Inquiry Details & History */}
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg max-h-60 overflow-y-auto custom-scrollbar">
+                <div className="space-y-4">
+                  <div className="pb-3 border-b border-gray-200">
+                    <p className="text-xs font-bold text-blue-600 mb-1">Customer Message ({formatDate(selectedInquiry.createdAt)})</p>
+                    <p className="text-sm text-gray-800">{selectedInquiry.message}</p>
+                  </div>
+                  
+                  {selectedInquiry.replies?.map((reply) => (
+                    <div key={reply.id} className={`pb-3 border-b border-gray-100 ${reply.isAdminReply ? 'pl-4 border-l-2 border-green-400' : 'pl-4 border-l-2 border-blue-400'}`}>
+                      <p className="text-xs font-bold mb-1 flex justify-between">
+                        <span className={reply.isAdminReply ? 'text-green-600' : 'text-blue-600'}>
+                          {reply.isAdminReply ? 'Support Team' : 'Customer'} ({reply.sender?.name})
+                        </span>
+                        <span className="text-gray-400 font-normal">{formatDate(reply.createdAt)}</span>
+                      </p>
+                      <p className="text-sm text-gray-700">{reply.content}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 

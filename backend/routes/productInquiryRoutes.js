@@ -18,5 +18,6 @@ router.get('/admin/all', adminOnly, productInquiryController.getAllProductInquir
 router.put('/admin/:id', adminOnly, productInquiryController.updateProductInquiry);
 
 router.get('/admin/stats', adminOnly, productInquiryController.getInquiryStats);
+router.post('/:id/reply', productInquiryController.addReply);
 
 module.exports = router;

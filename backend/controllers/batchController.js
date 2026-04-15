@@ -50,8 +50,16 @@ exports.getAllBatches = async (req, res) => {
 exports.getActiveBatches = async (req, res) => {
     try {
         const { Op, fn, col, where } = require('sequelize');
-        const now = new Date();
-        const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        const nairobiTime = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Africa/Nairobi',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        }).format(new Date());
+        
+        const currentTimeStr = nairobiTime.replace(':', ':'); // Ensure standard HH:mm format
+        
+        console.log(`[BatchDebug] Nairobi Time: ${currentTimeStr}`);
 
         const normalizeTime = (value) => {
             if (!value) return null;
@@ -72,14 +80,9 @@ exports.getActiveBatches = async (req, res) => {
             'active'
         ];
 
-        const loweredStatuses = ['scheduled', 'in progress', 'in_progress', 'active'];
-
         const candidates = await Batch.findAll({
             where: {
-                [Op.or]: [
-                    { status: { [Op.in]: rawStatusCandidates } },
-                    where(fn('LOWER', col('status')), { [Op.in]: loweredStatuses })
-                ]
+                status: { [Op.in]: rawStatusCandidates }
             },
             order: [['startTime', 'ASC']]
         });
@@ -96,7 +99,14 @@ exports.getActiveBatches = async (req, res) => {
             // If time fields are missing/invalid, don't hide the batch unexpectedly.
             if (!start || !end) return true;
 
-            return currentTimeStr >= start && currentTimeStr <= end;
+            let isMatch = false;
+            if (start <= end) {
+                isMatch = currentTimeStr >= start && currentTimeStr <= end;
+            } else {
+                // Handle midnight rollover (e.g., 23:00 to 01:00)
+                isMatch = currentTimeStr >= start || currentTimeStr <= end;
+            }
+            return isMatch;
         });
 
         res.status(200).json({

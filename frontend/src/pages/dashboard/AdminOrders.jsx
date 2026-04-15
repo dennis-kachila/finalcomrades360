@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FaBox, FaTruck, FaCheckCircle, FaClock, FaMapMarkerAlt, FaCreditCard, FaLock, FaUserPlus, FaEye, FaTimes, FaEdit, FaSearch, FaFilter, FaDownload, FaUser, FaCalendarAlt, FaMoneyBillWave, FaComments, FaPlus, FaMinus, FaInbox, FaWarehouse, FaStore, FaRoute, FaUndo, FaUserMinus } from 'react-icons/fa';
+import { FaBox, FaTruck, FaCheckCircle, FaClock, FaMapMarkerAlt, FaCreditCard, FaLock, FaUserPlus, FaEye, FaTimes, FaEdit, FaSearch, FaFilter, FaDownload, FaUser, FaCalendarAlt, FaMoneyBillWave, FaComments, FaPlus, FaMinus, FaInbox, FaWarehouse, FaStore, FaRoute, FaUndo, FaUserMinus, FaUtensils } from 'react-icons/fa';
 import api from '../../services/api';
 import { resolveImageUrl, FALLBACK_IMAGE } from '../../utils/imageUtils';
 import { formatPrice } from '../../utils/currency';
@@ -1692,6 +1692,44 @@ export default function AdminOrders() {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Special Prep / Batch Info Blocks */}
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  {selectedOrder.deliveryInstructions && (
+                    <div className="bg-orange-50 border-2 border-orange-200 p-4 rounded-xl shadow-sm">
+                      <h4 className="font-black text-orange-900 text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <FaUtensils size={14} className="text-orange-600" />
+                        Special Prep Instructions
+                      </h4>
+                      <p className="text-sm font-bold text-orange-800 leading-relaxed bg-white/50 p-3 rounded-lg border border-orange-100 italic">
+                        "{selectedOrder.deliveryInstructions}"
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedOrder.batch && (
+                    <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl shadow-sm">
+                      <h4 className="font-black text-blue-900 text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <FaClock className="text-blue-600" />
+                        Fast Food Fulfillment Batch
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-white/50 p-2 rounded-lg border border-blue-100">
+                          <p className="text-[10px] text-blue-600 font-bold uppercase">Batch Name</p>
+                          <p className="text-sm font-black text-blue-900">{selectedOrder.batch.name}</p>
+                        </div>
+                        <div className="bg-white/50 p-2 rounded-lg border border-blue-100">
+                          <p className="text-[10px] text-blue-600 font-bold uppercase">Expected Delivery</p>
+                          <p className="text-sm font-black text-blue-900">{selectedOrder.batch.expectedDelivery}</p>
+                        </div>
+                        <div className="bg-white/50 p-2 rounded-lg border border-blue-100 col-span-2">
+                          <p className="text-[10px] text-blue-600 font-bold uppercase">Preparation Window</p>
+                          <p className="text-sm font-black text-blue-900">{selectedOrder.batch.startTime} - {selectedOrder.batch.endTime}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Admin Routing Section */}

@@ -10,7 +10,8 @@ const {
   notifyCustomerReadyForPickupStation,
   notifyCustomerSellerConfirmed,
   notifyCustomerOrderCancelled,
-  notifyCustomerOrderPlaced
+  notifyCustomerOrderPlaced,
+  logNotify
 } = require('../utils/notificationHelpers');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
@@ -1373,7 +1374,8 @@ const listAllOrders = async (req, res) => {
           { model: FastFoodPickupPoint, as: 'DestinationFastFoodPickupPoint', attributes: ['id', 'name', 'address'] },
           { model: User, as: 'user', attributes: ['id', 'name', 'email', 'phone'] },
           { model: User, as: 'seller', attributes: ['id', 'name', 'email', 'phone', 'businessAddress', 'businessName'] },
-          { model: User, as: 'deliveryAgent', attributes: ['id', 'name', 'phone'] }
+          { model: User, as: 'deliveryAgent', attributes: ['id', 'name', 'phone'] },
+          { model: Batch, as: 'batch' }
         ],
         order: [['createdAt', 'DESC'], ['id', 'DESC']]
       });
@@ -3995,7 +3997,8 @@ const getOrderDetails = async (req, res) => {
           as: 'deliveryTasks',
           required: false,
           include: [{ model: User, as: 'deliveryAgent', attributes: ['id', 'name', 'email', 'phone', 'businessPhone', 'businessName'] }]
-        }
+        },
+        { model: Batch, as: 'batch' }
     ];
 
     if (orderId && String(orderId).includes('group')) {

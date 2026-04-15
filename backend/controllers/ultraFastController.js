@@ -169,8 +169,8 @@ const getHomepageBatchData = async (req, res) => {
   const isMarketing = req.query.marketing === 'true';
 
   try {
-    // FORCE CACHE BUST FROM V4 -> V5
-    const cacheKey = `homepage:batch:v5:${isMarketing ? 'marketing' : 'standard'}`;
+    // FORCE CACHE BUST FROM V8 -> V9
+    const cacheKey = `homepage:batch:v9:${isMarketing ? 'marketing' : 'standard'}`;
     const ignoreCache = req.query.ignoreCache === 'true';
     const cachedData = ignoreCache ? null : await cacheService.get(cacheKey);
     if (cachedData) {
@@ -295,13 +295,11 @@ const getHomepageBatchData = async (req, res) => {
 
     const fetchServicesData = async () => {
       try {
-        console.log('[HomepageBatch] Fetching services...');
-        const whereClause = { status: 'approved' };
-
+        const whereClause = { status: { [Op.or]: ['approved', 'active'] } };
+        
         if (isMarketing) {
           whereClause.marketingEnabled = true;
           whereClause.marketingCommission = { [Op.gt]: 1 };
-          // For services in marketing mode, we show them regardless of isAvailable
         } else {
           whereClause.isAvailable = true;
         }
@@ -314,7 +312,7 @@ const getHomepageBatchData = async (req, res) => {
               'status', 'isAvailable', 'availabilityMode', 'availabilityDays',
               'location', 'vendorLocation', 'isFeatured', 'discountPercentage',
               'discountPrice', 'deliveryFee', 'marketingCommission', 'marketingCommissionType', 'marketingEnabled',
-              'categoryId', 'subcategoryId'
+              'categoryId', 'subcategoryId', 'coverImage', 'description'
             ],
             include: [{
               model: ServiceImage,
@@ -327,10 +325,10 @@ const getHomepageBatchData = async (req, res) => {
           }),
           Service.count({ where: whereClause })
         ]);
-        console.log(`[HomepageBatch] Found ${services.length} approved services (Total: ${totalCount})`);
+        console.log(`[HomepageBatch] Successfully found ${services.length} services (Total: ${totalCount})`);
         return { services, totalCount };
       } catch (err) {
-        console.error('[HomepageBatch] Services query failed:', err);
+        console.error('[HomepageBatch] Services query error:', err.message);
         return { services: [], totalCount: 0 };
       }
     };
@@ -566,7 +564,8 @@ const getHomepageBatchData = async (req, res) => {
           categoryId: plain.categoryId,
           subcategoryId: plain.subcategoryId,
           images: images,
-          coverImage: images.length > 0 ? images[0] : null
+          coverImage: images.length > 0 ? images[0] : (plain.coverImage || null),
+          description: plain.description
         };
       } catch (err) {
         console.error('[HomepageBatch] Process service error:', err.message);

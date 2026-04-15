@@ -48,31 +48,29 @@ backend/cache/
 .sequelizerc
 
 # Debug and check scripts (temporary)
-check_*.js
-list_*.js
-debug_*.js
-inspect_*.js
-verify_*.js
-dump_*.js
-find_*.js
-filter_*.js
-fix_*.js
-patch_*.js
-make_*.js
-backfill_*.js
-repair_*.js
-repro_*.js
-simulate_*.js
-sync_*.js
-test_*.js
-kill_port.ps1
+*.js
+!frontend/vite.config.js
+!frontend/postcss.config.js
+!frontend/tailwind.config.js
+!frontend/eslint.config.js
+!backend/server.js
+# ... and other essential configs
+
+# Prevent any random root JS files from polluting github
+/*.js
+!/*.config.js
 
 # Product dump files
 backend/product_dump.txt
 
-# WhatsApp Web.js
-backend/.wwebjs_auth/
-backend/.wwebjs_cache/
+# WhatsApp Web.js (Globally ignore local sessions)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# AI Agent Temp Output
+scratch/
+copilot-firewall-hosts.json
+files_with_user.txt
 
 # Package lock (optional - uncomment if you prefer to track it)
 # package-lock.json

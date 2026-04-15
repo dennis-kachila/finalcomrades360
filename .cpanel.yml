@@ -4,4 +4,3 @@ deployment:
     - /bin/cp -r backend/* /home/vdranjxy/comrades-backend
     - /bin/cp -r frontend/dist/* /home/vdranjxy/public_html
     - /bin/cp .htaccess /home/vdranjxy/public_html
-    - /bin/cp backend/.env.production /home/vdranjxy/comrades-backend/.env

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Loader2, Eye, Edit3, Trash2, CheckCircle2, AlertCircle, RefreshCw, Info, Layout, Wand2, FileText, ChevronRight, Zap, RotateCcw } from 'lucide-react';
 import api from '../../../services/api';
+import useRealtimeSync from '../../../hooks/useRealtimeSync';
 import { toast } from 'react-toastify';
 
 const PAGES = [
@@ -33,6 +34,12 @@ const AppContentManager = () => {
       fetchPageContent();
     }
   }, [selectedPage, initialOverview]);
+
+  // Real-time synchronization: refresh the manager when platform config is updated
+  useRealtimeSync(['platform_settings', ...PAGES.map(p => p.key)], () => {
+    fetchAllPageStatuses();
+    if (!initialOverview) fetchPageContent();
+  });
 
   const fetchAllPageStatuses = async () => {
     setLoading(true);

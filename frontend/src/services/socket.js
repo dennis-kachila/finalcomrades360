@@ -1,7 +1,15 @@
 import { io } from 'socket.io-client';
 
 // WebSocket server URL - using the same host as the API but with WebSocket protocol
-const WS_URL = 'ws://localhost:5001';
+const getWsUrl = () => {
+  if (process.env.NODE_ENV === 'development') return 'ws://localhost:5004';
+  
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}`;
+};
+
+const WS_URL = getWsUrl();
 
 let socket;
 let reconnectAttempts = 0;

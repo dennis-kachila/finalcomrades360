@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { QRCodeSVG } from 'qrcode.react';
+import useRealtimeSync from '../../hooks/useRealtimeSync';
+import { toast } from 'react-toastify';
 
 export default function SystemSettings() {
   const [settings, setSettings] = useState({
@@ -170,6 +172,9 @@ export default function SystemSettings() {
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Real-time synchronization: listen for config updates from the server
+  useRealtimeSync(['platform_settings', 'maintenance_settings', 'whatsapp_config', 'finance_settings', 'notification_settings'], loadSettings);
 
   const updateSettings = async (section, data) => {
     resetAlerts();

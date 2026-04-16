@@ -16,6 +16,7 @@ import HeroBanner from '../components/HeroBanner';
 import { resolveImageUrl, FALLBACK_IMAGE } from '../utils/imageUtils';
 import { isFastFoodOpen } from '../utils/availabilityUtils';
 import { usePersistentFetch } from '../hooks/usePersistentFetch';
+import useRealtimeSync from '../hooks/useRealtimeSync';
 import { useToast } from '../components/ui/use-toast';
 
 // Main Home component with performance optimizations
@@ -779,6 +780,9 @@ function Home({ isMarketingMode: propMarketingMode = false }) {
 
   // Keep loadData for manual retry, but mapped to refresh
   const loadData = refreshHomeData;
+
+  // Real-time synchronization: refresh the homepage content when related items are modified
+  useRealtimeSync(['products', 'services', 'fastfood', 'maintenance', 'platform_settings'], loadData);
 
   // Initial load handled by hook
   // useEffect(() => {

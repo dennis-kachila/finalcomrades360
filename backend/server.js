@@ -27,7 +27,8 @@ app.set('timeout', 60000);
 // Security Middleware
 app.use(helmet({
   contentSecurityPolicy: false, // Disabled to avoid breaking the SPA/CDN assets
-  crossOriginEmbedderPolicy: false // Allow external images/videos
+  crossOriginEmbedderPolicy: false, // Allow external images/videos
+  crossOriginOpenerPolicy: false // Allow Google Auth popups to communicate
 }));
 app.use(compression());
 

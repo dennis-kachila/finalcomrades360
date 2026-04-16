@@ -49,6 +49,11 @@ const authLimiter = rateLimit({
   message: { error: 'Too many authentication attempts, please try again in 15 minutes.' },
   validate: { trustProxy: false } // Acknowledge proxy trust to stop validation warnings
 });
+app.use('/api', (req, res, next) => {
+  console.error(`[ROUTE-DIAGNOSTIC] ${req.method} ${req.url} (Path: ${req.path}, Original: ${req.originalUrl})`);
+  next();
+});
+
 app.use('/api', globalLimiter); // Apply global rate limit to all API routes
 app.use('/api/auth/login', authLimiter); // Stricter limit on login
 app.use('/api/auth/register', authLimiter); // Stricter limit on register

@@ -17,8 +17,8 @@ let messageService;
 // Initialize Express app with timeout configuration
 const app = express();
 
-// Trust proxy for express-rate-limit (necessary for cPanel/Passenger)
-app.set('trust proxy', 1);
+// Trust all proxies for express-rate-limit (essential for cPanel)
+app.set('trust proxy', true);
 
 // Set server timeout to 60 seconds (60000ms)
 app.set('timeout', 60000);

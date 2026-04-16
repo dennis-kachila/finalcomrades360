@@ -28,7 +28,7 @@ app.set('timeout', 60000);
 app.use(helmet({
   contentSecurityPolicy: false, // Disabled to avoid breaking the SPA/CDN assets
   crossOriginEmbedderPolicy: false, // Allow external images/videos
-  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
+  crossOriginOpenerPolicy: false // Disabled to allow Google Auth popup to postMessage to the SPA
 }));
 app.use(compression());
 

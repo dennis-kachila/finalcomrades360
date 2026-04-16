@@ -2,9 +2,8 @@ import api from './api';
 import { isFastFoodOpen } from '../utils/availabilityUtils';
 
 class FastFoodService {
-  // Create new fast food item
   async createFastFood(formData) {
-    const response = await api.post('/fastfood', formData);
+    const response = await api.post('/fast-food', formData);
     return response.data;
   }
 
@@ -18,13 +17,13 @@ class FastFoodService {
       }
     });
 
-    const response = await api.get(`/fastfood?${params.toString()}`);
+    const response = await api.get(`/fast-food?${params.toString()}`);
     return response.data;
   }
 
   // Get fast food item by ID
   async getFastFoodById(id) {
-    const response = await api.get(`/fastfood/${id}`);
+    const response = await api.get(`/fast-food/${id}`);
     return response.data;
   }
 
@@ -33,57 +32,57 @@ class FastFoodService {
     // Use PATCH for simple field updates (no files), PUT for full updates with files
     const hasFiles = formData instanceof FormData;
     const method = hasFiles ? 'put' : 'patch';
-    const response = await api[method](`/fastfood/${id}`, formData);
+    const response = await api[method](`/fast-food/${id}`, formData);
     return response.data;
   }
 
   // Delete fast food item
   async deleteFastFood(id, reason = '') {
     const config = reason ? { data: { reason } } : {};
-    const response = await api.delete(`/fastfood/${id}`, config);
+    const response = await api.delete(`/fast-food/${id}`, config);
     return response.data;
   }
 
   // Get available items for a vendor
   async getAvailableItems(vendorId) {
-    const response = await api.get(`/fastfood/available/${vendorId}`);
+    const response = await api.get(`/fast-food/available/${vendorId}`);
     return response.data;
   }
 
   // Get vendor's fast food items
   async getVendorFastFoods(vendorId) {
-    const url = vendorId ? `/fastfood/vendor/${vendorId}` : '/fastfood/vendor/me';
+    const url = vendorId ? `/fast-food/vendor/${vendorId}` : '/fast-food/vendor/me';
     const response = await api.get(url);
     return response.data;
   }
 
   // Add review to fast food item
   async addReview(id, reviewData) {
-    const response = await api.post(`/fastfood/${id}/reviews`, reviewData);
+    const response = await api.post(`/fast-food/${id}/reviews`, reviewData);
     return response.data;
   }
 
   // Update order count
   async updateOrderCount(id) {
-    const response = await api.patch(`/fastfood/${id}/order-count`);
+    const response = await api.patch(`/fast-food/${id}/order-count`);
     return response.data;
   }
 
   // Upload review image
   async uploadReviewImage(formData) {
-    const response = await api.post('/fastfood/upload-review-image', formData);
+    const response = await api.post('/fast-food/upload-review-image', formData);
     return response.data;
   }
 
   // Get categories
   async getCategories() {
-    const response = await api.get('/fastfood/categories');
+    const response = await api.get('/fast-food/categories');
     return response.data;
   }
 
   // Check availability
   async checkAvailability(id) {
-    const response = await api.get(`/fastfood/${id}/availability`);
+    const response = await api.get(`/fast-food/${id}/availability`);
     return response.data;
   }
 
@@ -296,7 +295,7 @@ class FastFoodService {
 
   async getPublicBatchSystemConfig() {
     // This is the public version
-    const response = await api.get('/fastfood/config/batch_system_enabled');
+    const response = await api.get('/fast-food/config/batch_system_enabled');
     return response.data;
   }
 

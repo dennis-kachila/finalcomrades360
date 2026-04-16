@@ -111,8 +111,9 @@ const adminOnly = (req, res, next) => {
   const userRole = normalize(req.user.role);
   const userRoles = Array.isArray(req.user.roles) ? req.user.roles.map(normalize) : [userRole];
 
-  const isAdmin = userRole === 'admin' || userRole === 'superadmin' ||
-    userRoles.includes('admin') || userRoles.includes('superadmin');
+  // Inclusive check for admin and all superadmin variants
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'super_admin' ||
+    userRoles.includes('admin') || userRoles.includes('superadmin') || userRoles.includes('super_admin');
 
   console.log(`[adminOnly] User ID: ${req.user.id}, Role: ${userRole}, Roles: ${JSON.stringify(userRoles)}, isAdmin: ${isAdmin}`);
 
@@ -239,7 +240,8 @@ const superAdminOnly = (req, res, next) => {
   const userRole = normalize(req.user.role);
   const userRoles = Array.isArray(req.user.roles) ? req.user.roles.map(normalize) : [userRole];
 
-  const isSuperAdmin = userRole === 'superadmin' || userRoles.includes('superadmin');
+  const isSuperAdmin = userRole === 'superadmin' || userRole === 'super_admin' || 
+    userRoles.includes('superadmin') || userRoles.includes('super_admin');
 
   if (!isSuperAdmin) {
     return res.status(403).json({ message: 'Super admin access required' });

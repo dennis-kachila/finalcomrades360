@@ -148,9 +148,13 @@ exports.updateConfig = async (req, res) => {
         const { value } = req.body;
 
         // Strict Role Check (Double Layer Security)
-        // Strict Role Check (Double Layer Security)
         const userRoleStr = String(req.user?.role || '').toLowerCase();
-        if (!['superadmin', 'super_admin', 'super-admin', 'admin'].includes(userRoleStr)) {
+        const userRoles = Array.isArray(req.user?.roles) ? req.user.roles.map(r => String(r).toLowerCase()) : [userRoleStr];
+        
+        const isSuperAdmin = ['superadmin', 'super_admin', 'super-admin'].includes(userRoleStr) || 
+                           userRoles.some(r => ['superadmin', 'super_admin', 'super-admin'].includes(r));
+        
+        if (!isSuperAdmin && !['admin'].includes(userRoleStr)) {
             return res.status(403).json({ success: false, message: 'Access denied. Admin or Super Admin only.' });
         }
 

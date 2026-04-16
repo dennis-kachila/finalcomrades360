@@ -167,6 +167,7 @@ app.use(async (req, res, next) => {
     '/api/admin', 
     '/api/config', 
     '/api/platform',
+    '/api/users/me',
     '/api/profile/dashboard-password' // Allow admins to unlock dashboard security
   ];
   const isAllowed = allowList.some(p => req.path.startsWith(p));
@@ -259,7 +260,7 @@ app.use('/api/platform', platformRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
-app.use('/api/categories/admin/categories', adminCategoryRoutes);
+app.use('/api/categories/admin', adminCategoryRoutes);
 app.use('/api/categories', categoryRoutes);
 
 app.use('/api/admin', adminRoutes);

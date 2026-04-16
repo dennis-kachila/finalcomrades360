@@ -259,20 +259,28 @@ const AppContent = () => {
       }
     } catch (_) {}
 
-    api.get('/platform/status').then(res => {
-      if (res.data.success) {
-        localStorage.setItem('maintenance_settings', JSON.stringify({
-          dashboards: res.data.dashboards || {},
-          sections: res.data.sections || {}
-        }));
-      }
-    }).catch(err => {
-      if (err.response?.status === 503 && err.response?.data?.maintenance) {
-        const msg = err.response.data?.message;
-        if (msg) sessionStorage.setItem('maintenance_message', msg);
-        window.location.href = '/maintenance';
-      }
-    });
+    const fetchPlatformStatus = () => {
+      api.get('/platform/status').then(res => {
+        if (res.data.success) {
+          localStorage.setItem('maintenance_settings', JSON.stringify({
+            dashboards: res.data.dashboards || {},
+            sections: res.data.sections || {}
+          }));
+        }
+      }).catch(err => {
+        if (err.response?.status === 503 && err.response?.data?.maintenance) {
+          const msg = err.response.data?.message;
+          if (msg) sessionStorage.setItem('maintenance_message', msg);
+          window.location.href = '/maintenance';
+        }
+      });
+    };
+
+    fetchPlatformStatus();
+
+    // Listen for real-time maintenance updates to re-sync global state
+    window.addEventListener('maintenance-settings-updated', fetchPlatformStatus);
+    return () => window.removeEventListener('maintenance-settings-updated', fetchPlatformStatus);
   }, []);
 
   // Handle referral links and marketing mode from URL

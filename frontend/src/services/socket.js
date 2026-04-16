@@ -4,6 +4,13 @@ import { io } from 'socket.io-client';
 const getWsUrl = () => {
   if (process.env.NODE_ENV === 'development') return 'ws://localhost:5004';
   
+  // Use VITE_SOCKET_URL from environment if available (standard for production builds)
+  const envUrl = import.meta.env?.VITE_SOCKET_URL;
+  if (envUrl) {
+    // Convert https to wss or http to ws
+    return envUrl.replace(/^http/, 'ws');
+  }
+
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
   return `${protocol}//${host}`;
@@ -26,7 +33,7 @@ const connectSocket = () => {
 
   // Create new socket connection
   socket = io(WS_URL, {
-    transports: ['websocket'],
+    transports: ['websocket', 'polling'], // Allow polling fallback for aggressive proxies
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,

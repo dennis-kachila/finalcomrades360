@@ -143,9 +143,19 @@ export const usePersistentFetch = (key, urlOrFetcher, options = {}) => {
             if (loading) setLoading(false);
         }
 
+        // Listen for global real-time updates to trigger fresh fetching
+        const handleGlobalUpdate = (e) => {
+            // If the scope matches or it's a critical system update
+            if (e.detail?.scope === 'system' || e.detail?.scope === key.split('_')[0]) {
+                fetchData(false); // Force non-silent refresh
+            }
+        };
+        window.addEventListener('realtime:data-updated', handleGlobalUpdate);
+
         return () => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
+            window.removeEventListener('realtime:data-updated', handleGlobalUpdate);
         };
     }, [key, fetchData, shouldRevalidate, initialData]);
 

@@ -488,6 +488,14 @@ async function startServer() {
   global.__serverStarted = true;
 
   try {
+    // 1. Initialize Database Connection & Sync
+    const { testConnection } = require('./database/database');
+    try {
+      await testConnection();
+    } catch (dbError) {
+      console.error('⚠️ Critical Database Initialization Failure:', dbError.message);
+      // We continue to allow manual debugging via health checks if possible
+    }
     // Socket.IO connection handling
     io.on('connection', (socket) => {
       console.log('Client connected:', socket.id);

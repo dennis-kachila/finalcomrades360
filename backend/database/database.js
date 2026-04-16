@@ -118,14 +118,16 @@ const testConnection = async () => {
     await sequelize.authenticate();
     console.error(`✅ Database connected successfully (${dbConfig.dialect})`);
 
-    // Sync all models ONLY in production or if explicitly requested via env
-    // Scaling issue: Syncing 40+ models on every dev restart causes SQLite locks/hangs
-    if (env === 'production' || process.env.DB_SYNC === 'true') {
-      console.error('🔄 Synchronizing database models...');
+    // Sync all models ONLY in development OR if explicitly requested via env
+    // Scaling issue: Syncing 61+ models on every restart in production takes 20-30s and triggers cPanel hangups
+    if (env === 'production' && process.env.DB_SYNC !== 'true') {
+      console.error('ℹ️ Skipping auto-sync (Production mode). Set DB_SYNC=true to update schema.');
+    } else if (env === 'production' || process.env.DB_SYNC === 'true') {
+      console.error('🔄 Synchronizing database models (This may take a moment)...');
       await sequelize.sync({ force: false, alter: false });
       console.error('✅ Database models synchronized');
     } else {
-      console.log('ℹ️ Skipping auto-sync (Development mode). Use DB_SYNC=true if schema changed.');
+      console.error('ℹ️ Skipping auto-sync (Development mode).');
     }
 
     // Self-healing: Enforce default roles

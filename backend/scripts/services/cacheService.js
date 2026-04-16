@@ -245,7 +245,4 @@ class CacheService {
 // Create singleton instance
 const cacheService = new CacheService();
 
-// Auto-connect on module load
-cacheService.connect();
-
 module.exports = cacheService;

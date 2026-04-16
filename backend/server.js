@@ -546,14 +546,23 @@ async function startServer() {
           // DEFERRED INITIALIZATION: Start heavy services after the port is open
           setImmediate(async () => {
             try {
-              console.log('🔄 Initializing deferred services (WhatsApp, Workers, Cron)...');
-              // Initialize OTP services (including WhatsApp Free Client)
+              console.error('🔄 Initializing deferred services (WhatsApp, Redis, Workers, Cron)...');
+              
+              // 1. Initialize Cache (Redis)
+              try {
+                const cache = require('./scripts/services/cacheService');
+                await cache.connect();
+              } catch (cacheErr) {
+                console.error('⚠️ Redis initialization skipped:', cacheErr.message);
+              }
+
+              // 2. Initialize OTP services (including WhatsApp Free Client)
               require('./utils/messageService');
               
               const { initScheduledTasks } = require('./cron/scheduledTasks');
               initScheduledTasks();
               runAutoHandoverWorker();
-              console.log('✨ All background services initialized.');
+              console.error('✨ All background services initialized.');
             } catch (deferredErr) {
               console.error('⚠️ Critical Error during deferred initialization:', deferredErr.message);
             }
@@ -561,19 +570,27 @@ async function startServer() {
         });
       } catch (listenError) {
         if (listenError.message.includes('once') || listenError.code === 'EADDRINUSE') {
-          console.log('ℹ️ Server already listening or binding, skipping extra listen call.');
+          console.error('ℹ️ Server already listening or binding, skipping extra listen call.');
         } else {
           throw listenError;
         }
       }
     } else {
-      console.log('ℹ️ Server already listening (Passenger managed), skipping manual listen call.');
+      console.error('ℹ️ Server already listening (Passenger managed), skipping manual listen call.');
       // Still trigger deferred initialization for managed environments
-      setImmediate(() => {
-        require('./utils/messageService');
-        const { initScheduledTasks } = require('./cron/scheduledTasks');
-        initScheduledTasks();
-        runAutoHandoverWorker();
+      setImmediate(async () => {
+        try {
+          // 1. Initialize Cache (Redis)
+          const cache = require('./scripts/services/cacheService');
+          await cache.connect();
+          
+          require('./utils/messageService');
+          const { initScheduledTasks } = require('./cron/scheduledTasks');
+          initScheduledTasks();
+          runAutoHandoverWorker();
+        } catch (err) {
+          console.error('⚠️ Error in Passenger deferred init:', err.message);
+        }
       });
     }
 

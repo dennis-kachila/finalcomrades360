@@ -93,7 +93,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'Batches',
+        model: 'Batch',
         key: 'id'
       }
     }

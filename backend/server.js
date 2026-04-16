@@ -11,6 +11,19 @@ const fs = require('fs');
 // Load environment variables
 dotenv.config();
 
+// DETECT STATIC PATHS GLOBALLY
+const IS_PROD = process.env.NODE_ENV === 'production';
+const cpanelPath = path.resolve(__dirname, '../public_html');
+const productionPath = path.join(__dirname, 'public');
+const developmentPath = path.join(__dirname, '../frontend/dist');
+
+let GLOBAL_STATIC_PATH = developmentPath;
+if (IS_PROD) {
+  if (fs.existsSync(cpanelPath)) GLOBAL_STATIC_PATH = cpanelPath;
+  else if (fs.existsSync(productionPath)) GLOBAL_STATIC_PATH = productionPath;
+}
+console.log(`[server] Static System Initialized: ${GLOBAL_STATIC_PATH} (Mode: ${process.env.NODE_ENV || 'development'})`);
+
 // WhatsApp service will be initialized after server start
 let messageService;
 
@@ -182,12 +195,16 @@ function finalizeMiddleware(app) {
   });
 
   // SPA catch-all
-  const staticPath = path.join(__dirname, '../frontend/dist');
   app.get('*', (req, res, next) => {
     if (req.url.startsWith('/api') || req.url.startsWith('/uploads')) {
       return next();
     }
-    res.sendFile(path.join(staticPath, 'index.html'), err => err && next());
+    res.sendFile(path.join(GLOBAL_STATIC_PATH, 'index.html'), err => {
+      if (err) {
+        console.error(`[SPA-ERROR] Could not serve index.html from ${GLOBAL_STATIC_PATH}:`, err.message);
+        next();
+      }
+    });
   });
 
   // Global 404 handler
@@ -332,20 +349,7 @@ app.use('/uploads', (req, res, next) => {
   res.status(404).json({ message: 'Resource not found' });
 });
 
-// Serve Frontend Static Files
-const isProd = process.env.NODE_ENV === 'production';
-const cpanelPath = path.resolve(__dirname, '../public_html');
-const productionPath = path.join(__dirname, 'public');
-const developmentPath = path.join(__dirname, '../frontend/dist');
-
-let staticPath = developmentPath;
-if (isProd) {
-  if (fs.existsSync(cpanelPath)) staticPath = cpanelPath;
-  else if (fs.existsSync(productionPath)) staticPath = productionPath;
-}
-
-console.log(`[server] Mode: ${process.env.NODE_ENV || 'development'} | Static: ${staticPath}`);
-app.use(express.static(staticPath));
+app.use(express.static(GLOBAL_STATIC_PATH));
 
 // SPA Fallback - Always serve index.html for non-API routes.
 // Maintenance enforcement happens at two levels:

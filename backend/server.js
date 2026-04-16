@@ -37,14 +37,16 @@ const globalLimiter = rateLimit({
   max: 300, // 300 requests per 15min per IP for general routes
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' }
+  message: { error: 'Too many requests, please try again later.' },
+  validate: { trustProxy: false } // Acknowledge proxy trust to stop validation warnings
 });
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20, // 20 login/register attempts per 15min per IP
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many authentication attempts, please try again in 15 minutes.' }
+  message: { error: 'Too many authentication attempts, please try again in 15 minutes.' },
+  validate: { trustProxy: false } // Acknowledge proxy trust to stop validation warnings
 });
 app.use('/api', globalLimiter); // Apply global rate limit to all API routes
 app.use('/api/auth/login', authLimiter); // Stricter limit on login

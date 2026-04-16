@@ -2,10 +2,9 @@
   RewriteEngine On
   RewriteBase /
   
-  # 1. Route API requests to the Node.js backend
-  # We assume the Node.js app is running on port 5004 (as per our .env)
-  # or managed via cPanel Node.js App routing.
-  RewriteRule ^api/(.*)$ http://localhost:5004/api/$1 [P,L]
+  # 1. Route API requests - Commented out manual proxy to port 5004 (Port Mismatch)
+  # In cPanel/Passenger, the routing is handled automatically.
+  # RewriteRule ^api/(.*)$ http://localhost:5004/api/$1 [P,L]
 
   # 2. React Router SPA Routing
   # If the requested resource is not a file or directory, serve index.html

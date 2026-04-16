@@ -22,13 +22,22 @@ let isWhatsAppReady = false;
 let latestQr = null;
 let whatsappStatus = 'initializing'; // initializing, qr_ready, authenticated, ready, disconnected, error
 
-// Prepare session directory
-const sessionDir = path.join(process.cwd(), '.wwebjs_auth/baileys_session');
+// Prepare session directory (using absolute path for cPanel/Passenger stability)
+const sessionDir = path.join(__dirname, '../.wwebjs_auth/baileys_session');
 if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
 }
 
+// Helper to log errors to a file on the server
+const logWhatsApp = (msg) => {
+    const logPath = path.join(__dirname, '../whatsapp_engine.log');
+    const line = `[${new Date().toISOString()}] ${msg}\n`;
+    try { fs.appendFileSync(logPath, line); } catch (e) {}
+    console.log(`[WhatsApp JS] ${msg}`);
+};
+
 const initWhatsApp = async () => {
+    logWhatsApp('STARTING: initWhatsApp triggered');
     // 1. Fetch config from DB
     let method = 'local';
     try {
@@ -39,23 +48,26 @@ const initWhatsApp = async () => {
             method = dbConfig.method || 'local';
         }
     } catch (err) {
-        console.warn('⚠️ [WhatsApp] Could not load config, defaulting to local:', err.message);
+        logWhatsApp(`CONFIG ERROR: ${err.message}`);
     }
 
     // 2. Guard: skip if explicitly disabled or set to cloud
     if (process.env.WHATSAPP_ENABLED !== 'true' || method === 'cloud') {
         whatsappStatus = method === 'cloud' ? 'cloud_active' : 'disabled';
-        console.log(`ℹ️ [WhatsApp] Local Engine ${method === 'cloud' ? 'using Cloud API' : 'disabled'}. Skipping.`);
+        logWhatsApp(`SKIPPING: method=${method}, enabled=${process.env.WHATSAPP_ENABLED}`);
         return;
     }
 
-    console.log('🔄 [WhatsApp] Initializing Baileys (No-Browser Engine)...');
+    logWhatsApp('INIT: Starting Baileys Socket...');
     whatsappStatus = 'initializing';
     latestQr = null;
 
     try {
+        logWhatsApp(`SESSION: Using ${sessionDir}`);
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+        logWhatsApp('VERSION: Fetching latest...');
         const { version } = await fetchLatestBaileysVersion();
+        logWhatsApp(`SOCKET: Initializing (Version ${version.join('.')})...`);
 
         sock = makeWASocket({
             version,
@@ -73,17 +85,18 @@ const initWhatsApp = async () => {
             const { connection, lastDisconnect, qr } = update;
             
             if (qr) {
-                console.log('📱 [WhatsApp] New QR Code generated. Please scan in Admin Dashboard.');
+                logWhatsApp('EVENT: QR Code Generated!');
                 latestQr = qr;
                 whatsappStatus = 'qr_ready';
             }
 
             if (connection === 'connecting') {
+                logWhatsApp('EVENT: Connecting...');
                 whatsappStatus = 'initializing';
             }
 
             if (connection === 'open') {
-                console.log('✅ [WhatsApp] Baileys Connected & Ready!');
+                logWhatsApp('EVENT: Ready & Connected!');
                 isWhatsAppReady = true;
                 whatsappStatus = 'ready';
                 latestQr = null;
@@ -91,7 +104,7 @@ const initWhatsApp = async () => {
 
             if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log('❌ [WhatsApp] Connection closed. Should reconnect:', shouldReconnect);
+                logWhatsApp(`EVENT: Closed (shouldReconnect=${shouldReconnect})`);
                 isWhatsAppReady = false;
                 whatsappStatus = 'disconnected';
                 
@@ -102,10 +115,13 @@ const initWhatsApp = async () => {
         });
 
         // Event: Save Credentials
-        sock.ev.on('creds.update', saveCreds);
+        sock.ev.on('creds.update', () => {
+            logWhatsApp('EVENT: Credentials Updated/Saved');
+            saveCreds();
+        });
 
     } catch (err) {
-        console.error('❌ [WhatsApp] Baileys Initialization Failed:', err.message);
+        logWhatsApp(`FATAL ERROR: ${err.message}`);
         whatsappStatus = 'error';
         isWhatsAppReady = false;
         sock = null;

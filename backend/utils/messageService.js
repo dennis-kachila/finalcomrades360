@@ -33,7 +33,8 @@ const logWhatsApp = (msg) => {
     const logPath = path.join(__dirname, '../whatsapp_engine.log');
     const line = `[${new Date().toISOString()}] ${msg}\n`;
     try { fs.appendFileSync(logPath, line); } catch (e) {}
-    console.log(`[WhatsApp JS] ${msg}`);
+    // Mirror to console.error for immediate visibility in cPanel stderr.log
+    console.error(`[WhatsApp JS] ${msg}`);
 };
 
 const initWhatsApp = async () => {

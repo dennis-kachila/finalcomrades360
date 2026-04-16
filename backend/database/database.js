@@ -59,7 +59,7 @@ const config = {
     dialect: 'mysql', // Explicitly force mysql for production config
     logging: process.env.SEQUELIZE_LOGGING === 'true' ? console.log : false,
     pool: {
-      max: 10,
+      max: 3,
       min: 0,
       acquire: 60000,
       idle: 20000,
@@ -116,14 +116,14 @@ sequelize.afterConnect(async (connection) => {
 const testConnection = async () => {
   try {
     await sequelize.authenticate();
-    console.log(`✅ Database connected successfully (${dbConfig.dialect})`);
+    console.error(`✅ Database connected successfully (${dbConfig.dialect})`);
 
     // Sync all models ONLY in production or if explicitly requested via env
     // Scaling issue: Syncing 40+ models on every dev restart causes SQLite locks/hangs
     if (env === 'production' || process.env.DB_SYNC === 'true') {
-      console.log('🔄 Synchronizing database models...');
+      console.error('🔄 Synchronizing database models...');
       await sequelize.sync({ force: false, alter: false });
-      console.log('✅ Database models synchronized');
+      console.error('✅ Database models synchronized');
     } else {
       console.log('ℹ️ Skipping auto-sync (Development mode). Use DB_SYNC=true if schema changed.');
     }
@@ -157,7 +157,7 @@ const testConnection = async () => {
          .replace('OR IGNORE', '') // Cleanup any legacy attempts
         );
       }
-      console.log('✅ Default roles verified/seeded.');
+      console.error('✅ Default roles verified/seeded.');
     } catch (roleErr) {
       console.warn('⚠️ Warning: Could not seed roles:', roleErr.message);
     }

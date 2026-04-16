@@ -52,9 +52,10 @@ const initWhatsApp = async () => {
     }
 
     // 2. Guard: skip if explicitly disabled or set to cloud
-    if (process.env.WHATSAPP_ENABLED !== 'true' || method === 'cloud') {
+    const isEnabled = process.env.WHATSAPP_ENABLED !== 'false'; // Default to true if missing
+    if (!isEnabled || method === 'cloud') {
         whatsappStatus = method === 'cloud' ? 'cloud_active' : 'disabled';
-        logWhatsApp(`SKIPPING: method=${method}, enabled=${process.env.WHATSAPP_ENABLED}`);
+        logWhatsApp(`SKIPPING: method=${method}, enabled=${isEnabled}`);
         return;
     }
 
@@ -129,7 +130,7 @@ const initWhatsApp = async () => {
 };
 
 // Auto-start
-if (process.env.WHATSAPP_ENABLED === 'true') {
+if (process.env.WHATSAPP_ENABLED !== 'false') {
     initWhatsApp();
 } else {
     whatsappStatus = 'disabled';

@@ -339,11 +339,18 @@ app.use('/uploads', (req, res, next) => {
 });
 
 // Serve Frontend Static Files
-// Priority 1: Local 'public' folder (Production/Deployment)
-// Priority 2: '../frontend/dist' (Development)
+// Priority 1: cPanel public_html
+// Priority 2: Local 'public' folder (Production/Deployment)
+// Priority 3: '../frontend/dist' (Development)
+const cpanelPath = path.resolve(__dirname, '../public_html');
 const productionPath = path.join(__dirname, 'public');
 const developmentPath = path.join(__dirname, '../frontend/dist');
-const staticPath = fs.existsSync(productionPath) ? productionPath : developmentPath;
+let staticPath = developmentPath;
+if (fs.existsSync(cpanelPath) && fs.existsSync(path.join(cpanelPath, 'index.html'))) {
+  staticPath = cpanelPath;
+} else if (fs.existsSync(productionPath)) {
+  staticPath = productionPath;
+}
 
 console.log(`[server] Serving static files from: ${staticPath}`);
 app.use(express.static(staticPath));

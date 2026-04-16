@@ -112,52 +112,60 @@ const { realtimeSyncMiddleware } = require('./middleware/realtimeSync');
 app.use(realtimeSyncMiddleware);
 
 // Import routes
-const platformRoutes = require('./routes/platformRoutes');
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
-const productRoutes = require('./routes/productRoutes');
-const categoryRoutes = require('./routes/categoryRoutes');
-const roleManagementRoutes = require('./routes/roleManagementRoutes');
-const heroPromotionRoutes = require('./routes/heroPromotionRoutes');
-const cartRoutes = require('./routes/cartRoutes');
-const adminCategoryRoutes = require('./routes/adminCategoryRoutes');
-const orderRoutes = require('./routes/orderRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
-const uploadRoutes = require('./routes/uploadRoutes');
-const userManagementRoutes = require('./routes/userManagementRoutes');
-const roleApplicationRoutes = require('./routes/roleApplicationRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const serviceRoutes = require('./routes/serviceRoutes');
-const wishlistRoutes = require('./routes/wishlistRoutes');
-const profileRoutes = require('./routes/profileRoutes');
-const socialMediaAccountRoutes = require('./routes/socialMediaAccountRoutes');
-const contactRoutes = require('./routes/contactRoutes');
-const productInquiryRoutes = require('./routes/productInquiryRoutes');
-const fastFoodRoutes = require('./routes/fastFoodRoutes');
-const marketingRoutes = require('./routes/marketingRoutes');
-const imageRoutes = require('./routes/imageRoutes');
-const jobOpeningRoutes = require('./routes/jobOpeningRoutes');
-const sellerRoutes = require('./routes/sellerRoutes');
-const ultraFastRoutes = require('./routes/ultraFastRoutes');
-const cacheRoutes = require('./routes/cacheRoutes');
-const searchRoutes = require('./routes/searchRoutes');
-const verificationRoutes = require('./routes/verificationRoutes');
-const walletRoutes = require('./routes/walletRoutes');
-const deliveryRoutes = require('./routes/deliveryRoutes');
-const warehouseRoutes = require('./routes/warehouseRoutes');
-const pickupStationRoutes = require('./routes/pickupStationRoutes');
-const stationManagerRoutes = require('./routes/stationManagerRoutes');
-console.log('[server] Warehouse routes loaded:', typeof warehouseRoutes);
-console.log('[server] Pickup Station routes loaded:', typeof pickupStationRoutes);
-const financeRoutes = require('./routes/financeRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
-const analyticsRoutes = require('./routes/analyticsRoutes');
-const inventoryRoutes = require('./routes/inventoryRoutes');
-const paymentEnhancementsRoutes = require('./routes/paymentEnhancementsRoutes');
-const batchRoutes = require('./routes/batchRoutes');
-const returnRoutes = require('./routes/returnRoutes');
-const { startBatchAutomation } = require('./services/batchAutomation');
-const { runAutoHandoverWorker } = require('./services/autoHandoverService');
+// Route Initialization Function (Lazy Loaded)
+function initializeRoutes(app) {
+  console.error('ℹ️ Starting deferred route initialization...');
+  
+  // Import and mount routes within the function to split the load
+  app.use('/api/platform', require('./routes/platformRoutes'));
+  app.use('/api/auth', require('./routes/authRoutes'));
+  app.use('/api/users', require('./routes/userRoutes'));
+  app.use('/api/products', require('./routes/productRoutes'));
+  app.use('/api/categories', require('./routes/categoryRoutes'));
+  app.use('/api/role-management', require('./routes/roleManagementRoutes'));
+  app.use('/api/hero-promotions', require('./routes/heroPromotionRoutes'));
+  app.use('/api/cart', require('./routes/cartRoutes'));
+  app.use('/api/admin/categories', require('./routes/adminCategoryRoutes'));
+  app.use('/api/orders', require('./routes/orderRoutes'));
+  app.use('/api/notifications', require('./routes/notificationRoutes'));
+  app.use('/api/upload', require('./routes/uploadRoutes'));
+  app.use('/api/admin/users', require('./routes/userManagementRoutes'));
+  app.use('/api/role-applications', require('./routes/roleApplicationRoutes'));
+  app.use('/api/admin', require('./routes/adminRoutes'));
+  app.use('/api/services', require('./routes/serviceRoutes'));
+  app.use('/api/wishlist', require('./routes/wishlistRoutes'));
+  app.use('/api/profile', require('./routes/profileRoutes'));
+  app.use('/api/social-media', require('./routes/socialMediaAccountRoutes'));
+  app.use('/api/contact', require('./routes/contactRoutes'));
+  app.use('/api/product-inquiries', require('./routes/productInquiryRoutes'));
+  app.use('/api/fast-food', require('./routes/fastFoodRoutes'));
+  app.use('/api/marketing', require('./routes/marketingRoutes'));
+  app.use('/api/image', require('./routes/imageRoutes'));
+  app.use('/api/job-openings', require('./routes/jobOpeningRoutes'));
+  app.use('/api/seller', require('./routes/sellerRoutes'));
+  app.use('/api/ultra-fast', require('./routes/ultraFastRoutes'));
+  app.use('/api/cache', require('./routes/cacheRoutes'));
+  app.use('/api/search', require('./routes/searchRoutes'));
+  app.use('/api/verification', require('./routes/verificationRoutes'));
+  app.use('/api/wallet', require('./routes/walletRoutes'));
+  app.use('/api/delivery', require('./routes/deliveryRoutes'));
+  app.use('/api/warehouse', require('./routes/warehouseRoutes'));
+  app.use('/api/pickup-station', require('./routes/pickupStationRoutes'));
+  app.use('/api/station-manager', require('./routes/stationManagerRoutes'));
+  
+  // Final heavy route modules
+  app.use('/api/finance', require('./routes/financeRoutes'));
+  app.use('/api/payments', require('./routes/paymentRoutes'));
+  app.use('/api/analytics', require('./routes/analyticsRoutes'));
+  app.use('/api/inventory', require('./routes/inventoryRoutes'));
+  app.use('/api/payment-enhancements', require('./routes/paymentEnhancementsRoutes'));
+  app.use('/api/batches', require('./routes/batchRoutes'));
+  app.use('/api/returns', require('./routes/returnRoutes'));
+
+  console.error('✅ 32+ Route modules successfully lazy-loaded.');
+}
+// Initialize database connection
+const { testConnection } = require('./database/database');
 // Initialize database connection
 const { testConnection } = require('./database/database');
 
@@ -495,8 +503,10 @@ async function startServer() {
       console.error('✅ Database connected and verified successfully');
     } catch (dbError) {
       console.error('⚠️ Critical Database Initialization Failure:', dbError.message);
-      // We continue to allow manual debugging via health checks if possible
     }
+
+    // 2. Initialize Routes (Lazy Loaded to prevent cPanel timeouts)
+    initializeRoutes(app);
     // Socket.IO connection handling
     io.on('connection', (socket) => {
       console.log('Client connected:', socket.id);
@@ -561,7 +571,13 @@ async function startServer() {
               
               const { initScheduledTasks } = require('./cron/scheduledTasks');
               initScheduledTasks();
+              
+              // 3. Start Heavy Workers
+              const { startBatchAutomation } = require('./services/batchAutomation');
+              const { runAutoHandoverWorker } = require('./services/autoHandoverService');
+              startBatchAutomation();
               runAutoHandoverWorker();
+              
               console.error('✨ All background services initialized.');
             } catch (deferredErr) {
               console.error('⚠️ Critical Error during deferred initialization:', deferredErr.message);
@@ -587,6 +603,11 @@ async function startServer() {
           require('./utils/messageService');
           const { initScheduledTasks } = require('./cron/scheduledTasks');
           initScheduledTasks();
+
+          // 3. Start Heavy Workers
+          const { startBatchAutomation } = require('./services/batchAutomation');
+          const { runAutoHandoverWorker } = require('./services/autoHandoverService');
+          startBatchAutomation();
           runAutoHandoverWorker();
         } catch (err) {
           console.error('⚠️ Error in Passenger deferred init:', err.message);

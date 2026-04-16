@@ -1,6 +1,7 @@
 const africastalking = require('africastalking');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const { sendWhatsAppCloud } = require('./metaWhatsAppService');
 
 // Initialize WhatsApp Client with LocalAuth for session persistence
 let whatsappClient = null;
@@ -9,10 +10,24 @@ let latestQr = null;
 let whatsappStatus = 'initializing'; // initializing, qr_ready, authenticated, ready, disconnected, error
 
 const initWhatsApp = async () => {
-  // Guard: skip if WhatsApp is explicitly disabled or Puppeteer can't run
-  if (process.env.WHATSAPP_ENABLED !== 'true') {
-    console.log('ℹ️ [WhatsApp] Disabled via WHATSAPP_ENABLED env var. Skipping initialization.');
-    whatsappStatus = 'disabled';
+  // Fetch config from DB to check method
+  let method = 'local';
+  try {
+    const { PlatformConfig } = require('../models');
+    const configRecord = await PlatformConfig.findOne({ where: { key: 'whatsapp_config' } });
+    if (configRecord) {
+      const dbConfig = typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value;
+      method = dbConfig.method || 'local';
+    }
+  } catch (err) {
+    console.warn('⚠️ [WhatsApp] Could not load config from DB for init, defaulting to local:', err.message);
+  }
+
+  // Guard: skip if WhatsApp is explicitly disabled, set to cloud, or Puppeteer can't run
+  if (process.env.WHATSAPP_ENABLED !== 'true' || method === 'cloud') {
+    const reason = method === 'cloud' ? 'using Official Meta Cloud API' : 'disabled via WHATSAPP_ENABLED';
+    console.log(`ℹ️ [WhatsApp] Local Engine ${reason}. Skipping initialization.`);
+    whatsappStatus = method === 'cloud' ? 'cloud_active' : 'disabled';
     return;
   }
 
@@ -128,6 +143,22 @@ const sendMessage = async (to, message, method = 'whatsapp') => {
     return sendEmail(to, message.subject, message.body);
   }
   if (method === 'whatsapp') {
+    // 1. Fetch current config to decide between Local and Cloud
+    try {
+      const { PlatformConfig } = require('../models');
+      const configRecord = await PlatformConfig.findOne({ where: { key: 'whatsapp_config' } });
+      if (configRecord) {
+        const dbConfig = typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value;
+        
+        if (dbConfig.method === 'cloud') {
+          return sendWhatsAppCloud(to, message, dbConfig);
+        }
+      }
+    } catch (err) {
+      console.warn('⚠️ [WhatsApp] Config lookup failed, falling back to local engine:', err.message);
+    }
+
+    // Default to Local Engine
     return sendWhatsAppLocal(to, message);
   } else {
     return sendSms(to, message);

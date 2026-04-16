@@ -210,7 +210,9 @@ const testConnection = async () => {
         {
           key: 'whatsapp_config',
           value: JSON.stringify({ 
-            method: 'local',
+            method: 'cloud', // Default to stable Cloud method
+            metaAccessToken: '',
+            metaPhoneNumberId: '',
             templates: {
               orderPlaced: 'Hi {name}, your order #{orderNumber} has been received! Total: KES {total}.',
               orderInTransit: 'Good news! Your order #{orderNumber} has been collected by {agentName} and is in transit. 🚚',

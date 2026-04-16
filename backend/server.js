@@ -166,8 +166,6 @@ function initializeRoutes(app) {
 }
 // Initialize database connection
 const { testConnection } = require('./database/database');
-// Initialize database connection
-const { testConnection } = require('./database/database');
 
 // Global Maintenance Mode Middleware
 app.use(async (req, res, next) => {

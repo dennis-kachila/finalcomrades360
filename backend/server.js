@@ -578,12 +578,12 @@ async function startServer() {
   }
 }
 
-// Always start the server (Passenger handles the binding)
-startServer();
+// Always start the server ONLY if run directly (node server.js)
+if (require.main === module) {
+  startServer();
+}
 
-module.exports = {
-  app,
-  startServer,
-};
+// Export for cPanel/Passenger or tests
+module.exports = app;
 
 // Restart 1772711452057// Restart 1774100536.86857

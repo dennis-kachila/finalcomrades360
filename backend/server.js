@@ -444,6 +444,7 @@ const { Server } = require('socket.io');
 const { setIO } = require('./realtime/socket');
 
 // Start server after database connection
+const DEFAULT_PORT = process.env.PORT || 5004;
 let isStarting = false;
 
 async function startServer() {

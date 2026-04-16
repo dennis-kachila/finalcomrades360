@@ -1,5 +1,7 @@
 deployment:
   tasks:
     - /bin/mkdir -p /home/vdranjxy/comrades-backend
-    - /bin/cp -r backend/* /home/vdranjxy/comrades-backend
-    - /bin/cp -r frontend/dist/* /home/vdranjxy/public_html
+    - /usr/bin/rsync -au --exclude='node_modules' backend/ /home/vdranjxy/comrades-backend/
+    - /usr/bin/rsync -au frontend/dist/ /home/vdranjxy/public_html/
+    - /bin/mkdir -p /home/vdranjxy/comrades-backend/tmp
+    - /bin/touch /home/vdranjxy/comrades-backend/tmp/restart.txt

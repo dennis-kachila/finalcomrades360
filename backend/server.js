@@ -204,13 +204,16 @@ function finalizeMiddleware(app) {
 // Initialize database connection
 const { testConnection } = require('./database/database');
 
-// Global Maintenance Mode Middleware
+// Global Maintenance Mode Middleware with in-memory caching
+let cachedMaintenanceSettings = null;
+let lastMaintenanceCheck = 0;
+
 app.use(async (req, res, next) => {
-  // Only enforce maintenance for API calls — let the SPA index.html load normally
-  // The frontend handles redirects to /maintenance based on API errors.
+  // Only enforce maintenance for API calls
   if (!req.path.startsWith('/api')) return next();
 
-  // Always allow critical/admin/auth paths
+  // Always allow critical/admin/auth paths (INSTANT BYPASS)
+  const path = req.path.toLowerCase();
   const allowList = [
     '/api/auth/login', 
     '/api/auth/me', 
@@ -218,37 +221,30 @@ app.use(async (req, res, next) => {
     '/api/config', 
     '/api/platform',
     '/api/users/me',
-    '/api/profile/dashboard-password' // Allow admins to unlock dashboard security
+    '/api/profile/dashboard-password'
   ];
-  const isAllowed = allowList.some(p => req.path.startsWith(p));
-  if (isAllowed) return next();
+  
+  if (allowList.some(p => path.startsWith(p.toLowerCase()))) return next();
 
   try {
-    // Admin / Super-Admin JWT bypass — they can use the system even during maintenance
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const jwt = require('jsonwebtoken');
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-        const adminRoles = ['admin', 'super_admin', 'superadmin'];
-        const userRole = decoded.role || '';
-        const userRoles = Array.isArray(decoded.roles) ? decoded.roles : [];
-        if (adminRoles.includes(userRole) || userRoles.some(r => adminRoles.includes(r))) {
-          return next(); // Admin passes through
-        }
-      } catch (_) {
-        // invalid/expired token — fall through to maintenance check
+    // Refresh cache every 60 seconds
+    const now = Date.now();
+    if (!cachedMaintenanceSettings || (now - lastMaintenanceCheck > 60000)) {
+      const { PlatformConfig } = require('./models');
+      const config = await PlatformConfig.findOne({ where: { key: 'maintenance_settings' } });
+      if (config) {
+        cachedMaintenanceSettings = typeof config.value === 'string' ? JSON.parse(config.value) : config.value;
+      } else {
+        cachedMaintenanceSettings = { enabled: false };
       }
+      lastMaintenanceCheck = now;
     }
 
-    const { PlatformConfig } = require('./models');
-    const config = await PlatformConfig.findOne({ where: { key: 'maintenance_settings' } });
-    if (config) {
-      const settings = typeof config.value === 'string' ? JSON.parse(config.value) : config.value;
+    const settings = cachedMaintenanceSettings;
+    if (!settings) return next();
       
-      // 1. GLOBAL Check
       if (settings.enabled) {
+        console.error(`[MAINTENANCE] Blocking request to: ${req.path}`);
         return res.status(503).json({ 
           success: false, 
           maintenance: true,

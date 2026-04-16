@@ -114,17 +114,19 @@ app.use(realtimeSyncMiddleware);
 // Import routes
 // Route Initialization Function (Lazy Loaded)
 function initializeRoutes(app) {
-  console.error('ℹ️ Starting deferred route initialization...');
-  
-  // Import and mount routes within the function to split the load
-  app.use('/api/platform', require('./routes/platformRoutes'));
+  console.error('ℹ️ Registering core API routes...');
   app.use('/api/auth', require('./routes/authRoutes'));
   app.use('/api/users', require('./routes/userRoutes'));
-  app.use('/api/products', require('./routes/productRoutes'));
   app.use('/api/categories', require('./routes/categoryRoutes'));
+  app.use('/api/cart', require('./routes/cartRoutes'));
+  app.use('/api/wishlist', require('./routes/wishlistRoutes'));
+  app.use('/api/ultra-fast', require('./routes/ultraFastRoutes'));
+  
+  console.error('ℹ️ Registering extended API modules...');
+  app.use('/api/platform', require('./routes/platformRoutes'));
+  app.use('/api/products', require('./routes/productRoutes'));
   app.use('/api/role-management', require('./routes/roleManagementRoutes'));
   app.use('/api/hero-promotions', require('./routes/heroPromotionRoutes'));
-  app.use('/api/cart', require('./routes/cartRoutes'));
   app.use('/api/admin/categories', require('./routes/adminCategoryRoutes'));
   app.use('/api/orders', require('./routes/orderRoutes'));
   app.use('/api/notifications', require('./routes/notificationRoutes'));
@@ -133,17 +135,20 @@ function initializeRoutes(app) {
   app.use('/api/role-applications', require('./routes/roleApplicationRoutes'));
   app.use('/api/admin', require('./routes/adminRoutes'));
   app.use('/api/services', require('./routes/serviceRoutes'));
-  app.use('/api/wishlist', require('./routes/wishlistRoutes'));
   app.use('/api/profile', require('./routes/profileRoutes'));
   app.use('/api/social-media', require('./routes/socialMediaAccountRoutes'));
   app.use('/api/contact', require('./routes/contactRoutes'));
   app.use('/api/product-inquiries', require('./routes/productInquiryRoutes'));
-  app.use('/api/fast-food', require('./routes/fastFoodRoutes'));
+  
+  // SUPPORT BOTH HYPHENATED AND NON-HYPHENATED FASTFOOD PATHS
+  const fastFoodRoutes = require('./routes/fastFoodRoutes');
+  app.use('/api/fast-food', fastFoodRoutes);
+  app.use('/api/fastfood', fastFoodRoutes);
+
   app.use('/api/marketing', require('./routes/marketingRoutes'));
   app.use('/api/image', require('./routes/imageRoutes'));
   app.use('/api/job-openings', require('./routes/jobOpeningRoutes'));
   app.use('/api/seller', require('./routes/sellerRoutes'));
-  app.use('/api/ultra-fast', require('./routes/ultraFastRoutes'));
   app.use('/api/cache', require('./routes/cacheRoutes'));
   app.use('/api/search', require('./routes/searchRoutes'));
   app.use('/api/verification', require('./routes/verificationRoutes'));
@@ -271,14 +276,14 @@ app.use(async (req, res, next) => {
         else if (path.startsWith('/api/finance')) block = settings.dashboards?.finance;
         else if (path.startsWith('/api/service-provider')) block = settings.dashboards?.provider;
         
-        // Public Section Mapping
+        // Public Section Mapping — handle both hyphenated and non-hyphenated formats
         else if (path.startsWith('/api/products')) block = settings.sections?.products;
         else if (path.startsWith('/api/services')) block = settings.sections?.services;
-        else if (path.startsWith('/api/fastfood')) block = settings.sections?.fastfood;
+        else if (path.startsWith('/api/fast-food') || path.startsWith('/api/fastfood')) block = settings.sections?.fastfood;
 
         if (block?.enabled) {
           // If it's a public section, return 404 to hide it "silently"
-          const isSection = path.startsWith('/api/products') || path.startsWith('/api/services') || path.startsWith('/api/fastfood');
+          const isSection = path.startsWith('/api/products') || path.startsWith('/api/services') || path.startsWith('/api/fast-food') || path.startsWith('/api/fastfood');
           
           if (isSection) {
             return res.status(404).json({

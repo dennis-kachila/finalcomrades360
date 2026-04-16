@@ -481,7 +481,10 @@ async function startServer() {
         },
         methods: ['GET', 'POST'],
         credentials: true
-      }
+      },
+      transports: ['polling', 'websocket'], // Allow polling fallback for cPanel proxies
+      pingTimeout: 60000,
+      pingInterval: 25000
     });
 
     // Set up socket.io instance

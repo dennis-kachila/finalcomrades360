@@ -33,7 +33,7 @@ const connectSocket = () => {
 
   // Create new socket connection
   socket = io(WS_URL, {
-    transports: ['websocket', 'polling'], // Allow polling fallback for aggressive proxies
+    transports: ['polling', 'websocket'], // Polling first is more reliable through proxies
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,

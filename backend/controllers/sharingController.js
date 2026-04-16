@@ -3,7 +3,7 @@ const ReferralTracking = require('../models/ReferralTracking');
 const User = require('../models/User');
 const ProductView = require('../models/ProductView');
 const MarketingAnalytics = require('../models/MarketingAnalytics');
-const { v4 as uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require('uuid');
 
 // Generate shareable product link
 const generateProductLink = async (productId, marketerId) => {

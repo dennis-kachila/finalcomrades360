@@ -349,6 +349,8 @@ async function notifyCustomerMarketerCreated(userId, tempPassword, loginIdentifi
         type: 'success',
         defaultTemplate
     }, { id: userId });
+}
+
 /**
  * Notify customer that their account was created via Google and provide temp password
  */

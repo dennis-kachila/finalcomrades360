@@ -3,4 +3,3 @@ deployment:
     - /bin/mkdir -p /home/vdranjxy/comrades-backend
     - /bin/cp -r backend/* /home/vdranjxy/comrades-backend
     - /bin/cp -r frontend/dist/* /home/vdranjxy/public_html
-    - /bin/cp .htaccess /home/vdranjxy/public_html

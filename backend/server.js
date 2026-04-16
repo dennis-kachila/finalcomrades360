@@ -243,6 +243,7 @@ app.use(async (req, res, next) => {
     const settings = cachedMaintenanceSettings;
     if (!settings) return next();
       
+      /* TEMPORARY EMERGENGY BYPASS: Maintenance Mode is forced to OFF
       if (settings.enabled) {
         console.error(`[MAINTENANCE] Blocking request to: ${req.path}`);
         return res.status(503).json({ 
@@ -251,6 +252,7 @@ app.use(async (req, res, next) => {
           message: settings.message || 'System is currently under maintenance. Please try again later.' 
         });
       }
+      */
 
       // 2. GRANULAR Check (for non-admins)
       if (settings.dashboards || settings.sections) {

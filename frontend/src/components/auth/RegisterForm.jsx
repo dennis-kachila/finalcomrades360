@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import api from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { validateKenyanPhone, PHONE_VALIDATION_ERROR, formatKenyanPhoneInput } from '../../utils/validation'
@@ -8,6 +8,7 @@ import { GoogleLogin } from '@react-oauth/google'
 
 export default function RegisterForm({ onSuccess, initialReferralCode, isModal = false }) {
     const location = useLocation()
+    const navigate = useNavigate()
     const { setSession, googleLogin } = useAuth()
 
     // ── Form state ───────────────────────────────────────────────────────────────
@@ -148,11 +149,11 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
         try {
             setLoading(true);
             await googleLogin(credentialResponse.credential);
-            onSuccess?.();
-            if (!isModal) {
-                const from = location.state?.from?.pathname || '/'
-                window.location.href = from
-            }
+            // Navigate to the destination using client-side routing so that
+            // CartContext stays mounted and can detect the user change, pick up
+            // the guest cart from localStorage, and merge it with the server.
+            const from = location.state?.from?.pathname || '/';
+            navigate(from);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to authenticate with Google. Please try again.');
         } finally {

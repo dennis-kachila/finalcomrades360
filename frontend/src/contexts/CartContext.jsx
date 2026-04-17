@@ -51,6 +51,7 @@ export function CartProvider({ children }) {
   });
   const mergingRef = useRef(false); // Ref to safely prevent double-merges
   const refreshingRef = useRef(false); // Ref to prevent duplicate simultaneous refresh calls
+  const pendingAuthRefreshRef = useRef(false); // Ref to track that a merge-refresh is waiting for an in-progress refresh to finish
   const variantConflictResolverRef = useRef(null);
   const fastFoodConflictResolverRef = useRef(null);
 
@@ -170,9 +171,11 @@ export function CartProvider({ children }) {
   }, [toast]);
 
   const refresh = useCallback(async (silent = false) => {
-    // Prevent duplicate simultaneous refresh calls
+    // Prevent duplicate simultaneous refresh calls.
     if (refreshingRef.current) return;
     refreshingRef.current = true;
+    // Clear pending flag now that this refresh is actually running.
+    pendingAuthRefreshRef.current = false;
 
     const cartType = getActiveCartType();
     const storageKey = `cartState_${cartType}`;
@@ -217,11 +220,13 @@ export function CartProvider({ children }) {
           } finally {
             mergingRef.current = false;
           }
-        } else {
-          // If no guest cart to merge, or merge already in progress, ensure all guest carts are cleared
+        } else if (!guestCartToMerge) {
+          // No guest cart was found — safe to clear any stale keys
           localStorage.removeItem('cartState_personal');
           localStorage.removeItem('cartState_marketing');
         }
+        // If mergingRef.current is true (another merge is already in progress),
+        // do NOT clear localStorage — the in-progress merge still needs that data.
 
         if (!silent && (!cart.items || cart.items.length === 0)) setLoading(true);
 
@@ -778,8 +783,28 @@ export function CartProvider({ children }) {
     }
   }, [refresh, calculateSummary, getActiveCartType, user]);
 
-  // Load cart on mount and when user changes
+  // How long (ms) to wait before retrying refresh() when a previous run was
+  // already in flight at the time the user authenticated.  300 ms is enough for
+  // the typical guest-rehydration API round-trip to complete while still being
+  // imperceptible to the user.
+  const REFRESH_RETRY_DELAY_MS = 300;
+
+  // Load cart on mount and when user changes.
+  // When the user authenticates while a previous guest-refresh is still running,
+  // the refreshingRef guard would silently drop the merge call.  We work around
+  // this by scheduling a single retry so the guest cart is merged correctly.
   useEffect(() => {
+    if (refreshingRef.current) {
+      // A refresh is already running (e.g. guest rehydration on mount).
+      // Only queue one retry — if pendingAuthRefreshRef is already set, a retry
+      // is already scheduled and we should not create a second one.
+      if (pendingAuthRefreshRef.current) return;
+      pendingAuthRefreshRef.current = true;
+      const retryTimer = setTimeout(() => {
+        refresh();
+      }, REFRESH_RETRY_DELAY_MS);
+      return () => clearTimeout(retryTimer);
+    }
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]); // Only reload when user ID changes, not when refresh changes

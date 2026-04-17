@@ -268,8 +268,9 @@ export default function ProductDetails() {
   const [relatedProducts, setRelatedProducts] = useState([]);
 
   // Instant Loading Implementation
+  // v2: cache key bumped to bust stale FALLBACK_DATA_URI entries written by old ensureImagesExist logic
   const { data: fetchedProduct, loading: hookLoading, error: hookError } = usePersistentFetch(
-    `product_details_${id}`,
+    `product_details_v2_${id}`,
     `/products/${id}`,
     { staleTime: 5 * 60 * 1000 }
   );
@@ -399,8 +400,13 @@ export default function ProductDetails() {
     if (fetchedProduct) {
       setProduct(fetchedProduct);
       setLoading(false);
-      // Always update active image for the new product
-      setActiveImage(fetchedProduct.coverImage || (Array.isArray(fetchedProduct.galleryImages) && fetchedProduct.galleryImages[0]) || null);
+      // Resolve best available image: coverImage → first galleryImage → first images[] entry
+      const bestImage =
+        fetchedProduct.coverImage ||
+        (Array.isArray(fetchedProduct.galleryImages) && fetchedProduct.galleryImages[0]) ||
+        (Array.isArray(fetchedProduct.images) && fetchedProduct.images[0]) ||
+        null;
+      setActiveImage(bestImage);
     } else if (hookLoading) {
       setLoading(true);
     }
@@ -570,7 +576,12 @@ export default function ProductDetails() {
             {/* Image Gallery Column */}
             <div className="space-y-4 lg:col-span-7">
               <div className="aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-100 relative group">
-                <img src={getResizedImageUrl(resolveImageUrl(activeImage), { width: 800, quality: 80 })} alt={product.name} className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
+                <img
+                  src={getResizedImageUrl(resolveImageUrl(activeImage || images[0] || FALLBACK_IMAGE), { width: 800, quality: 80 })}
+                  alt={product.name}
+                  className="w-full h-full object-cover transition-transform hover:scale-105 duration-500"
+                  onError={(e) => { if (e.target.src !== FALLBACK_IMAGE) e.target.src = FALLBACK_IMAGE; }}
+                />
                 {hasStockData && (
                   <div className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-black uppercase tracking-tighter shadow-sm border ${product.stock > 0 ? 'bg-green-500 text-white border-green-400' : 'bg-red-500 text-white border-red-400'}`}>
                     {product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}

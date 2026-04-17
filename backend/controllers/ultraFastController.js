@@ -645,13 +645,16 @@ const getHomepageBatchData = async (req, res) => {
 // Cache invalidation endpoint for admin use
 const invalidateHomepageCache = async (req, res) => {
   try {
-    console.log('[CacheInvalidation] Invalidating homepage cache');
+    console.log('[CacheInvalidation] Invalidating homepage and products cache');
 
-    // Delete all homepage-related cache entries
-    await cacheService.delPattern('homepage:*');
+    // Delete all homepage-related and product-related cache entries
+    await Promise.all([
+      cacheService.delPattern('homepage:*'),
+      cacheService.delPattern('products:*')
+    ]);
 
     res.status(200).json({
-      message: 'Homepage cache invalidated successfully',
+      message: 'Homepage and products cache invalidated successfully',
       timestamp: new Date().toISOString()
     });
 

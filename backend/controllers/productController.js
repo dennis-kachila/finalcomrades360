@@ -891,10 +891,11 @@ const getAllProducts = async (req, res) => {
     if (forceLite) {
       findOptions.attributes = [
         'id', 'name', 'shortDescription', 'basePrice', 'displayPrice', 'discountPrice',
+        'discountPercentage',
         'stock', 'status', 'approved', 'reviewStatus', 'categoryId',
         'subcategoryId', 'sellerId', 'createdAt', 'isActive', 'visibilityStatus',
         'marketingEnabled', 'marketingCommission', 'marketingCommissionType',
-        'coverImage', 'isFlashSale', 'variants', 'tags'
+        'coverImage', 'galleryImages', 'isFlashSale', 'variants', 'tags'
       ];
     }
 
@@ -907,15 +908,26 @@ const getAllProducts = async (req, res) => {
     const sanitized = products.map(p => {
       const plain = p.get({ plain: true });
 
-      // Performance: For lite/marketing mode, skip processing full images array
+      // Performance: For lite/marketing mode, use lightweight image processing
       if (forceLite) {
-        // coverImage is selected directly from database column
-        // If null (e.g. old data not migrated), try fallback logic
-        if (!plain.coverImage) {
-          // Fallback logic could be here, but migration should have handled it
+        // Keep coverImage as-is (including base64 data URIs) — product cards need ONE cover image.
+        // Strip base64 from galleryImages to keep the list payload manageable.
+        const isInlineData = (v) => typeof v === 'string' && v.trim().toLowerCase().startsWith('data:image');
+
+        // Normalize coverImage path if it's a relative file path
+        if (plain.coverImage && !isInlineData(plain.coverImage) && !/^https?:\/\//i.test(plain.coverImage)) {
+          let p = plain.coverImage.replace(/^\/+/, '');
+          if (!p.startsWith('uploads/')) p = `uploads/products/${p}`;
+          plain.coverImage = `/${p}`;
         }
-        delete (plain.galleryImages ? [plain.coverImage, ...plain.galleryImages] : [plain.coverImage]);
-        // plain.galleryImages is likely not selected, so no need to delete
+
+        // Strip base64 from galleryImages to save bandwidth on list endpoints
+        let rawGallery = plain.galleryImages || [];
+        if (typeof rawGallery === 'string') { try { rawGallery = JSON.parse(rawGallery); } catch (_) { rawGallery = []; } }
+        plain.galleryImages = Array.isArray(rawGallery) ? rawGallery.filter(g => !isInlineData(g)) : [];
+
+        // Ensure images[] is populated for frontend fallback chain
+        plain.images = plain.coverImage ? [plain.coverImage, ...plain.galleryImages] : plain.galleryImages;
       } else {
         // Full mode: process all images
         // Use new columns if available, otherwise fallback to images
@@ -1361,17 +1373,37 @@ const getProductById = async (req, res) => {
       });
     }
 
-    // Ensure images exist or fallback
+    // Normalize image fields - pass them through as-is so the frontend can handle
+    // missing files via its own resolveImageUrl + onError fallback.
+    // We do NOT replace missing file-path images with a placeholder SVG here because
+    // that fallback gets cached permanently in usePersistentFetch and hides the real image.
     console.log('[getProductById] Processing images...');
     try {
-      const imagesToProcess = plain.galleryImages ? [plain.coverImage, ...plain.galleryImages] : [plain.coverImage];
-      const processedImages = await ensureImagesExist(Array.isArray(imagesToProcess) ? imagesToProcess : []);
-      // Map processed images back to coverImage and galleryImages for the frontend
-      plain.coverImage = processedImages[0] || null;
-      plain.galleryImages = processedImages.slice(1);
-      console.log('[getProductById] Images processed successfully, count:', processedImages.length);
+      const normalizeImg = (img) => {
+        if (!img) return null;
+        const s = typeof img === 'string' ? img.trim() : null;
+        if (!s) return null;
+        // Data URIs and absolute URLs pass through unchanged
+        if (/^(data:|https?:\/\/)/i.test(s)) return s;
+        // Normalize relative paths: strip leading slash, add /uploads prefix if missing
+        let p = s.replace(/^\/+/, '');
+        if (!p.startsWith('uploads/')) p = `uploads/products/${p}`;
+        return `/${p}`;
+      };
+
+      plain.coverImage = normalizeImg(plain.coverImage);
+
+      let gallery = plain.galleryImages || [];
+      if (typeof gallery === 'string') {
+        try { gallery = JSON.parse(gallery); } catch (_) { gallery = []; }
+      }
+      plain.galleryImages = Array.isArray(gallery)
+        ? gallery.map(normalizeImg).filter(Boolean)
+        : [];
+
+      console.log('[getProductById] Images normalized, coverImage present:', !!plain.coverImage, ', gallery count:', plain.galleryImages.length);
     } catch (imageError) {
-      console.error('[getProductById] Error processing images:', imageError);
+      console.error('[getProductById] Error normalizing images:', imageError);
       // Continue without images rather than failing completely
       plain.galleryImages = [];
     }

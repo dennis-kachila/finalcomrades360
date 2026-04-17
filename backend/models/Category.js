@@ -49,6 +49,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       allowNull: true,
       defaultValue: null
+    },
+    taxonomyType: {
+      type: DataTypes.ENUM('product', 'service', 'fast_food'),
+      allowNull: false,
+      defaultValue: 'product'
     }
   }, {
     sequelize,

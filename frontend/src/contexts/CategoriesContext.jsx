@@ -95,6 +95,7 @@ export const CategoriesProvider = ({ children }) => {
           return {
             ...category,
             name: cleanName,
+            taxonomyType: category.taxonomyType || 'product', // Default to product
             Subcategory: subs,      // capital S — used by FastFoodForm, ComradesProductForm
             subcategories: subs,    // lowercase — used by ServiceForm, getSubcategoriesByCategory
           };

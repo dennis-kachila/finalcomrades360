@@ -782,6 +782,8 @@ const Products = () => {
                   id={activeView === 'create' ? undefined : selectedProduct?.id}
                   mode={activeView}
                   onEdit={() => handleViewChange('edit', selectedProduct)}
+                  strictMode={true}
+                  taxonomyType="product"
                 />
               )}
             </div>

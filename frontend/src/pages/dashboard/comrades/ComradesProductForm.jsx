@@ -115,7 +115,9 @@ const ComradesProductForm = ({
   onSubcategoryChange,
   onEdit,
   onAfterSave,
-  mode = 'create' // New mode prop
+  mode = 'create', // New mode prop
+  strictMode = false, // Add strictMode prop
+  taxonomyType = 'product' // Add taxonomyType prop
 }) => {
   const { id: paramId } = useParams();
   const location = useLocation();
@@ -141,6 +143,25 @@ const ComradesProductForm = ({
   const effectiveIsViewMode = isViewMode;
   const effectiveIsEditMode = isEditMode;
   const effectiveIsCreateMode = isCreateMode && !isEditMode;
+
+  // Filter categories based on taxonomyType
+  const filteredCategories = useMemo(() => {
+    if (!allCategories) return [];
+    // If strictMode is on, ONLY show categories matching our taxonomyType
+    // Otherwise, show everything
+    return allCategories.filter(cat => 
+      !strictMode || 
+      String(cat.taxonomyType || 'product') === String(taxonomyType)
+    );
+  }, [allCategories, strictMode, taxonomyType]);
+
+  // Handle category change while respecting strictMode
+  const handleCategoryChangeWrapper = (categoryId) => {
+    // If we're in strict mode, we don't trigger the auto-switch callback to parent
+    if (!strictMode && onCategoryChange) {
+      onCategoryChange(categoryId);
+    }
+  };
 
   // DEBUG MODE DETECTION
   const [previousDebugMode, setPreviousDebugMode] = useState('');
@@ -1042,41 +1063,48 @@ const ComradesProductForm = ({
       // Get the current product name from the form data if available
       const currentProductName = formData.name || productName || '';
 
-      if (detectedType === CATEGORY_TYPES.FOOD_DRINKS) {
-        componentToSwitch = 'fastfood';
-        toastMessage = '🍽️ Food & Drinks Form';
-        toastDescription = `Switched to FastFoodForm for "${category.name}"`;
+      // Only switch if NOT in strictMode
+      if (!strictMode) {
+        if (detectedType === CATEGORY_TYPES.FOOD_DRINKS) {
+          componentToSwitch = 'fastfood';
+          toastMessage = '🍽️ Food & Drinks Form';
+          toastDescription = `Switched to FastFoodForm for "${category.name}"`;
 
-        // Set the product name in the form data before switching
-        if (currentProductName) {
-          setFormData(prev => ({
-            ...prev,
-            name: currentProductName
-          }));
-        }
-      } else if (detectedType === CATEGORY_TYPES.SERVICES) {
-        componentToSwitch = 'service';
-        toastMessage = '🛠️ Services Form';
-        toastDescription = `Switched to ServiceForm for "${category.name}"`;
+          // Set the product name in the form data before switching
+          if (currentProductName) {
+            setFormData(prev => ({
+              ...prev,
+              name: currentProductName
+            }));
+          }
+        } else if (detectedType === CATEGORY_TYPES.SERVICES) {
+          componentToSwitch = 'service';
+          toastMessage = '🛠️ Services Form';
+          toastDescription = `Switched to ServiceForm for "${category.name}"`;
 
-        // Set the product name in the form data before switching
-        if (currentProductName) {
-          setFormData(prev => ({
-            ...prev,
-            name: currentProductName
-          }));
+          // Set the product name in the form data before switching
+          if (currentProductName) {
+            setFormData(prev => ({
+              ...prev,
+              name: currentProductName
+            }));
+          }
+        } else {
+          componentToSwitch = 'comrades';
+          toastMessage = '📦 Regular Product Form';
+          toastDescription = `Using ComradesProductForm for "${category.name}"`;
         }
+
+        setCurrentComponent(componentToSwitch);
+        
+        // Show toast notification
+        toast({
+          title: toastMessage,
+          description: toastDescription,
+        });
       } else {
-        componentToSwitch = 'comrades';
-        toastMessage = '📦 Regular Product Form';
-        toastDescription = `Using ComradesProductForm for "${category.name}"`;
+        console.log('🛡️ [ComradesProductForm] strictMode enabled - skipping auto-switch logic');
       }
-
-      setCurrentComponent(componentToSwitch);
-
-      // Show toast notification
-      toast({
-        title: toastMessage,
         description: toastDescription,
       });
 
@@ -2112,7 +2140,7 @@ const ComradesProductForm = ({
                       className={`w-full h-10 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 transition-colors ${validationErrors.category ? 'border-red-500 bg-red-50 focus:ring-red-400' : 'bg-white border-blue-500 hover:border-blue-600 focus:ring-blue-300 shadow-sm'} disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <option value="">Select category</option>
-                      {(allCategories || []).map((cat) => (
+                      {(filteredCategories || []).map((cat) => (
                         <option key={cat.id || cat._id} value={String(cat.id || cat._id)}>
                           {cat.emoji} {cat.name}
                         </option>

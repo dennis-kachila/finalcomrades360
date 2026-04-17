@@ -542,21 +542,19 @@ const FastFoodForm = ({
     try {
       // STEP 1: Try to get subcategories from context allCategories
       if (allCategories && allCategories.length > 0) {
-        // Find "Food & Drinks" category — exact name first, then partial match
-        const foodCategory = allCategories.find(cat =>
-          cat.name.toLowerCase() === 'food & drinks' ||
-          cat.name.toLowerCase() === 'food and drinks'
-        ) || allCategories.find(cat => {
-          const name = cat.name.toLowerCase();
-          return (name.includes('food') && name.includes('drink')) ||
-            (name.includes('food') && !name.includes('book'));
-        });
+        // Find categories explicitly tagged as 'fast_food'
+        const foodCategories = allCategories.filter(cat =>
+          String(cat.taxonomyType) === 'fast_food'
+        );
 
-        console.log('Found food category from context:', foodCategory?.name, 'id:', foodCategory?.id);
+        console.log('Found food categories by taxonomyType:', foodCategories.length);
 
-        if (foodCategory) {
-          const foodSubcatList = foodCategory.Subcategory || foodCategory.subcategories || [];
-          console.log('Food subcategories from context:', foodSubcatList.length, foodSubcatList);
+        if (foodCategories.length > 0) {
+          // For FastFoodForm, we focus on the first matching category or merge all subcategories
+          // Usually there is only one "Fast Food" or "Food & Drinks" category
+          const mainFoodCategory = foodCategories[0];
+          const foodSubcatList = mainFoodCategory.Subcategory || mainFoodCategory.subcategories || [];
+          console.log('Food subcategories from taxonomy:', foodSubcatList.length, foodSubcatList);
 
           if (foodSubcatList.length > 0) {
             setFoodSubcategories(foodSubcatList);

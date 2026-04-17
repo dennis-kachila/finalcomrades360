@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useToast } from '../../components/ui/use-toast';
 import { ArrowLeft, Plus, Upload, X, Utensils, Clock } from 'lucide-react';
 import serviceApi from '../../services/serviceApi';
+import { useCategories } from '../../contexts/CategoriesContext';
 
 const serviceSchema = z.object({
   name: z.string().min(3, 'Name must be at least 3 characters'),
@@ -32,8 +33,15 @@ const serviceSchema = z.object({
 const CreateService = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { categories: allCategories } = useCategories();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedImages, setUploadedImages] = useState([]);
+
+  // Filter for categories explicitly tagged as 'service'
+  const serviceCategories = React.useMemo(() => {
+    if (!allCategories) return [];
+    return allCategories.filter(cat => String(cat.taxonomyType) === 'service');
+  }, [allCategories]);
 
   const form = useForm({
     resolver: zodResolver(serviceSchema),
@@ -104,15 +112,7 @@ const CreateService = () => {
     toast({ title: 'Schedule Copied', description: `Synced all days to ${dayData.from} - ${dayData.to}` });
   };
 
-  const categories = [
-    'Home Services',
-    'Tutoring',
-    'Beauty & Wellness',
-    'Automotive',
-    'Technology',
-    'Events',
-    'Other'
-  ];
+
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -231,11 +231,15 @@ const CreateService = () => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {categories.map(category => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
-                          ))}
+                          {serviceCategories.length === 0 ? (
+                            <SelectItem value="none" disabled>No service categories available</SelectItem>
+                          ) : (
+                            serviceCategories.map(cat => (
+                              <SelectItem key={cat.id || cat._id} value={String(cat.id || cat._id)}>
+                                {cat.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />

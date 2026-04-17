@@ -233,10 +233,9 @@ const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, m
   useEffect(() => {
     if (!allCategories || allCategories.length === 0) return;
 
-    // Filter for categories with 'service' or 'services' in the name (case insensitive)
+    // Filter for categories explicitly tagged as 'service'
     const serviceCategories = allCategories.filter(category =>
-      (category.name.toLowerCase().includes('service') || category.name.toLowerCase().includes('services')) &&
-      !category.name.toLowerCase().includes('customer service') // Avoid internal categories if any
+      String(category.taxonomyType) === 'service'
     );
 
     setCategories(serviceCategories);

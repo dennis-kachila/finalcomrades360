@@ -11,7 +11,7 @@ const MPESA_CONFIG = {
   consumerSecret: process.env.MPESA_CONSUMER_SECRET,
   shortcode: process.env.MPESA_SHORTCODE || '174379', // Default sandbox shortcode
   passkey: process.env.MPESA_PASSKEY,
-  callbackUrl: process.env.MPESA_CALLBACK_URL || `${process.env.BASE_URL}/api/payments/mpesa/callback`,
+  callbackUrl: process.env.MPESA_CALLBACK_URL || `${process.env.FRONTEND_URL || 'https://comrades360.shop'}/api/payments/mpesa/callback`,
   accountReference: process.env.MPESA_ACCOUNT_REFERENCE || 'Comrades360',
   transactionDesc: 'Comrades360 Order Payment',
   // Enhanced configuration

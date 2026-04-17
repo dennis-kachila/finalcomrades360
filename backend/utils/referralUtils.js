@@ -28,7 +28,7 @@ const generateUniqueReferralCode = async () => {
 
 // Generate a referral link for a user
 const generateReferralLink = (userId, referralCode) => {
-  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:4000';
+  const baseUrl = process.env.FRONTEND_URL || 'https://comrades360.shop';
   return `${baseUrl}/register?ref=${referralCode}`;
 };
 

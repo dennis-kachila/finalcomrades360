@@ -2,7 +2,7 @@ import { io } from 'socket.io-client';
 
 // WebSocket server URL - using the same host as the API but with WebSocket protocol
 const getWsUrl = () => {
-  if (process.env.NODE_ENV === 'development') return 'ws://localhost:5004';
+  if (process.env.NODE_ENV === 'development') return 'ws://localhost:5001';
   
   // Use VITE_SOCKET_URL from environment if available (standard for production builds)
   const envUrl = import.meta.env?.VITE_SOCKET_URL;
@@ -33,7 +33,7 @@ const connectSocket = () => {
 
   // Create new socket connection
   socket = io(WS_URL, {
-    transports: ['polling', 'websocket'], // Polling first is more reliable through proxies
+    transports: ['websocket', 'polling'], // Prioritize WebSocket but keep polling as fallback
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,

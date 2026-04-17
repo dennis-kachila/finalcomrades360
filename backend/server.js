@@ -13,16 +13,32 @@ dotenv.config();
 
 // DETECT STATIC PATHS GLOBALLY
 const IS_PROD = process.env.NODE_ENV === 'production';
+const rootStaticPath = path.resolve(__dirname, 'public'); 
 const cpanelPath = path.resolve(__dirname, '../public_html');
 const productionPath = path.join(__dirname, 'public');
 const developmentPath = path.join(__dirname, '../frontend/dist');
 
+// PRODUCTION PRIORITY: In cPanel/Passenger, the backend is often in a peer folder to public_html
 let GLOBAL_STATIC_PATH = developmentPath;
 if (IS_PROD) {
-  if (fs.existsSync(cpanelPath)) GLOBAL_STATIC_PATH = cpanelPath;
-  else if (fs.existsSync(productionPath)) GLOBAL_STATIC_PATH = productionPath;
+  if (fs.existsSync(cpanelPath)) {
+    GLOBAL_STATIC_PATH = cpanelPath;
+  } else if (fs.existsSync(productionPath)) {
+    GLOBAL_STATIC_PATH = productionPath;
+  } else if (fs.existsSync(rootStaticPath)) {
+    GLOBAL_STATIC_PATH = rootStaticPath;
+  } else if (fs.existsSync(path.resolve(__dirname, '../../public_html'))) {
+    // Extra fallback for deep structures
+    GLOBAL_STATIC_PATH = path.resolve(__dirname, '../../public_html');
+  }
 }
 console.log(`[server] Static System Initialized: ${GLOBAL_STATIC_PATH} (Mode: ${process.env.NODE_ENV || 'development'})`);
+if (!fs.existsSync(GLOBAL_STATIC_PATH)) {
+  console.error(`⚠️ WARNING: GLOBAL_STATIC_PATH does not exist: ${GLOBAL_STATIC_PATH}`);
+}
+if (!fs.existsSync(path.join(GLOBAL_STATIC_PATH, 'index.html'))) {
+  console.error(`⚠️ WARNING: index.html not found in static path: ${GLOBAL_STATIC_PATH}`);
+}
 
 // WhatsApp service will be initialized after server start
 let messageService;
@@ -78,6 +94,8 @@ const IS_DEV = process.env.NODE_ENV !== 'production';
 // Dynamically build allowed origins
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  'https://comrades360.shop',
+  'https://www.comrades360.shop',
   ...(IS_DEV ? [
     'http://localhost:4000',
     'http://127.0.0.1:4000',
@@ -196,15 +214,27 @@ function finalizeMiddleware(app) {
 
   // SPA catch-all
   app.get('*', (req, res, next) => {
+    // 1. Instantly skip API and Uploads
     if (req.url.startsWith('/api') || req.url.startsWith('/uploads')) {
       return next();
     }
-    res.sendFile(path.join(GLOBAL_STATIC_PATH, 'index.html'), err => {
-      if (err) {
-        console.error(`[SPA-ERROR] Could not serve index.html from ${GLOBAL_STATIC_PATH}:`, err.message);
-        next();
+
+    // 2. Identify file extension
+    const ext = path.extname(req.path);
+    
+    // 3. For navigation requests (no extension) or index.html, serve the entry point
+    if (!ext || ext === '.html') {
+      const indexPath = path.join(GLOBAL_STATIC_PATH, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        return res.sendFile(indexPath);
+      } else {
+        console.error(`[SPA-ERROR] index.html missing at ${indexPath} for request ${req.url}`);
+        // If index.html is missing but it's a page request, don't fall through to 404 JSON yet
+        // maybe provide a simple fallback or let it next()
       }
-    });
+    }
+    
+    next();
   });
 
   // Global 404 handler
@@ -311,7 +341,6 @@ app.use(async (req, res, next) => {
             message: block.message || 'This section is currently under maintenance.'
           });
         }
-      }
     }
   } catch (err) {
     // Fail silent to allow app startup
@@ -427,10 +456,13 @@ const DEFAULT_PORT = process.env.PORT || (process.env.NODE_ENV === 'production' 
 // Socket.IO configuration
 const socketAllowedOrigins = [
   process.env.FRONTEND_URL,
+  'https://comrades360.shop',
+  'https://www.comrades360.shop',
   ...(process.env.NODE_ENV !== 'production' ? [
     'http://localhost:4000',
     'http://127.0.0.1:4000',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
   ] : [])
 ].filter(Boolean);
 
@@ -447,7 +479,7 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: true
   },
-  transports: ['websocket'], // Force WebSocket to avoid 400 errors from polling in multi-process setups
+  transports: ['websocket', 'polling'], // Prioritize WebSocket but allow fallback to prevent 400 errors
   pingTimeout: 60000,
   pingInterval: 25000
 });
@@ -468,7 +500,7 @@ async function startServer() {
         // DEFERRED INITIALIZATION: Start heavy services after the port is open
         setImmediate(async () => {
           try {
-            console.error('🔄 Loading Database and Routes in background...');
+            console.error('🔄 [Init] Beginning deferred service initialization...');
             
             // 1. Initialize Database Connection & Sync
             const { testConnection } = require('./database/database');

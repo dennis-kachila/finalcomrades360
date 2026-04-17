@@ -14,7 +14,7 @@ const generateProductLink = async (productId, marketerId) => {
     if (!product || !marketer) return null;
     
     const linkId = uuidv4().slice(0, 8);
-    const shareableLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/product/${productId}?ref=${marketer.referralCode}&link=${linkId}`;
+    const shareableLink = `${process.env.FRONTEND_URL || 'https://comrades360.shop'}/product/${productId}?ref=${marketer.referralCode}&link=${linkId}`;
     
     // Update product with shareable link if not exists
     if (!product.shareableLink) {
@@ -263,7 +263,7 @@ const trackShare = async (req, res) => {
     const deviceType = /Mobile|Android|iPhone|iPad/.test(userAgent) ? 'mobile' : 
                       /Tablet/.test(userAgent) ? 'tablet' : 'desktop';
 
-    const shareUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/share/${productId}?ref=${marketer.referralCode}&platform=${platform}`;
+    const shareUrl = `${process.env.FRONTEND_URL || 'https://comrades360.shop'}/share/${productId}?ref=${marketer.referralCode}&platform=${platform}`;
 
     // Track the share action
     await MarketingAnalytics.create({
@@ -302,7 +302,7 @@ const generateSharingContent = async (req, res) => {
       return res.status(404).json({ error: 'Product or marketer not found' });
     }
 
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = process.env.FRONTEND_URL || 'https://comrades360.shop';
     const shareLink = `${baseUrl}/share/${productId}?ref=${marketer.referralCode}`;
     const discountText = product.isFlashSale ? `🔥 ${product.discountPercentage}% OFF!` : '';
     const priceText = product.isFlashSale ? 

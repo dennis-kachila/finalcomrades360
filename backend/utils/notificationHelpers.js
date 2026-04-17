@@ -337,7 +337,7 @@ async function notifyCustomerDeliveryUpdate(customerId, orderNumber, status, mes
 async function notifyCustomerMarketerCreated(userId, tempPassword, loginIdentifier, marketerName = 'A Marketer') {
     const defaultTemplate = `Hello {name}, your account has been created by {marketerName}. Your temporary password is: {tempPassword}. Please login at {loginUrl} and change your password immediately.`;
     
-    const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:4000'}/login`;
+    const loginUrl = `${process.env.FRONTEND_URL || 'https://comrades360.shop'}/login`;
 
     await sendCustomerNotificationAcrossChannels('WELCOME_MARKETER_CREATED', {
         name: 'Customer', // Fallback name

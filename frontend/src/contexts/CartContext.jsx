@@ -257,7 +257,7 @@ export function CartProvider({ children }) {
                   item.itemType === 'service' ? `/services/${item.serviceId || item.id}` :
                     `/products/${item.productId || item.id}`;
                 const resp = await api.get(endpoint);
-                const dbItem = resp.data;
+                const dbItem = resp?.data?.data || resp?.data;
                 if (dbItem) {
                   let unitPrice = Number(dbItem.discountPrice || dbItem.displayPrice || dbItem.basePrice || dbItem.price || item.price || 0);
                   const unitDeliveryFee = Number(dbItem.deliveryFee || 0);

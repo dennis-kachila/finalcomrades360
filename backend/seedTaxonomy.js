@@ -4,6 +4,7 @@ const taxonomy = [
   {
     name: 'Electronics & Appliances',
     emoji: '📱',
+    taxonomyType: 'product',
     subcategories: [
       { name: 'Smartphones & Tablets', emoji: '📱' },
       { name: 'Laptops & Computing', emoji: '💻' },
@@ -15,6 +16,7 @@ const taxonomy = [
   {
     name: 'Fashion & Design',
     emoji: '👗',
+    taxonomyType: 'product',
     subcategories: [
       { name: "Men's Clothing", emoji: '👕' },
       { name: "Women's Clothing", emoji: '👗' },
@@ -26,6 +28,7 @@ const taxonomy = [
   {
     name: 'Food & Drinks',
     emoji: '🍕',
+    taxonomyType: 'fast_food',
     subcategories: [
       { name: 'Fast Food & Meals', emoji: '🍔' },
       { name: 'Beverages & Soft Drinks', emoji: '🥤' },
@@ -37,6 +40,7 @@ const taxonomy = [
   {
     name: 'Services & Bookings',
     emoji: '🛠️',
+    taxonomyType: 'service',
     subcategories: [
       { name: 'Beauty & Hair Styling', emoji: '💇' },
       { name: 'Repair & Maintenance', emoji: '🔧' },
@@ -48,6 +52,7 @@ const taxonomy = [
   {
     name: 'Home & Living',
     emoji: '🏠',
+    taxonomyType: 'product',
     subcategories: [
       { name: 'Furniture', emoji: '🛋️' },
       { name: 'Bedding & Bath', emoji: '🛏️' },
@@ -59,6 +64,7 @@ const taxonomy = [
   {
     name: 'Health & Beauty',
     emoji: '🧴',
+    taxonomyType: 'product',
     subcategories: [
       { name: 'Skin Care', emoji: '🧴' },
       { name: 'Makeup & Cosmetics', emoji: '💄' },
@@ -70,6 +76,7 @@ const taxonomy = [
   {
     name: 'Supermarket & Supplies',
     emoji: '🛒',
+    taxonomyType: 'product',
     subcategories: [
       { name: 'Canned Foods & Pasta', emoji: '🍝' },
       { name: 'Household Cleaning', emoji: '🧽' },
@@ -81,6 +88,7 @@ const taxonomy = [
   {
     name: 'Sports & Fitness',
     emoji: '⚽',
+    taxonomyType: 'product',
     subcategories: [
       { name: 'Gym Equipment', emoji: '🏋️' },
       { name: 'Outdoor & Camping', emoji: '🏕️' },
@@ -92,6 +100,7 @@ const taxonomy = [
   {
     name: 'Baby & Kids',
     emoji: '🧸',
+    taxonomyType: 'product',
     subcategories: [
       { name: "Kids' Toys", emoji: '🧸' },
       { name: 'Baby Clothing', emoji: '🍼' },
@@ -109,16 +118,23 @@ async function seed() {
     try {
       // Create or find category
       const slug = catData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      const [category] = await Category.findOrCreate({
+      const [category, created] = await Category.findOrCreate({
         where: { name: catData.name },
         defaults: {
           emoji: catData.emoji,
           slug,
+          taxonomyType: catData.taxonomyType,
           isActive: true
         }
       });
       
-      console.log(`✅ Category: ${catData.name}`);
+      // If category already exists, update its taxonomyType
+      if (!created) {
+        await category.update({ taxonomyType: catData.taxonomyType });
+        console.log(`✅ Updated Category: ${catData.name} (${catData.taxonomyType})`);
+      } else {
+        console.log(`✅ Created Category: ${catData.name} (${catData.taxonomyType})`);
+      }
       
       // Create subcategories
       for (const subData of catData.subcategories) {

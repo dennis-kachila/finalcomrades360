@@ -25,6 +25,7 @@ import {
   DialogTitle as UIDialogTitle,
 } from '../../components/ui/dialog';
 import useAutoSave from '../../hooks/useAutoSave'; // Import AutoSave hook
+import AutoSaveIndicator from '../../components/ui/AutoSaveIndicator';
 import { recursiveParse, ensureArray, ensureObject } from '../../utils/parsingUtils';
 
 const DEFAULT_SCHEDULE = [
@@ -3050,42 +3051,44 @@ const FastFoodForm = ({
         }
 
         {/* Actions */}
-        <div className="pt-6 border-t flex justify-end space-x-4">
+        <div className="pt-6 border-t flex items-center justify-between">
           <Button
             type="button"
             variant="ghost"
-            className="text-red-500 hover:text-red-700 hover:bg-red-50 mr-auto"
+            className="text-red-500 hover:text-red-700 hover:bg-red-50"
             onClick={() => setShowClearDialog(true)}
           >
             Clear Form
           </Button>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              if (onCancel) onCancel();
-              else if (onSuccess) onSuccess();
-              else navigate('/dashboard/fastfood');
-            }}
-            disabled={loading}
-          >
-            {isViewMode ? 'Back' : 'Cancel'}
-          </Button>
-          {isViewMode ? (
+          <div className="flex items-center space-x-4">
+            {!isViewMode && <AutoSaveIndicator lastSaved={lastSaved} />}
+            
             <Button
               type="button"
+              variant="outline"
               onClick={() => {
-                console.log('🔘 Edit Item button clicked in FastFoodForm. calling onEdit...');
-                if (onEdit) onEdit();
-                else console.warn('⚠️ No onEdit prop provided to FastFoodForm');
+                if (onCancel) onCancel();
+                else if (onSuccess) onSuccess();
+                else navigate('/dashboard/fastfood');
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              disabled={loading}
             >
-              Edit Item
+              {isViewMode ? 'Back' : 'Cancel'}
             </Button>
-          ) : (
-            <>
+            {isViewMode ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  console.log('🔘 Edit Item button clicked in FastFoodForm. calling onEdit...');
+                  if (onEdit) onEdit();
+                  else console.warn('⚠️ No onEdit prop provided to FastFoodForm');
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Edit Item
+              </Button>
+            ) : (
               <Button
                 type="button"
                 disabled={loading}
@@ -3109,8 +3112,8 @@ const FastFoodForm = ({
                   </>
                 )}
               </Button>
-            </>
-          )}
+            )}
+          </div>
         </div>
       </form >
 

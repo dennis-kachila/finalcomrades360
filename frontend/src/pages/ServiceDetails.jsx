@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { useToast } from '../components/ui/use-toast';
 
 import serviceApi from '../services/serviceApi';
-import { resolveImageUrl } from '../utils/imageUtils';
+import { resolveImageUrl, getResizedImageUrl } from '../utils/imageUtils';
 import Footer from '../components/Footer';
 import { usePersistentFetch } from '../hooks/usePersistentFetch';
 
@@ -128,7 +128,7 @@ const ServiceDetails = () => {
                         <div className="space-y-4">
                             <div className="aspect-video rounded-xl overflow-hidden bg-gray-100 border border-gray-100">
                                 <img
-                                    src={resolveImageUrl(activeImage)}
+                                    src={getResizedImageUrl(resolveImageUrl(activeImage), { width: 800, quality: 80 })}
                                     alt={service.title}
                                     className="w-full h-full object-cover"
                                 />
@@ -141,7 +141,7 @@ const ServiceDetails = () => {
                                             onClick={() => setActiveImage(img)}
                                             className={`flex-shrink-0 w-24 h-16 rounded-lg overflow-hidden border-2 transition-all ${activeImage === img ? 'border-blue-600 shadow-md' : 'border-transparent hover:border-gray-300'}`}
                                         >
-                                            <img src={resolveImageUrl(img)} alt={`Gallery ${index}`} className="w-full h-full object-cover" />
+                                            <img src={getResizedImageUrl(resolveImageUrl(img), { width: 800, quality: 80 })} alt={`Gallery ${index}`} className="w-full h-full object-cover" />
                                         </button>
                                     ))}
                                 </div>

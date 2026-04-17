@@ -81,9 +81,11 @@ export default function FastFoodSection({ initialData = null, initialTotal = 0 }
                 setItems(nextItems);
 
                 // Check if we have more to load
-                const total = response.data.pagination?.totalItems || response.data.totalCount || 0;
+                const total = response.data.pagination?.totalItems || response.data.pagination?.totalFastFood || response.data.totalCount || initialTotal || 0;
                 const updatedCount = nextItems.length;
-                setHasMore(total > updatedCount && fetchedItems.length >= limit);
+                // Fix: if fetchedItems > 0 and total > updatedCount then we likely have more items.
+                // Using fetchedItems.length >= limit causes bugs if backend filters items after pagination
+                setHasMore(total > updatedCount && fetchedItems.length > 0);
                 setPage(pageNum);
             }
         } catch (error) {
@@ -95,8 +97,17 @@ export default function FastFoodSection({ initialData = null, initialTotal = 0 }
     };
 
     useEffect(() => {
+        // Sync items with initialData if provided and we haven't modified selectedCategory
+        if (selectedCategory === 'all' && initialData && initialData.length > 0 && items.length === 0) {
+            setItems(initialData);
+            setHasMore(initialTotal > initialData.length);
+            setLoading(false);
+        }
+    }, [initialData, initialTotal]);
+
+    useEffect(() => {
         setPage(1);
-        if (hasBootstrappedFromInitial && selectedCategory === 'all') {
+        if (hasBootstrappedFromInitial && selectedCategory === 'all' && items.length === 0) {
             setHasMore(initialTotal > (initialData?.length || 0));
             // Use initial chunk immediately (3 rows), wait for user to click Load More
             setItems(initialData);

@@ -27,7 +27,7 @@ import { useToast } from '../components/ui/use-toast';
 import { useWishlist } from '../contexts/WishlistContext';
 import { fastFoodService } from '../services/fastFoodService';
 import fastFoodPickupPointService from '../services/fastFoodPickupPointService';
-import { resolveImageUrl } from '../utils/imageUtils';
+import { resolveImageUrl, getResizedImageUrl } from '../utils/imageUtils';
 import { ensureArray, normalizeIngredient, recursiveParse } from '../utils/parsingUtils';
 import Footer from '../components/Footer';
 import AdminInquiryModal from '../components/AdminInquiryModal';
@@ -1007,7 +1007,7 @@ const FastFoodDetails = () => {
             <div className="space-y-4 px-0 md:px-0">
               <div className="aspect-square md:rounded-2xl overflow-hidden bg-gray-100 border-0 md:border border-orange-100 relative group">
                 <img
-                  src={resolveImageUrl(activeImage || item.mainImage)}
+                  src={getResizedImageUrl(resolveImageUrl(activeImage || item.mainImage), { width: 800, quality: 80 })}
                   alt={item.name}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
@@ -1031,7 +1031,7 @@ const FastFoodDetails = () => {
                       onClick={() => setActiveImage(img)}
                       className={`w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-all ${activeImage === img ? 'border-orange-500 shadow' : 'border-transparent hover:border-orange-200'}`}
                     >
-                      <img src={resolveImageUrl(img)} alt={`gallery-${idx}`} className="w-full h-full object-cover" />
+                      <img src={getResizedImageUrl(resolveImageUrl(img), { width: 800, quality: 80 })} alt={`gallery-${idx}`} className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>

@@ -10,6 +10,7 @@ import { productApi } from '../../services/api';
 import { useCategories } from '../../contexts/CategoriesContext';
 import { formatKES, parsePriceInput } from '../../utils/currency';
 import { Loader2, ArrowLeft, Upload, Video, Save, Check, Edit, Package } from 'lucide-react';
+import AutoSaveIndicator from '../../components/ui/AutoSaveIndicator';
 import { resolveImageUrl, FALLBACK_IMAGE } from '../../utils/imageUtils';
 import ChangesDialog from '../../components/ui/changes-dialog';
 import Dialog from '../../components/Dialog';
@@ -141,6 +142,14 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
   const [newPhysicalFeature, setNewPhysicalFeature] = useState({ name: '', value: '' });
   const [initialProduct, setInitialProduct] = useState(null);
   const [showAllUom, setShowAllUom] = useState(false);
+
+  // Filter categories based on product taxonomy
+  const filteredCategories = useMemo(() => {
+    if (!allCategories) return [];
+    return allCategories.filter(cat => 
+      String(cat.taxonomyType || 'product') === 'product'
+    );
+  }, [allCategories]);
 
   // FastFoodForm Success Handler
   const handleFastFoodSuccess = () => {
@@ -1942,7 +1951,7 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
                       className="w-full h-10 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 hover:bg-blue-100 transition-colors"
                     >
                       <option value="">Select category</option>
-                      {(allCategories || []).map(cat => (
+                      {(filteredCategories || []).map(cat => (
                         <option key={cat.id || cat._id} value={String(cat.id || cat._id)}>
                           {cat.emoji} {cat.name}
                         </option>
@@ -2770,16 +2779,15 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
 
 
                 {/* Submit Buttons */}
-                <div className="flex gap-4">
-                  {hasDraft && (
-                    <Button type="button" variant="outline" onClick={clearDraftAndReset}>
-                      Clear Draft
-                    </Button>
-                  )}
-                  <Button type="button" variant="secondary" onClick={() => performSave(true)} disabled={loading}>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save as Draft
-                  </Button>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <AutoSaveIndicator lastSaved={showSaved ? new Date() : null} isSaving={false} />
+                    {hasDraft && (
+                      <Button type="button" variant="ghost" size="sm" className="text-xs text-gray-400 hover:text-red-500" onClick={clearDraftAndReset}>
+                        Clear Draft
+                      </Button>
+                    )}
+                  </div>
                   <Button type="submit" disabled={loading}>
                     {loading ? (
                       <>

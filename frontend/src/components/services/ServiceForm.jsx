@@ -20,6 +20,7 @@ import {
 import { Button } from '../ui/button';
 import { FaCheck } from 'react-icons/fa';
 import useAutoSave from '../../hooks/useAutoSave';
+import AutoSaveIndicator from '../ui/AutoSaveIndicator';
 import SystemFeedbackModal from '../ui/SystemFeedbackModal';
 import { recursiveParse, ensureArray, ensureObject } from '../../utils/parsingUtils';
 
@@ -1328,41 +1329,65 @@ const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, m
         </div>
 
         {/* Submit Button */}
-        <div className="pt-4">
-          {isViewMode ? (
-            <button
+        <div className="pt-6 border-t flex items-center justify-between mt-8">
+          <div className="text-sm text-gray-500 italic">
+            All changes are saved automatically to your drafts.
+          </div>
+
+          <div className="flex items-center space-x-4">
+            {!isViewMode && <AutoSaveIndicator lastSaved={lastSaved} />}
+            
+            <Button
               type="button"
+              variant="outline"
               onClick={() => {
-                if (onEdit) {
-                  onEdit();
-                } else {
+                if (isEditing) {
                   const serviceId = initialData?.id || initialData?._id;
-                  if (serviceId) {
-                    navigate(`/dashboard/products/edit/${serviceId}`);
-                  }
+                  navigate(`/dashboard/services`);
+                } else {
+                  navigate(-1);
                 }
               }}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Edit Service
-            </button>
-          ) : (
-            <button
-              type="submit"
               disabled={isLoading}
-              className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {isEditing ? 'Updating...' : 'Creating...'}
-                </>
-              ) : isEditing ? 'Update Service' : 'Create Service'}
-            </button>
-          )}
+              Cancel
+            </Button>
+
+            {isViewMode ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  if (onEdit) {
+                    onEdit();
+                  } else {
+                    const serviceId = initialData?.id || initialData?._id;
+                    if (serviceId) {
+                      navigate(`/dashboard/products/edit/${serviceId}`);
+                    }
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Edit Service
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className={`bg-blue-600 hover:bg-blue-700 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {isEditing ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : isEditing ? 'Update Service' : 'Create Service'}
+              </Button>
+            )}
+          </div>
         </div>
       </form>
 

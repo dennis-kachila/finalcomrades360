@@ -18,6 +18,8 @@ import FastFoodForm from '../FastFoodForm';
 import ServiceForm from '../../../components/services/ServiceForm';
 import ChangesDialog from '../../../components/ui/changes-dialog';
 import Dialog from '../../../components/Dialog';
+import AutoSaveIndicator from '../../../components/ui/AutoSaveIndicator';
+import useAutoSave from '../../../hooks/useAutoSave';
 
 // Category detection constants
 const CATEGORY_TYPES = {
@@ -396,6 +398,16 @@ const ComradesProductForm = ({
   const [showChangesDialog, setShowChangesDialog] = useState(false);
   const [createdProduct, setCreatedProduct] = useState(null);
   const [changes, setChanges] = useState([]);
+
+  // AutoSave — persist form data to localStorage while filling form (create mode only)
+  const [formData, setFormData] = useState(() => getInitialFormData());
+  const autoSaveDraftKey = !effectiveIsViewMode ? `comrades_product_draft_${id || 'new'}` : null;
+  const { lastSaved: autoLastSaved, clearDraft: clearAutoSaveDraft } = useAutoSave(
+    autoSaveDraftKey,
+    formData,
+    null, // restore is handled separately
+    { debounceMs: 1200 }
+  );
 
   // Helper to find category/subcategory name by ID
   const getCategoryName = (id) => {
@@ -3386,46 +3398,49 @@ const ComradesProductForm = ({
 
                 {/* Action buttons - Only show in Edit/Create/List mode */}
                 {(!effectiveIsViewMode || isEditing) && (
-                  <div className="flex justify-end space-x-4 pt-6 border-t bg-white mt-8">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => navigate('/dashboard/products')}
-                      disabled={loading}
-                      className="bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:text-gray-900 px-6 py-2 font-medium relative z-20"
-                    >
-                      Cancel
-                    </Button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className={`flex items-center justify-center px-8 py-2 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 min-w-[120px] relative z-20 border-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${effectiveIsListMode
-                        ? 'bg-green-600 hover:bg-green-700 border-green-700'
-                        : 'bg-blue-600 hover:bg-blue-700 border-blue-700'
-                        }`}
-                      style={{ color: 'white' }}
-                      data-testid="submit-button"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" style={{ color: 'white' }} />
-                          <span style={{ color: 'white', fontWeight: '600' }}>
-                            {effectiveIsListMode ? 'Processing...' : (effectiveIsEditMode ? 'Updating...' : 'Creating...')}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          {effectiveIsListMode ? <Check className="h-4 w-4 mr-2" style={{ color: 'white' }} /> : <Save className="h-4 w-4 mr-2" style={{ color: 'white' }} />}
-                          <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>
-                            {(() => {
-                              if (effectiveIsListMode) return 'List Product';
-                              if (effectiveIsCreateMode) return 'Create Product';
-                              return 'Update Product';
-                            })()}
-                          </span>
-                        </>
-                      )}
-                    </button>
+                  <div className="flex items-center justify-between pt-6 border-t bg-white mt-8">
+                    <AutoSaveIndicator lastSaved={(() => { try { const d = localStorage.getItem('comrades_product_draft'); if (d) { const p = JSON.parse(d); return p._savedAt || null; } } catch(e) {} return null; })()} isSaving={false} />
+                    <div className="flex space-x-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => navigate('/dashboard/products')}
+                        disabled={loading}
+                        className="bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:text-gray-900 px-6 py-2 font-medium relative z-20"
+                      >
+                        Cancel
+                      </Button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className={`flex items-center justify-center px-8 py-2 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 min-w-[120px] relative z-20 border-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${effectiveIsListMode
+                          ? 'bg-green-600 hover:bg-green-700 border-green-700'
+                          : 'bg-blue-600 hover:bg-blue-700 border-blue-700'
+                          }`}
+                        style={{ color: 'white' }}
+                        data-testid="submit-button"
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" style={{ color: 'white' }} />
+                            <span style={{ color: 'white', fontWeight: '600' }}>
+                              {effectiveIsListMode ? 'Processing...' : (effectiveIsEditMode ? 'Updating...' : 'Creating...')}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            {effectiveIsListMode ? <Check className="h-4 w-4 mr-2" style={{ color: 'white' }} /> : <Save className="h-4 w-4 mr-2" style={{ color: 'white' }} />}
+                            <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>
+                              {(() => {
+                                if (effectiveIsListMode) return 'List Product';
+                                if (effectiveIsCreateMode) return 'Create Product';
+                                return 'Update Product';
+                              })()}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
               </form>

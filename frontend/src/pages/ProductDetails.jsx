@@ -6,7 +6,7 @@ import { useCart } from '../contexts/CartContext';
 import { useWishlist } from '../contexts/WishlistContext';
 import { useAuth } from '../contexts/AuthContext';
 import ProductInquiryModal from '../components/ProductInquiryModal';
-import { resolveImageUrl, getProductImages, FALLBACK_IMAGE } from '../utils/imageUtils';
+import { resolveImageUrl, getProductImages, FALLBACK_IMAGE, getResizedImageUrl } from '../utils/imageUtils';
 import { useImageVersion } from '../hooks/useImageVersion';
 import { Share2, Heart, Shield, Truck, RotateCcw, Package, X, Star, Info, PlayCircle, ArrowLeft, MapPin, ShoppingBag, List, Settings } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
@@ -287,7 +287,7 @@ export default function ProductDetails() {
   const { getVersionedUrls } = useImageVersion(imageUrls, id);
 
   const images = useMemo(() => {
-    const productImages = getProductImages(product);
+    const productImages = getProductImages(product).map(url => getResizedImageUrl(url, { width: 800, quality: 80 }));
     return getVersionedUrls(productImages);
   }, [product, getVersionedUrls]);
 
@@ -570,7 +570,7 @@ export default function ProductDetails() {
             {/* Image Gallery Column */}
             <div className="space-y-4 lg:col-span-7">
               <div className="aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-100 relative group">
-                <img src={resolveImageUrl(activeImage)} alt={product.name} className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
+                <img src={getResizedImageUrl(resolveImageUrl(activeImage), { width: 800, quality: 80 })} alt={product.name} className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
                 {hasStockData && (
                   <div className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-black uppercase tracking-tighter shadow-sm border ${product.stock > 0 ? 'bg-green-500 text-white border-green-400' : 'bg-red-500 text-white border-red-400'}`}>
                     {product.stock > 0 ? `${product.stock} in stock` : 'Out of Stock'}

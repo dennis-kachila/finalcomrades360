@@ -146,10 +146,6 @@ const ComradesProductForm = ({
   const effectiveIsEditMode = isEditMode;
   const effectiveIsCreateMode = isCreateMode && !isEditMode;
 
-  // IMPORTANT: Declare context hooks BEFORE any useMemo/useCallback that depends on them
-  const { user: currentUser } = useAuth();
-  const { categories: allCategories, getSubcategoriesByCategory } = useCategories();
-
   // Filter categories based on taxonomyType
   const filteredCategories = useMemo(() => {
     if (!allCategories) return [];
@@ -169,34 +165,31 @@ const ComradesProductForm = ({
     }
   };
 
-  // DEBUG MODE DETECTION — use useEffect to avoid setState-during-render
+  // DEBUG MODE DETECTION
   const [previousDebugMode, setPreviousDebugMode] = useState('');
   const currentDebugMode = effectiveIsCreateMode ? 'CREATE' : effectiveIsEditMode ? 'EDIT' : effectiveIsListMode ? 'LIST' : effectiveIsViewMode ? 'VIEW' : 'UNKNOWN';
 
-  useEffect(() => {
-    if (previousDebugMode !== currentDebugMode) {
-      setPreviousDebugMode(currentDebugMode);
-      console.log('=== COMPONENT MOUNT DEBUG ===');
-      console.log('ComradesProductForm mode:', currentDebugMode);
-      console.log('Effective Mode:', currentDebugMode);
-    }
-  }, [currentDebugMode, previousDebugMode]);
+  if (previousDebugMode !== currentDebugMode) {
+    setPreviousDebugMode(currentDebugMode);
+    console.log('=== COMPONENT MOUNT DEBUG ===');
+    console.log('ComradesProductForm mode:', currentDebugMode);
+    console.log('Effective Mode:', currentDebugMode);
+  }
 
-  // DEBUG BUTTON TEXT — use useEffect to avoid setState-during-render
+  // DEBUG BUTTON TEXT
   const [previousButtonText, setPreviousButtonText] = useState('');
   const currentButtonText = effectiveIsViewMode ? 'View Product' : effectiveIsListMode ? 'List Product' : effectiveIsCreateMode ? 'Create Product' : 'Update Product';
 
-  useEffect(() => {
-    if (previousButtonText !== currentButtonText) {
-      setPreviousButtonText(currentButtonText);
-      console.log('ComradesProductForm button text:', currentButtonText);
-    }
-  }, [currentButtonText, previousButtonText]);
+  if (previousButtonText !== currentButtonText) {
+    setPreviousButtonText(currentButtonText);
+    console.log('ComradesProductForm button text:', currentButtonText);
+  }
 
   // Smart form switching state
   const [currentFormType, setCurrentFormType] = useState(CATEGORY_TYPES.REGULAR);
   const [currentComponent, setCurrentComponent] = useState('comrades'); // Track which component to render
   const [productName, setProductName] = useState(''); // Track product name for form switching
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     console.log('🟢 [ComradesProductForm] Component mounted/updated');
@@ -209,6 +202,7 @@ const ComradesProductForm = ({
   const [showMediaError, setShowMediaError] = useState(false);
   const [mediaErrorMessage, setMediaErrorMessage] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
+  const { categories: allCategories, getSubcategoriesByCategory } = useCategories();
 
   // Local storage key for draft products
   // Using a helper function to avoid circular dependency with formData initialization

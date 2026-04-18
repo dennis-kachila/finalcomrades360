@@ -296,7 +296,6 @@ const ComradesProductForm = ({
         downloadUrl: ''
       };
 
-    if (id || initialProduct) {
       return initialData;
     }
 
@@ -1641,8 +1640,8 @@ const ComradesProductForm = ({
           const { data: backendCats } = await productApi.getCategories();
           console.log('🚀 [ComradesProductForm] Backend categories fetched:', backendCats.length);
           // Find selected names from UI list
-          const uiCategory = allCategories.find(c => c.id.toString() === String(formData.categoryId));
-          const uiSubcategory = (uiCategory?.Subcategory || []).find(s => s.id.toString() === String(formData.subcategoryId));
+          const uiCategory = allCategories.find(c => String(c.id || c._id) === String(formData.categoryId));
+          const uiSubcategory = (uiCategory?.Subcategory || []).find(s => String(s.id || s._id) === String(formData.subcategoryId));
           // Map by name in backend list
           const backendCategory = backendCats.find(c => c.name === uiCategory?.name);
           if (backendCategory) {
@@ -3562,33 +3561,8 @@ const ComradesProductForm = ({
           confirmLabel={effectiveIsEditMode ? 'Done' : 'Back to Products'}
         />
       </div>
-    );
-  } catch (error) {
-    console.error('❌ [ComradesProductForm] CRITICAL RENDER ERROR:', error);
-    return (
-      <div className="p-10 text-center bg-red-50 min-h-screen flex flex-col items-center justify-center">
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-red-100 max-w-lg">
-          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaTimesCircle className="text-3xl" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Form Rendering Error</h2>
-          <p className="text-slate-600 mb-6">
-            We encountered a technical error while trying to display this form. 
-            Our team has been notified (check console for details).
-          </p>
-          <div className="bg-slate-50 p-4 rounded-lg text-left mb-6 overflow-auto max-h-32 font-mono text-xs text-red-600 border border-slate-200">
-            {error.message}
-          </div>
-          <button 
-            onClick={() => window.location.reload()}
-            className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors"
-          >
-            Try Refreshing Page
-          </button>
-        </div>
-      </div>
-    );
-  }
+    </div>
+  );
 };
 
 export default ComradesProductForm;

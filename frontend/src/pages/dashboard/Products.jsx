@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
+import ComradesProductForm from './comrades/ComradesProductForm';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   FaPlus,
@@ -20,7 +21,7 @@ import { useQuery } from '@tanstack/react-query';
 
 // Lazy load components
 const ProductCardSkeleton = lazy(() => import('../../components/ProductCardSkeleton'));
-const ComradesProductForm = lazy(() => import('./comrades/ComradesProductForm'));
+// const ComradesProductForm = lazy(() => import('./comrades/ComradesProductForm'));
 const ServiceForm = lazy(() => import('../../components/services/ServiceForm'));
 const FastFoodForm = lazy(() => import('./FastFoodForm'));
 const InventoryManagement = lazy(() => import('./components/InventoryManagement'));

@@ -53,7 +53,7 @@ const PageLayout = ({ children, title = 'Comrades360', description = 'Your one-s
               max-width: ${fluid ? 'none' : '1440px'};
               width: 100%;
               margin: ${fluid ? '0' : '0 auto'};
-              padding: ${fluid ? '0' : '0 0.5rem'};
+              padding: ${fluid ? '0' : '0 1rem'};
             }
             
             /* Skeleton loading animation */

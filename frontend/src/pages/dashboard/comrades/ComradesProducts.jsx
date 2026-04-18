@@ -577,7 +577,7 @@ const ComradesProducts = ({ status: initialStatus }) => {
   const isRootPath = location.pathname === '/dashboard/products/comrades';
 
   return (
-    <div className="p-6">
+    <div className="p-2 sm:p-6">
       {flash && (
         <div className="mb-4 p-4 border-l-4 border-green-500 bg-green-50 rounded">
           <div className="font-semibold text-green-800">{flash.message}</div>

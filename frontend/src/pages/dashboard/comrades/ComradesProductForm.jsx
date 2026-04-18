@@ -1997,8 +1997,8 @@ const ComradesProductForm = ({
 
   return (
     <div className="w-full max-w-5xl ml-0 mr-auto overflow-x-hidden">
-      <div className="bg-white rounded-lg shadow-lg">
-        <div className="p-3 sm:p-5 md:p-8">
+      <div className="sm:rounded-lg rounded-none shadow-md sm:shadow-lg bg-white overflow-hidden">
+        <div className="p-2 sm:p-5 md:p-8">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-4">
               <Button
@@ -2342,7 +2342,7 @@ const ComradesProductForm = ({
                 {/* Pricing + Stock */}
                 <div className={`p-6 rounded-lg border transition-colors ${validationErrors.basePrice || validationErrors.stock ? 'bg-red-50 border-red-500 shadow-md' : 'bg-blue-50 border-blue-200'}`}>
                   <h3 className={`text-xl font-semibold mb-4 ${validationErrors.basePrice || validationErrors.stock ? 'text-red-900' : 'text-blue-900'}`}>Pricing & Stock</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
                     <div ref={pricingRef} className="relative">
                       <div className="flex justify-between items-center mb-1">
                         <Label htmlFor="basePrice" className={`text-lg font-medium ${validationErrors.basePrice ? 'text-red-700' : 'text-blue-800'}`}>Base Price</Label>
@@ -2530,9 +2530,9 @@ const ComradesProductForm = ({
                         </div>
                       </div>
                       {(variant.options || []).filter(opt => opt).length > 0 && variant.name && (
-                        <div className="mt-4 overflow-x-auto border rounded-md shadow-inner bg-white">
+                        <div className="mt-4 overflow-x-auto -mx-2 sm:mx-0 border rounded-none sm:rounded-md shadow-inner bg-white">
                           <Label className="px-4 py-2 block border-b bg-gray-50 text-blue-900 font-bold">Variant Options and Prices</Label>
-                          <table className="min-w-[800px] w-full mt-2">
+                          <table className="min-w-[600px] sm:min-w-[800px] w-full mt-2">
                             <thead className="bg-gray-50">
                               <tr>
                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">{variant.name}</th>
@@ -3451,9 +3451,9 @@ const ComradesProductForm = ({
 
                 {/* Action buttons - Only show in Edit/Create/List mode */}
                 {(!effectiveIsViewMode || isEditing) && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t bg-white mt-8">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t bg-white mt-8 p-4 sm:p-0">
                     <AutoSaveIndicator lastSaved={autoLastSaved} isSaving={false} />
-                    <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 w-full sm:w-auto">
+                    <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-end gap-3 w-full sm:w-auto">
                       <Button
                         type="button"
                         variant="outline"

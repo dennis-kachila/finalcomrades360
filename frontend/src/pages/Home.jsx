@@ -986,9 +986,9 @@ function Home({ isMarketingMode: propMarketingMode = false }) {
         onAddToCart={handleAddToCart}
       />
 
-      <div data-testid="homepage-content" className="w-full px-0 md:px-4 pt-4 md:pt-8 pb-2">
+      <div data-testid="homepage-content" className="w-full px-1 sm:px-4 pt-4 md:pt-8 pb-2">
         {/* Quick Navigation Buttons */}
-        <div className="mb-6 flex items-center justify-center">
+        <div className="mb-6 flex items-center justify-center px-1 sm:px-0">
           <div className="flex flex-row gap-2 w-full max-w-xl">
             {isSectionVisible('products') && (
               <a href="/products" className="flex-1 px-1 py-1 rounded-md bg-gradient-to-br from-blue-500 to-blue-700 text-white font-medium text-xs sm:text-base shadow hover:scale-105 hover:shadow-lg transition-all flex flex-row items-center justify-center min-w-[60px] sm:min-w-[90px] h-8 sm:h-auto">
@@ -1013,8 +1013,8 @@ function Home({ isMarketingMode: propMarketingMode = false }) {
 
         {/* Product Category Filter Navigation */}
         {isSectionVisible('products') && (
-          <div className="bg-white border rounded-lg shadow-sm mb-6 mt-4">
-            <div className="px-4 py-4">
+          <div className="bg-white border rounded-none sm:rounded-lg shadow-sm mb-6 mt-4">
+            <div className="px-2 sm:px-4 py-4">
               <div className="flex items-center justify-end mb-2">
                 {selectedCategoryId !== 'all' && (
                   <button
@@ -1069,7 +1069,7 @@ function Home({ isMarketingMode: propMarketingMode = false }) {
 
       {/* Services Section */}
       {isSectionVisible('services') && ((!loading && !loadingServices && services.length === 0 && !selectedServiceSubcategory) ? null : (
-      <div className="w-full px-0 md:px-4 sm:py-4 py-2">
+      <div className="w-full px-1 sm:px-4 sm:py-4 py-2">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Best Services</h2>
@@ -1086,8 +1086,8 @@ function Home({ isMarketingMode: propMarketingMode = false }) {
         </div>
 
         {/* Subcategory Filter Navigation */}
-        <div className="bg-white border rounded-lg shadow-sm mb-6">
-          <div className="px-4 py-4">
+        <div className="bg-white border rounded-none sm:rounded-lg shadow-sm mb-6">
+          <div className="px-2 sm:px-4 py-4">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-semibold text-gray-900">Filter by Service Type</h4>
               {selectedServiceSubcategory && (

@@ -38,47 +38,34 @@ async function compressImage(inputPath, outputPath, options = {}) {
       }
     }
 
-    // Create sharp instance for processing
-    let image = sharp(inputPath).resize(newWidth, newHeight, {
-      fit: 'inside',
-      withoutEnlargement: true
-    });
+    // PASS 1: Fast compression
+    // If original is already massive (>3MB), start with lower quality to avoid 2nd pass
+    const stats = fs.statSync(inputPath);
+    const originalSize = stats.size;
+    
+    let startQuality = quality;
+    if (originalSize > 3 * 1024 * 1024) startQuality = 65;
 
-    // Always convert to JPEG for consistent storage and transfer efficiency.
-    image = image.jpeg({
-      quality,
-      progressive: true,
-      mozjpeg: true
-    });
+    let buffer = await sharp(inputPath)
+      .resize(newWidth, newHeight, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: startQuality, progressive: true, mozjpeg: true })
+      .toBuffer();
 
-    // Compress and save
-    const buffer = await image.toBuffer();
-
-    // If still too large, reduce quality iteratively
-    let currentQuality = quality;
-    let currentBuffer = buffer;
-
-    while (currentBuffer.length > maxSizeBytes && currentQuality > 10) {
-      currentQuality -= 10;
-      image = sharp(inputPath).resize(newWidth, newHeight, {
-        fit: 'inside',
-        withoutEnlargement: true
-      });
-
-      image = image.jpeg({
-        quality: currentQuality,
-        progressive: true,
-        mozjpeg: true
-      });
-
-      currentBuffer = await image.toBuffer();
+    // PASS 2: Emergency shrink (Only if Pass 1 failed 1MB limit)
+    let finalQuality = startQuality;
+    if (buffer.length > maxSizeBytes) {
+      console.log(`[Compression] Pass 1 exceeded 1MB (${(buffer.length/1024/1024).toFixed(2)}MB). Triggering emergency Pass 2...`);
+      finalQuality = 50; 
+      buffer = await sharp(inputPath)
+        .resize(newWidth, newHeight, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: finalQuality, progressive: true, mozjpeg: true })
+        .toBuffer();
     }
 
-    // Save the compressed image
-    await fs.promises.writeFile(outputPath, currentBuffer);
+    // Save the result
+    await fs.promises.writeFile(outputPath, buffer);
 
-    const originalSize = fs.statSync(inputPath).size;
-    const compressedSize = currentBuffer.length;
+    const compressedSize = buffer.length;
     const compressionRatio = ((originalSize - compressedSize) / originalSize * 100).toFixed(2);
 
     return {

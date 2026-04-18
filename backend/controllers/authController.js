@@ -288,26 +288,28 @@ const login = async (req, res) => {
     if (!isMatch) {
       console.log('[authController] Password mismatch return 401');
 
-      // Record failed login attempt
-      try {
-        const ipAddress = req.ip || req.connection.remoteAddress;
-        const userAgent = req.headers['user-agent'] || 'Unknown';
-        const { browser, os, device } = parseUA(userAgent);
-        const geo = geoip.lookup(ipAddress);
-        const location = geo ? `${geo.city}, ${geo.region}, ${geo.country}` : 'Unknown';
+      // Record failed login attempt (Backgrounded)
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const userAgent = req.headers['user-agent'] || 'Unknown';
+      setImmediate(async () => {
+        try {
+          const { browser, os, device } = parseUA(userAgent);
+          const geo = geoip.lookup(ipAddress);
+          const location = geo ? `${geo.city}, ${geo.region}, ${geo.country}` : 'Unknown';
 
-        await LoginHistory.create({
-          userId: user.id,
-          ipAddress,
-          browser,
-          os,
-          device,
-          location,
-          status: 'failed'
-        });
-      } catch (historyError) {
-        console.error('Error saving failed login history:', historyError);
-      }
+          await LoginHistory.create({
+            userId: user.id,
+            ipAddress,
+            browser,
+            os,
+            device,
+            location,
+            status: 'failed'
+          });
+        } catch (historyError) {
+          console.error('Error saving failed login history:', historyError);
+        }
+      });
 
       return res.status(401).json({
         success: false,
@@ -330,33 +332,28 @@ const login = async (req, res) => {
     console.log('[authController] Step 7: JWT Signed.');
 
     // Return success response
-    console.log('[authController] Step 8: Recording login history...');
-
-    // Update last login
-    await user.update({ lastLogin: new Date() });
-
-    // Record login history
-    try {
-      const ipAddress = req.ip || req.connection.remoteAddress;
-      const userAgent = req.headers['user-agent'] || 'Unknown';
-
-      const { browser, os, device } = parseUA(userAgent);
-      const geo = geoip.lookup(ipAddress);
-      const location = geo ? `${geo.city}, ${geo.region}, ${geo.country}` : 'Unknown';
-
-      await LoginHistory.create({
-        userId: user.id,
-        ipAddress,
-        browser,
-        os,
-        device,
-        location,
-        status: 'success'
-      });
-    } catch (historyError) {
-      console.error('Error saving login history:', historyError);
-      // Don't fail the login if history fails
-    }
+    // Background Tasks: Update last login and record history
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    setImmediate(async () => {
+      try {
+        await user.update({ lastLogin: new Date() });
+        const { browser, os, device } = parseUA(userAgent);
+        const geo = geoip.lookup(ipAddress);
+        const location = geo ? `${geo.city}, ${geo.region}, ${geo.country}` : 'Unknown';
+        await LoginHistory.create({
+          userId: user.id,
+          ipAddress,
+          browser,
+          os,
+          device,
+          location,
+          status: 'success'
+        });
+      } catch (historyError) {
+        console.error('Error in background login tasks:', historyError);
+      }
+    });
 
     console.log('[authController] Step 9: Preparing clean response...');
     const rawUser = user.toJSON();

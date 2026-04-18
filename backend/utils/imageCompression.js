@@ -12,23 +12,25 @@ const fs = require('fs');
 async function compressImage(inputPath, outputPath, options = {}) {
   try {
     const {
-      quality = 80,           // JPEG quality (0-100)
-      maxWidth = 1600,        // Maximum width in pixels
-      maxHeight = 1600,       // Maximum height in pixels
+      quality = 75,           // Optimized for fast processing
+      maxWidth = 1600,
+      maxHeight = 1600,
       maxSizeBytes = 1 * 1024 * 1024 // 1MB maximum size
     } = options;
+
+    const stats = fs.statSync(inputPath);
+    const originalSize = stats.size;
 
     // Get image metadata
     const metadata = await sharp(inputPath).metadata();
     const { width, height } = metadata;
 
-    // Calculate new dimensions while maintaining aspect ratio
+    // Calculate new dimensions
     let newWidth = width;
     let newHeight = height;
 
     if (width > maxWidth || height > maxHeight) {
       const aspectRatio = width / height;
-
       if (width > height) {
         newWidth = Math.min(width, maxWidth);
         newHeight = Math.round(newWidth / aspectRatio);
@@ -38,47 +40,31 @@ async function compressImage(inputPath, outputPath, options = {}) {
       }
     }
 
-    // Create sharp instance for processing
-    let image = sharp(inputPath).resize(newWidth, newHeight, {
-      fit: 'inside',
-      withoutEnlargement: true
-    });
+    // PASS 1: Fast compression
+    // If original is already massive (>3MB), start with lower quality to avoid 2nd pass
+    let startQuality = quality;
+    if (originalSize > 3 * 1024 * 1024) startQuality = 65;
 
-    // Always convert to JPEG for consistent storage and transfer efficiency.
-    image = image.jpeg({
-      quality,
-      progressive: true,
-      mozjpeg: true
-    });
+    let buffer = await sharp(inputPath)
+      .resize(newWidth, newHeight, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: startQuality, progressive: true, mozjpeg: true })
+      .toBuffer();
 
-    // Compress and save
-    const buffer = await image.toBuffer();
-
-    // If still too large, reduce quality iteratively
-    let currentQuality = quality;
-    let currentBuffer = buffer;
-
-    while (currentBuffer.length > maxSizeBytes && currentQuality > 10) {
-      currentQuality -= 10;
-      image = sharp(inputPath).resize(newWidth, newHeight, {
-        fit: 'inside',
-        withoutEnlargement: true
-      });
-
-      image = image.jpeg({
-        quality: currentQuality,
-        progressive: true,
-        mozjpeg: true
-      });
-
-      currentBuffer = await image.toBuffer();
+    // PASS 2: Emergency shrink (Only if Pass 1 failed 1MB limit)
+    let finalQuality = startQuality;
+    if (buffer.length > maxSizeBytes) {
+      console.log(`[Compression] Pass 1 exceeded 1MB (${(buffer.length/1024/1024).toFixed(2)}MB). Triggering emergency Pass 2...`);
+      finalQuality = 50; 
+      buffer = await sharp(inputPath)
+        .resize(newWidth, newHeight, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: finalQuality, progressive: true, mozjpeg: true })
+        .toBuffer();
     }
 
-    // Save the compressed image
-    await fs.promises.writeFile(outputPath, currentBuffer);
+    // Save the result
+    await fs.promises.writeFile(outputPath, buffer);
 
-    const originalSize = fs.statSync(inputPath).size;
-    const compressedSize = currentBuffer.length;
+    const compressedSize = buffer.length;
     const compressionRatio = ((originalSize - compressedSize) / originalSize * 100).toFixed(2);
 
     return {
@@ -86,17 +72,14 @@ async function compressImage(inputPath, outputPath, options = {}) {
       originalSize,
       compressedSize,
       compressionRatio: `${compressionRatio}%`,
-      finalQuality: currentQuality,
+      finalQuality,
       newDimensions: { width: newWidth, height: newHeight },
       savedBytes: originalSize - compressedSize
     };
 
   } catch (error) {
     console.error('Image compression error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+    return { success: false, error: error.message };
   }
 }
 

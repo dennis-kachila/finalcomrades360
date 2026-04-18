@@ -318,19 +318,27 @@ export default function CustomerOrders() {
     return getCustomerStatus(order);
   };
 
-  // Check if order can be cancelled (within 10 minutes and not shipped)
+  // Check if order can be cancelled based on order type:
+  // - Food orders: within 10 minutes
+  // - Product orders: within 24 hours
   const canCancelOrder = (order) => {
     const orderTime = new Date(order.createdAt);
     const now = new Date();
-    const timeDiff = (now - orderTime) / (1000 * 60); // minutes
-    const canCancel = timeDiff <= 10 && ['order_placed', 'seller_confirmed', 'super_admin_confirmed', 'processing'].includes(order.status);
+    const timeDiffMinutes = (now - orderTime) / (1000 * 60);
+
+    const isFoodOrder = (order.OrderItems || []).some(item => item.itemType === 'fastfood' || item.fastFoodId);
+    const windowMinutes = isFoodOrder ? 10 : 24 * 60;
+
+    const canCancel = timeDiffMinutes <= windowMinutes &&
+      ['order_placed', 'seller_confirmed', 'super_admin_confirmed', 'processing'].includes(order.status);
 
     console.log(`🕐 CustomerOrders.jsx - Cancel Check for Order ${order.id}:`);
     console.log(`  Order createdAt: ${order.createdAt}`);
     console.log(`  Order time: ${orderTime.toISOString()}`);
     console.log(`  Current time: ${now.toISOString()}`);
-    console.log(`  Time diff: ${timeDiff.toFixed(2)} minutes`);
+    console.log(`  Time diff: ${timeDiffMinutes.toFixed(2)} minutes`);
     console.log(`  Status: ${order.status}`);
+    console.log(`  isFoodOrder: ${isFoodOrder}, window: ${windowMinutes} minutes`);
     console.log(`  Can cancel: ${canCancel}`);
 
     return canCancel;
@@ -394,7 +402,7 @@ export default function CustomerOrders() {
       }
     } catch (error) {
       console.error('Cancel order error:', error);
-      alert('Failed to cancel order. Please try again.');
+      alert(error.response?.data?.error || error.response?.data?.message || 'Failed to cancel order. Please try again.');
     }
   };
 

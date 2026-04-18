@@ -1,5 +1,5 @@
 const { sequelize } = require('../database/database');
-const { Product, User, Wallet, Transaction, Order, OrderItem, Commission, DeliveryAgentProfile, Cart, FastFood, Service, DeliveryTask, DeliveryCharge, Warehouse, PickupStation, FastFoodPickupPoint, PlatformConfig, Notification, HandoverCode, Batch } = require('../models');
+const { Product, User, Wallet, Transaction, Order, OrderItem, Commission, DeliveryAgentProfile, Cart, FastFood, Service, DeliveryTask, DeliveryCharge, Warehouse, PickupStation, FastFoodPickupPoint, PlatformConfig, Notification, HandoverCode, Batch, Payment } = require('../models');
 
 const { calculateCommission: createCommissionRecords } = require('./commissionController');
 const { isValidTransition, getValidTransitionsForOrder, autoCreateDeliveryTask } = require('./orderTransitionController');
@@ -21,6 +21,8 @@ const { upsertDeliveryChargeForTask, invoiceSellerChargeImmediately } = require(
 
 const currentShare = 70; // 70% share for agent
 const currentRate = 30; // 30% rate for platform
+const FOOD_ORDER_CANCEL_WINDOW_MINUTES = 10;
+const PRODUCT_ORDER_CANCEL_WINDOW_HOURS = 24;
 
 const parseMaybeJson = (value, fallback) => {
   if (value === null || value === undefined || value === '') return fallback;
@@ -3879,6 +3881,23 @@ const cancelOrder = async (req, res) => {
       if (hasFastFood && ['seller_confirmed', 'super_admin_confirmed', 'processing'].includes(order.status)) {
         await t.rollback();
         return res.status(400).json({ error: `Fast food order ${order.orderNumber} cannot be cancelled once preparation has started.` });
+      }
+
+      // Time-window enforcement (customers only; admins bypass)
+      if (req.user.role === 'customer') {
+        const orderAge = (Date.now() - new Date(order.createdAt).getTime()) / (1000 * 60); // minutes
+        if (hasFastFood) {
+          if (orderAge > FOOD_ORDER_CANCEL_WINDOW_MINUTES) {
+            await t.rollback();
+            return res.status(400).json({ error: `Food order ${order.orderNumber} can only be cancelled within ${FOOD_ORDER_CANCEL_WINDOW_MINUTES} minutes of placing it.` });
+          }
+        } else {
+          const orderAgeHours = orderAge / 60;
+          if (orderAgeHours > PRODUCT_ORDER_CANCEL_WINDOW_HOURS) {
+            await t.rollback();
+            return res.status(400).json({ error: `Order ${order.orderNumber} can only be cancelled within ${PRODUCT_ORDER_CANCEL_WINDOW_HOURS} hours of placing it.` });
+          }
+        }
       }
     }
 

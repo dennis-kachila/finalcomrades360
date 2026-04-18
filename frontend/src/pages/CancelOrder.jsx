@@ -62,19 +62,22 @@ export default function CancelOrder() {
     const allowedStatuses = ['order_placed', 'seller_confirmed', 'super_admin_confirmed', 'processing'];
     if (!allowedStatuses.includes(order.status)) return false;
 
-    // Check time window (10 minutes)
     const orderTime = new Date(order.createdAt);
     const now = new Date();
-    const timeDiff = (now - orderTime) / (1000 * 60); // minutes
+    const timeDiffMinutes = (now - orderTime) / (1000 * 60);
+
+    const isFoodOrder = order.OrderItems?.some(item => item.itemType === 'fastfood' || item.fastFoodId);
+    const windowMinutes = isFoodOrder ? 10 : 24 * 60;
 
     console.log(`🕐 Frontend - Cancel Check for Order ${order.id}:`);
     console.log(`  Order createdAt: ${order.createdAt}`);
     console.log(`  Order time: ${orderTime.toISOString()}`);
     console.log(`  Current time: ${now.toISOString()}`);
-    console.log(`  Time diff: ${timeDiff.toFixed(2)} minutes`);
-    console.log(`  Can cancel: ${timeDiff <= 10}`);
+    console.log(`  Time diff: ${timeDiffMinutes.toFixed(2)} minutes`);
+    console.log(`  isFoodOrder: ${isFoodOrder}, window: ${windowMinutes} minutes`);
+    console.log(`  Can cancel: ${timeDiffMinutes <= windowMinutes}`);
 
-    return timeDiff <= 10;
+    return timeDiffMinutes <= windowMinutes;
   };
 
   const handleCancelOrder = async () => {
@@ -118,7 +121,7 @@ export default function CancelOrder() {
       }
     } catch (err) {
       console.error('Cancel order error:', err);
-      setError(err.response?.data?.message || 'Failed to cancel order. Please try again.');
+      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to cancel order. Please try again.');
     } finally {
       setCancelling(false);
     }
@@ -199,6 +202,8 @@ export default function CancelOrder() {
   }
 
   const isCancellable = canCancelOrder(order);
+  const isFoodOrder = order?.OrderItems?.some(item => item.itemType === 'fastfood' || item.fastFoodId);
+  const cancellationWindowLabel = isFoodOrder ? '10 minutes' : '24 hours';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -358,14 +363,14 @@ export default function CancelOrder() {
                       ? 'Order has already been shipped or delivered'
                       : order.status === 'Cancelled'
                         ? 'Order is already cancelled'
-                        : 'Cancellation window has expired (10 minutes)'}
+                        : `Cancellation window has expired (${cancellationWindowLabel})`}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center text-green-600">
                     <FaCheckCircle className="mr-2" />
-                    <span className="text-sm">Within cancellation window</span>
+                    <span className="text-sm">Within cancellation window ({cancellationWindowLabel})</span>
                   </div>
                   <div className="flex items-center text-green-600">
                     <FaCheckCircle className="mr-2" />

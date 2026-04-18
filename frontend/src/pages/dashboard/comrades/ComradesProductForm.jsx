@@ -448,11 +448,13 @@ const ComradesProductForm = ({
 
   // Helper to find category/subcategory name by ID
   const getCategoryName = (id) => {
+    if (!allCategories || !Array.isArray(allCategories)) return `[Category ${id}]`;
     const category = allCategories.find(cat => String(cat.id) === String(id) || String(cat._id) === String(id));
     return category ? category.name : `[Category ${id}]`;
   };
 
   const getSubcategoryName = (categoryId, subcategoryId) => {
+    if (!allCategories || !Array.isArray(allCategories)) return `[Subcategory ${subcategoryId}]`;
     const category = allCategories.find(cat => String(cat.id) === String(categoryId) || String(cat._id) === String(categoryId));
     if (!category) return `[Subcategory ${subcategoryId}]`;
 
@@ -644,29 +646,35 @@ const ComradesProductForm = ({
           physicalFeatures: ensureObject(product.physicalFeatures || product.attributes),
           specifications: ensureObject(product.specifications),
           variants: (function () {
-            let variants = ensureArray(product.variants);
-            return variants.map(v => {
-              const optionDetails = {};
-              if (v.prices && !v.optionDetails) {
-                Object.entries(v.prices).forEach(([opt, price]) => {
-                  const dispPrice = parseFloat(price || 0);
-                  const discPercent = 0; // Legacy mapping didn't have disc %
-                  const discPrice = dispPrice;
-                  optionDetails[opt] = { basePrice: price, displayPrice: price, discountPercentage: 0, discountPrice: discPrice.toFixed(2) };
-                });
-                return { ...v, optionDetails };
-              } else if (v.optionDetails) {
-                // Pre-calculate discountPrice if missing or needs update
-                Object.entries(v.optionDetails).forEach(([opt, details]) => {
-                  const disp = parseFloat(details.displayPrice || details.basePrice || 0);
-                  const perc = parseFloat(details.discountPercentage || 0);
-                  const calc = perc > 0 ? disp * (1 - perc / 100) : disp;
-                  optionDetails[opt] = { ...details, discountPrice: calc.toFixed(2) };
-                });
-                return { ...v, optionDetails };
-              }
-              return v;
-            });
+            try {
+              let variants = ensureArray(product.variants);
+              return variants.map(v => {
+                if (!v) return null;
+                const optionDetails = {};
+                if (v.prices && !v.optionDetails) {
+                  Object.entries(v.prices).forEach(([opt, price]) => {
+                    const dispPrice = parseFloat(price || 0);
+                    const discPrice = dispPrice;
+                    optionDetails[opt] = { basePrice: price, displayPrice: price, discountPercentage: 0, discountPrice: discPrice.toFixed(2) };
+                  });
+                  return { ...v, optionDetails };
+                } else if (v.optionDetails) {
+                  // Pre-calculate discountPrice if missing or needs update
+                  Object.entries(v.optionDetails).forEach(([opt, details]) => {
+                    if (!details) return;
+                    const disp = parseFloat(details.displayPrice || details.basePrice || 0);
+                    const perc = parseFloat(details.discountPercentage || 0);
+                    const calc = perc > 0 ? disp * (1 - perc / 100) : disp;
+                    optionDetails[opt] = { ...details, discountPrice: calc.toFixed(2) };
+                  });
+                  return { ...v, optionDetails };
+                }
+                return { ...v, optionDetails: v.optionDetails || {} };
+              }).filter(Boolean);
+            } catch (e) {
+              console.warn('[ComradesProductForm] Variant parsing failed:', e);
+              return [];
+            }
           })(),
 
           marketingStartDate: formatBackendDate(product.marketingStartDate),
@@ -3554,8 +3562,33 @@ const ComradesProductForm = ({
           confirmLabel={effectiveIsEditMode ? 'Done' : 'Back to Products'}
         />
       </div>
-    </div>
-  );
+    );
+  } catch (error) {
+    console.error('❌ [ComradesProductForm] CRITICAL RENDER ERROR:', error);
+    return (
+      <div className="p-10 text-center bg-red-50 min-h-screen flex flex-col items-center justify-center">
+        <div className="bg-white p-8 rounded-2xl shadow-xl border border-red-100 max-w-lg">
+          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FaTimesCircle className="text-3xl" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Form Rendering Error</h2>
+          <p className="text-slate-600 mb-6">
+            We encountered a technical error while trying to display this form. 
+            Our team has been notified (check console for details).
+          </p>
+          <div className="bg-slate-50 p-4 rounded-lg text-left mb-6 overflow-auto max-h-32 font-mono text-xs text-red-600 border border-slate-200">
+            {error.message}
+          </div>
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors"
+          >
+            Try Refreshing Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 };
 
 export default ComradesProductForm;

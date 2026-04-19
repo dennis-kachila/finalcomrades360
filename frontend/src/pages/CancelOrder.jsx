@@ -59,14 +59,20 @@ export default function CancelOrder() {
 
   const canCancelOrder = (order) => {
     if (!order) return false;
-    const allowedStatuses = ['order_placed', 'seller_confirmed', 'super_admin_confirmed', 'processing'];
-    if (!allowedStatuses.includes(order.status)) return false;
+
+    const isFoodOrder = order.OrderItems?.some(item => item.itemType === 'fastfood' || item.fastFoodId);
+    // Food orders can only be cancelled at order_placed (backend rejects later statuses)
+    const allowedStatuses = isFoodOrder
+      ? ['order_placed']
+      : ['order_placed', 'seller_confirmed', 'super_admin_confirmed', 'processing'];
+
+    const normalizedStatus = order.status == null ? '' : String(order.status).toLowerCase();
+
+    if (!allowedStatuses.includes(normalizedStatus)) return false;
 
     const orderTime = new Date(order.createdAt);
     const now = new Date();
     const timeDiffMinutes = (now - orderTime) / (1000 * 60);
-
-    const isFoodOrder = order.OrderItems?.some(item => item.itemType === 'fastfood' || item.fastFoodId);
     const windowMinutes = isFoodOrder ? 10 : 24 * 60;
 
     console.log(`🕐 Frontend - Cancel Check for Order ${order.id}:`);
@@ -359,9 +365,9 @@ export default function CancelOrder() {
                   <FaTimesCircle className="mx-auto h-12 w-12 text-red-500 mb-3" />
                   <p className="text-red-600 font-medium">Order cannot be cancelled</p>
                   <p className="text-sm text-gray-600 mt-2">
-                    {order.status === 'Shipped' || order.status === 'Delivered'
+                    {['shipped', 'delivered'].includes(String(order.status).toLowerCase())
                       ? 'Order has already been shipped or delivered'
-                      : order.status === 'Cancelled'
+                      : String(order.status).toLowerCase() === 'cancelled'
                         ? 'Order is already cancelled'
                         : `Cancellation window has expired (${cancellationWindowLabel})`}
                   </p>

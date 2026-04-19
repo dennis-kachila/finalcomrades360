@@ -319,18 +319,31 @@ export default function CustomerOrders() {
   };
 
   // Check if order can be cancelled based on order type:
-  // - Food orders: within 10 minutes
+  // - Food orders: within 10 minutes, only when status is order_placed
   // - Product orders: within 24 hours
+  // For grouped orders, derive food status from sub-orders (use stricter rule if any sub-order is food)
   const canCancelOrder = (order) => {
+    const subOrders = order.isGroup ? (order.orders || []) : [order];
     const orderTime = new Date(order.createdAt);
     const now = new Date();
     const timeDiffMinutes = (now - orderTime) / (1000 * 60);
 
-    const isFoodOrder = (order.OrderItems || []).some(item => item.itemType === 'fastfood' || item.fastFoodId);
+    const isFoodOrder = subOrders.some(o =>
+      (o.OrderItems || []).some(item => item.itemType === 'fastfood' || item.fastFoodId)
+    );
     const windowMinutes = isFoodOrder ? 10 : 24 * 60;
 
-    const canCancel = timeDiffMinutes <= windowMinutes &&
-      ['order_placed', 'seller_confirmed', 'super_admin_confirmed', 'processing'].includes(order.status);
+    const allowedStatuses = isFoodOrder
+      ? ['order_placed']
+      : ['order_placed', 'seller_confirmed', 'super_admin_confirmed', 'processing'];
+
+    // For grouped orders, every sub-order's status must satisfy the constraint
+    const allStatusesAllowed = subOrders.every(o => {
+      const normalizedStatus = o?.status == null ? '' : String(o.status).toLowerCase();
+      return allowedStatuses.includes(normalizedStatus);
+    });
+
+    const canCancel = timeDiffMinutes <= windowMinutes && allStatusesAllowed;
 
     console.log(`🕐 CustomerOrders.jsx - Cancel Check for Order ${order.id}:`);
     console.log(`  Order createdAt: ${order.createdAt}`);

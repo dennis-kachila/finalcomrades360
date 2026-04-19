@@ -3843,11 +3843,13 @@ const cancelOrder = async (req, res) => {
     if (isGroup) {
       orders = await Order.findAll({
         where: { checkoutGroupId: groupId },
-        include: [{ model: OrderItem, as: 'OrderItems', include: [{ model: Product, as: 'Product' }, { model: FastFood, as: 'FastFood' }] }]
+        // required: false → LEFT JOIN keeps OrderItems with null productId/fastFoodId (fastfood rows)
+        include: [{ model: OrderItem, as: 'OrderItems', include: [{ model: Product, as: 'Product', required: false }, { model: FastFood, as: 'FastFood', required: false }] }]
       });
     } else {
       const order = await Order.findByPk(orderId, {
-        include: [{ model: OrderItem, as: 'OrderItems', include: [{ model: Product, as: 'Product' }, { model: FastFood, as: 'FastFood' }] }]
+        // required: false → LEFT JOIN keeps OrderItems with null productId/fastFoodId (fastfood rows)
+        include: [{ model: OrderItem, as: 'OrderItems', include: [{ model: Product, as: 'Product', required: false }, { model: FastFood, as: 'FastFood', required: false }] }]
       });
       if (order) orders = [order];
     }
@@ -3883,8 +3885,8 @@ const cancelOrder = async (req, res) => {
         return res.status(400).json({ error: `Fast food order ${order.orderNumber} cannot be cancelled once preparation has started.` });
       }
 
-      // Time-window enforcement (customers only; admins bypass)
-      if (req.user.role === 'customer') {
+      // Time-window enforcement (admins bypass; all other roles enforced)
+      if (!['admin', 'super_admin'].includes(req.user.role)) {
         const orderAge = (Date.now() - new Date(order.createdAt).getTime()) / (1000 * 60); // minutes
         if (hasFastFood) {
           if (orderAge > FOOD_ORDER_CANCEL_WINDOW_MINUTES) {

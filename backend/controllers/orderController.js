@@ -3843,10 +3843,12 @@ const cancelOrder = async (req, res) => {
     if (isGroup) {
       orders = await Order.findAll({
         where: { checkoutGroupId: groupId },
+        // required: false → LEFT JOIN keeps OrderItems with null productId/fastFoodId (fastfood rows)
         include: [{ model: OrderItem, as: 'OrderItems', include: [{ model: Product, as: 'Product', required: false }, { model: FastFood, as: 'FastFood', required: false }] }]
       });
     } else {
       const order = await Order.findByPk(orderId, {
+        // required: false → LEFT JOIN keeps OrderItems with null productId/fastFoodId (fastfood rows)
         include: [{ model: OrderItem, as: 'OrderItems', include: [{ model: Product, as: 'Product', required: false }, { model: FastFood, as: 'FastFood', required: false }] }]
       });
       if (order) orders = [order];

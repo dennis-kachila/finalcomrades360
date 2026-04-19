@@ -3,6 +3,9 @@ jest.mock('../utils/messageService', () => ({
   sendMessage: jest.fn().mockResolvedValue({ success: true }),
 }));
 
+// Set ephemeral port before requiring app so parallel Jest workers don't conflict
+process.env.PORT = 0;
+
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const app = require('../app');
@@ -19,14 +22,35 @@ function makeToken(user) {
   return jwt.sign({ id: user.id }, jwtSecret, { expiresIn: '1h' });
 }
 
+/**
+ * Poll /api/health until it returns 200 (routes fully registered) or timeout.
+ * This is more reliable than a fixed setTimeout on slow machines/CI.
+ */
+async function waitForAppReadiness({ timeoutMs = 10000, intervalMs = 100 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const response = await request(app).get('/api/health');
+      if (response.status === 200) return;
+    } catch (_err) {
+      // Routes may not be registered yet; keep retrying until deadline.
+    }
+
+    await new Promise(resolve => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error('Timed out waiting for app readiness via GET /api/health');
+}
+
 describe('Order cancellation window enforcement', () => {
   let customerUser;
   let adminUser;
   let sellerUser;
 
   beforeAll(async () => {
-    // Wait for server's lazy route registration (routes are registered via setImmediate after port bind)
-    await new Promise(r => setTimeout(r, 2000));
+    // Wait deterministically for lazy route registration to complete.
+    await waitForAppReadiness();
 
     // Ensure tables exist (non-destructive)
     await sequelize.sync({ force: false, alter: false });
@@ -103,12 +127,16 @@ describe('Order cancellation window enforcement', () => {
     });
     createdOrderIds.push(order.id);
 
-    // Backdate createdAt via raw SQL to test time-window boundaries
-    // Note: Order model uses freezeTableName:true so the table is named "Order"
+    // Backdate createdAt via Sequelize QueryInterface so the test remains portable across dialects.
+    // Pass Order.rawAttributes as the 5th argument so Sequelize coerces the Date to the correct
+    // storage format for the dialect (ISO string for SQLite, DATETIME for MySQL).
     if (ageMinutes !== undefined) {
-      await sequelize.query(
-        'UPDATE "Order" SET "createdAt" = ? WHERE id = ?',
-        { replacements: [new Date(Date.now() - ageMinutes * 60 * 1000), order.id] }
+      await sequelize.getQueryInterface().bulkUpdate(
+        Order.getTableName(),
+        { createdAt: new Date(Date.now() - ageMinutes * 60 * 1000) },
+        { id: order.id },
+        {},
+        Order.rawAttributes
       );
     }
 

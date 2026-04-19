@@ -338,7 +338,10 @@ export default function CustomerOrders() {
       : ['order_placed', 'seller_confirmed', 'super_admin_confirmed', 'processing'];
 
     // For grouped orders, every sub-order's status must satisfy the constraint
-    const allStatusesAllowed = subOrders.every(o => allowedStatuses.includes(o.status));
+    const allStatusesAllowed = subOrders.every(o => {
+      const normalizedStatus = o?.status == null ? '' : String(o.status).toLowerCase();
+      return allowedStatuses.includes(normalizedStatus);
+    });
 
     const canCancel = timeDiffMinutes <= windowMinutes && allStatusesAllowed;
 

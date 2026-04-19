@@ -66,7 +66,9 @@ export default function CancelOrder() {
       ? ['order_placed']
       : ['order_placed', 'seller_confirmed', 'super_admin_confirmed', 'processing'];
 
-    if (!allowedStatuses.includes(order.status)) return false;
+    const normalizedStatus = typeof order.status === 'string' ? order.status.toLowerCase() : '';
+
+    if (!allowedStatuses.includes(normalizedStatus)) return false;
 
     const orderTime = new Date(order.createdAt);
     const now = new Date();

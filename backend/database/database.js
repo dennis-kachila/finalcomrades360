@@ -4,15 +4,21 @@ const fs = require('fs');
 const dotenv = require('dotenv');
 
 // Load environment variables with robust path detection
-const rootPath = path.resolve(__dirname, '..', '..');
-const envPath = path.join(rootPath, '.env');
+const rootEnv = path.resolve(__dirname, '..', '..', '.env');
+const rootEnvProd = path.resolve(__dirname, '..', '..', '.env.production');
+const backendEnv = path.resolve(__dirname, '..', '.env');
 
-console.log(`[Database] Attempting to load .env from: ${envPath}`);
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
+if (fs.existsSync(rootEnvProd)) {
+  console.log(`[Database] Loading production env from: ${rootEnvProd}`);
+  dotenv.config({ path: rootEnvProd });
+} else if (fs.existsSync(rootEnv)) {
+  console.log(`[Database] Loading env from: ${rootEnv}`);
+  dotenv.config({ path: rootEnv });
+} else if (fs.existsSync(backendEnv)) {
+  console.log(`[Database] Loading fallback backend env from: ${backendEnv}`);
+  dotenv.config({ path: backendEnv });
 } else {
-  console.warn(`⚠️ Warning: root .env not found at ${envPath}`);
-  dotenv.config(); // Fallback to default behavior
+  console.warn(`⚠️ Warning: No .env found. Using process.env defaults.`);
 }
 
 const isProd = process.env.NODE_ENV === 'production';

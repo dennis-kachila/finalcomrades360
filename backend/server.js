@@ -9,11 +9,15 @@ const path = require('path');
 const fs = require('fs');
 
 // Load environment variables with robust path detection
-const envPath = path.resolve(__dirname, '..', '.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
+const rootEnv = path.resolve(__dirname, '..', '.env');
+const rootEnvProd = path.resolve(__dirname, '..', '.env.production');
+
+if (fs.existsSync(rootEnvProd)) {
+  dotenv.config({ path: rootEnvProd });
+} else if (fs.existsSync(rootEnv)) {
+  dotenv.config({ path: rootEnv });
 } else {
-  console.warn(`⚠️ Warning: root .env not found at ${envPath}`);
+  console.warn('⚠️ Warning: No root .env or .env.production found.');
   dotenv.config();
 }
 
@@ -224,8 +228,6 @@ function initializeRoutes(app) {
   app.use('/api/images', require('./routes/imageRoutes'));
 
   console.error('✅ 35+ Route modules successfully lazy-loaded.');
-  
-  // finalizeMiddleware(app) call removed from here - will be called at the very end of the file
 }
 
 // Final Middleware Function (Deferred to stay at end of stack)
@@ -388,7 +390,8 @@ const server = createServer(app);
 server.timeout = 60000;
 server.keepAliveTimeout = 65000;
 
-const DEFAULT_PORT = process.env.PORT || (process.env.NODE_ENV === 'production' ? 5000 : 5001);
+// Passenger/cPanel often provides process.env.PORT
+const DEFAULT_PORT = process.env.PORT || (process.env.NODE_ENV === 'production' ? 5000 : 4000);
 
 // Socket.IO configuration
 const socketAllowedOrigins = [
@@ -523,12 +526,11 @@ async function startServer() {
     }
   } else {
     console.error('ℹ️ Server already listening (Passenger managed), skipping manual listen call.');
-    // Defer initialization for managed environments
+    // Managed environment: Start everything immediately
     setImmediate(async () => {
       try {
         const { testConnection } = require('./database/database');
         await testConnection();
-        // initializeRoutes(app); // No longer needed here as it's called globally above
         
         const cache = require('./scripts/services/cacheService');
         await cache.connect();

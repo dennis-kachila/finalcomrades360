@@ -706,19 +706,28 @@ exports.updateFastFood = async (req, res) => {
                         });
                     }
 
-                    // AUTO-FILL: If location is missing, attempt to pull from Vendor's Business Profile
-                    if (!updateData.vendorLocation || !updateData.vendorLat || !updateData.vendorLng) {
+                    // Determine final state of location fields (merged with existing data)
+                    const currentLoc = updateData.vendorLocation !== undefined ? updateData.vendorLocation : fastFood.vendorLocation;
+                    const currentLat = updateData.vendorLat !== undefined ? updateData.vendorLat : fastFood.vendorLat;
+                    const currentLng = updateData.vendorLng !== undefined ? updateData.vendorLng : fastFood.vendorLng;
+
+                    // AUTO-FILL: If location info is still missing, attempt to pull from Vendor's Business Profile
+                    if (!currentLoc || !currentLat || !currentLng) {
                         const vendorProfile = await User.findByPk(fastFood.vendor);
                         if (vendorProfile) {
-                            updateData.vendorLocation = updateData.vendorLocation || vendorProfile.businessAddress;
-                            updateData.vendorLat = updateData.vendorLat || vendorProfile.businessLat;
-                            updateData.vendorLng = updateData.vendorLng || vendorProfile.businessLng;
+                            if (!currentLoc && vendorProfile.businessAddress) updateData.vendorLocation = vendorProfile.businessAddress;
+                            if (!currentLat && vendorProfile.businessLat) updateData.vendorLat = vendorProfile.businessLat;
+                            if (!currentLng && vendorProfile.businessLng) updateData.vendorLng = vendorProfile.businessLng;
                             console.log(`[updateFastFood] Auto-filled location for vendor ${fastFood.vendor} from business profile.`);
                         }
                     }
 
-                    // FINAL VALIDATION: Vendor Location (Mandatory for Smart Filtering)
-                    if (!updateData.vendorLocation || !updateData.vendorLat || !updateData.vendorLng) {
+                    // FINAL VALIDATION: Re-check merged results after auto-fill
+                    const finalLoc = updateData.vendorLocation !== undefined ? updateData.vendorLocation : fastFood.vendorLocation;
+                    const finalLat = updateData.vendorLat !== undefined ? updateData.vendorLat : fastFood.vendorLat;
+                    const finalLng = updateData.vendorLng !== undefined ? updateData.vendorLng : fastFood.vendorLng;
+
+                    if (!finalLoc || !finalLat || !finalLng) {
                         return res.status(400).json({
                             success: false,
                             message: 'Vendor Location and Coordinates (Lat/Lng) are required for smart menu filtering. Vendor profile must be complete.'

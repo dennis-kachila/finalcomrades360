@@ -1331,12 +1331,17 @@ const FastFoodDetails = () => {
                 <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2 mb-3 sm:mb-4"><Utensils className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" /> Ingredients</h3>
                 {ingredients.length > 0 ? (
                   <ul className="space-y-2 text-sm text-gray-700">
-                    {ingredients.map((ingredient, index) => (
-                      <li key={`${ingredient.name}-${index}`}>
-                        <span className="font-semibold">{ingredient.name}</span>
-                        {ingredient.quantity ? ` (${ingredient.quantity})` : ''}
-                      </li>
-                    ))}
+                    {ingredients.map((ingredient, index) => {
+                      const name = typeof ingredient.name === 'object' ? (ingredient.name?.name || JSON.stringify(ingredient.name)) : String(ingredient.name || 'Unnamed Ingredient');
+                      const qty = typeof ingredient.quantity === 'object' ? (ingredient.quantity?.value || JSON.stringify(ingredient.quantity)) : String(ingredient.quantity || '');
+                      
+                      return (
+                        <li key={`${name}-${index}`}>
+                          <span className="font-semibold">{name}</span>
+                          {qty ? ` (${qty})` : ''}
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <p className="text-sm text-gray-500">Ingredients not listed.</p>
@@ -1344,11 +1349,14 @@ const FastFoodDetails = () => {
 
                 {dietaryTags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-4">
-                    {dietaryTags.map((tag, idx) => (
-                      <span key={`${tag}-${idx}`} className="px-2 py-1 text-[11px] rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
-                        {tag}
-                      </span>
-                    ))}
+                    {dietaryTags.map((tag, idx) => {
+                      const tagLabel = typeof tag === 'object' ? (tag.name || tag.label || JSON.stringify(tag)) : String(tag);
+                      return (
+                        <span key={`${tagLabel}-${idx}`} className="px-2 py-1 text-[11px] rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          {tagLabel}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1377,12 +1385,19 @@ const FastFoodDetails = () => {
                         <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" /> Customization Notes
                       </h3>
                       <ul className="space-y-2">
-                        {customizations.map((note, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-sm text-gray-600 italic">
-                            <div className="mt-1.5 h-1 w-1 rounded-full bg-orange-400 shrink-0" />
-                            {note}
-                          </li>
-                        ))}
+                        {customizations.map((note, idx) => {
+                          const noteText = typeof note === 'object' 
+                            ? (note.name || note.label || note.title || JSON.stringify(note)) 
+                            : String(note);
+                          const notePrice = (typeof note === 'object' && note.price) ? ` (KES ${note.price})` : '';
+                          
+                          return (
+                            <li key={idx} className="flex items-start gap-2 text-sm text-gray-600 italic">
+                              <div className="mt-1.5 h-1 w-1 rounded-full bg-orange-400 shrink-0" />
+                              {noteText}{notePrice}
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   )}
@@ -1396,11 +1411,14 @@ const FastFoodDetails = () => {
                   <p className="font-semibold text-red-700 text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Allergen Information</p>
                   {allergens.length > 0 ? (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {allergens.map((allergen, idx) => (
-                        <span key={`${allergen}-${idx}`} className="px-2 py-1 rounded text-[11px] bg-white border border-red-200 text-red-700">
-                          {allergen}
-                        </span>
-                      ))}
+                      {allergens.map((allergen, idx) => {
+                        const allergenLabel = typeof allergen === 'object' ? (allergen.name || allergen.label || JSON.stringify(allergen)) : String(allergen);
+                        return (
+                          <span key={`${allergenLabel}-${idx}`} className="px-2 py-1 rounded text-[11px] bg-white border border-red-200 text-red-700">
+                            {allergenLabel}
+                          </span>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-xs text-red-700 mt-1">No allergens specified by vendor.</p>

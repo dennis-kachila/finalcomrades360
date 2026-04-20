@@ -292,9 +292,6 @@ function Checkout() {
           // Auto-fill address for home delivery ONLY if not in marketing mode
           if (!isMarketingMode && (profile.county || profile.town || profile.estate || profile.houseNumber || profile.name || profile.phone)) {
             const addressParts = [
-              profile.name,
-              profile.phone,
-              profile.additionalPhone,
               profile.county,
               profile.town,
               profile.estate,
@@ -486,62 +483,6 @@ function Checkout() {
     if (lookupInput) lookupInput.value = '';
   };
 
-  const handleInitiatePrepay = async () => {
-    if (!formData.mobileMoneyPhone || !validateKenyanPhone(formData.mobileMoneyPhone)) {
-      alert(PHONE_VALIDATION_ERROR);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      console.log('💳 Initiating prepay payment...');
-      let paymentResponse;
-
-      switch (formData.paymentSubMethod) {
-        case 'mpesa_prepay':
-          paymentResponse = await paymentService.initiateMpesaPayment(
-            null,
-            formData.mobileMoneyPhone.trim(),
-            scopedSummary.total || 0,
-            null // Skip checkoutGroupId since orders aren't created yet
-          );
-          break;
-
-        case 'airtel_money_prepay':
-          paymentResponse = await paymentService.initiateAirtelMoneyPayment(
-            null,
-            formData.mobileMoneyPhone.trim()
-          );
-          break;
-
-        default:
-          alert('Unknown payment method selected');
-          return;
-      }
-
-      if (paymentResponse?.data?.success || paymentResponse?.success) {
-        const paymentInfo = paymentResponse.data || paymentResponse;
-        setPaymentId(paymentInfo.payment?.id || paymentInfo.id);
-        setPollingPayment(true);
-
-        const paymentInstructions = getPaymentInstructions(formData.paymentSubMethod, paymentInfo);
-        
-        if ((formData.paymentSubMethod === 'mpesa_prepay' || formData.paymentSubMethod === 'airtel_money_prepay') && paymentInfo.payment) {
-          const provider = formData.paymentSubMethod === 'mpesa_prepay' ? 'M-Pesa' : 'Airtel Money';
-          alert(`${provider} payment initiated!\n\n${paymentInfo.payment.customerMessage || 'Check your phone for payment prompt'}\n\nAmount: KES ${scopedSummary.total?.toLocaleString()}\n\nPlease complete the payment to proceed.`);
-        } else {
-          alert(`Payment initiated!\n\n${paymentInstructions}\n\nAmount: KES ${scopedSummary.total?.toLocaleString()}\n\nPlease complete the payment to proceed.`);
-        }
-      } else {
-        alert(`Payment initiation failed: ${paymentResponse?.message || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('❌ Payment initiation error:', error);
-      alert(`Payment failed: ${error.response?.data?.message || error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -595,11 +536,7 @@ function Checkout() {
           setFormData(prev => ({ ...prev, isEditingAddress: true }));
           return;
         }
-        if (!formData.editedHouseNumber || !formData.editedHouseNumber.trim()) {
-          alert('📍 House Number Required\n\nPlease enter your house or room number. Click "Edit Address" to update your location details.');
-          setFormData(prev => ({ ...prev, isEditingAddress: true }));
-          return;
-        }
+        // House Number is now optional - no validation check required here
       }
     }
 
@@ -615,8 +552,7 @@ function Checkout() {
     }
 
     // Validate mobile money phone number
-    if ((formData.paymentSubMethod === 'mpesa_prepay' || formData.paymentSubMethod === 'airtel_money_prepay' ||
-      formData.paymentSubMethod === 'airtel_money') &&
+    if ((formData.paymentSubMethod === 'airtel_money') &&
       !formData.mobileMoneyPhone.trim()) {
       alert('Please enter your mobile money phone number');
       return;
@@ -690,7 +626,7 @@ function Checkout() {
           deliveryAddress: formData.deliveryMethod === 'home_delivery' ? (
             isMarketingMode ? formData.customerAddress.trim() : (
               formData.isEditingAddress ?
-                [userProfile?.name, userProfile?.phone, userProfile?.additionalPhone, formData.editedCounty, formData.editedTown, formData.editedEstate, formData.editedHouseNumber].filter(Boolean).join(', ') :
+                [formData.editedCounty, formData.editedTown, formData.editedEstate, formData.editedHouseNumber].filter(Boolean).join(', ') :
                 formData.deliveryAddress.trim()
             )
           ) : null,
@@ -811,20 +747,9 @@ function Checkout() {
   // Helper function to get payment instructions
   const getPaymentInstructions = (paymentSubMethod, paymentInfo = null) => {
     switch (paymentSubMethod) {
-      case 'mpesa_prepay':
       case 'mpesa':
-        if (paymentInfo?.payment) {
-          return `M-Pesa STK Push initiated. Check your phone for payment prompt.\n\nAmount: KES ${paymentInfo.payment.amount?.toLocaleString()}\nOrder: ${paymentInfo.payment.orderId}\n\nPayment will be verified automatically.`;
-        }
-        return 'M-Pesa Payment Instructions:\nPaybill: 714888\nAccount: 223117\nAmount: Order Total\n\nPlease complete payment within 24 hours.';
-
-      case 'airtel_money_prepay':
       case 'airtel_money':
-        if (paymentInfo?.payment) {
-          return `Airtel Money STK Push initiated. Check your phone for payment prompt.\n\nAmount: KES ${paymentInfo.payment.amount?.toLocaleString()}\nOrder: ${paymentInfo.payment.orderId}\n\nPayment will be verified automatically.`;
-        }
-        return 'Airtel Money Payment Instructions:\nPaybill: 714888\nAccount: 223117\nAmount: Order Total\n\nPlease complete payment within 24 hours.';
-
+        return 'Please follow the manual payment instructions provided below and upload your payment proof to continue.';
       default:
         return 'Please complete payment as per instructions provided.';
     }
@@ -1404,7 +1329,7 @@ function Checkout() {
                           </div>
 
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Estate/Building *</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Estate/Building/Hostel *</label>
                             <input
                               type="text"
                               value={formData.editedEstate}
@@ -1416,14 +1341,13 @@ function Checkout() {
                           </div>
 
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">House Number *</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">House/Room Number (Optional)</label>
                             <input
                               type="text"
                               value={formData.editedHouseNumber}
                               onChange={(e) => setFormData(prev => ({ ...prev, editedHouseNumber: e.target.value }))}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="Enter house, room, or door number"
-                              required
+                              placeholder="e.g. House 12, Room 4, or Door B"
                             />
                           </div>
 
@@ -1575,7 +1499,7 @@ function Checkout() {
                       onClick={() => setFormData(prev => ({
                         ...prev,
                         paymentMethod: 'prepay',
-                        paymentSubMethod: 'mpesa_prepay'
+                        paymentSubMethod: 'mpesa'
                       }))}
                       className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.paymentMethod === 'prepay'
                         ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
@@ -1614,7 +1538,7 @@ function Checkout() {
                           onClick={() => setFormData(prev => ({ ...prev, paymentSubMethod: 'mpesa' }))}
                           className={`p-3 border rounded-lg cursor-pointer transition-all ${formData.paymentSubMethod === 'mpesa' ? 'border-green-500 bg-white' : 'border-gray-200 bg-white/50'}`}
                         >
-                          <span className="text-sm font-medium">M-Pesa (Manual)</span>
+                          <span className="text-sm font-medium">Mobile Money for Prepay</span>
                         </div>
                       </div>
                       {formData.paymentSubMethod === 'mpesa' && (
@@ -1633,22 +1557,10 @@ function Checkout() {
                       <h4 className="font-medium text-blue-900 mb-3 text-xs uppercase tracking-wider">Prepay Options</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <div
-                          onClick={() => setFormData(prev => ({ ...prev, paymentSubMethod: 'mpesa_prepay' }))}
-                          className={`p-3 border rounded-lg cursor-pointer transition-all ${formData.paymentSubMethod === 'mpesa_prepay' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white/50'}`}
-                        >
-                          <span className="text-sm font-medium">M-Pesa (STK)</span>
-                        </div>
-                        <div
-                          onClick={() => setFormData(prev => ({ ...prev, paymentSubMethod: 'airtel_money_prepay' }))}
-                          className={`p-3 border rounded-lg cursor-pointer transition-all ${formData.paymentSubMethod === 'airtel_money_prepay' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white/50'}`}
-                        >
-                          <span className="text-sm font-medium">Airtel Money</span>
-                        </div>
-                        <div
                           onClick={() => setFormData(prev => ({ ...prev, paymentSubMethod: 'mpesa' }))}
                           className={`p-3 border rounded-lg cursor-pointer transition-all ${formData.paymentSubMethod === 'mpesa' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white/50'}`}
                         >
-                          <span className="text-sm font-medium">M-Pesa (Manual)</span>
+                          <span className="text-sm font-medium">Mobile Money for Prepay</span>
                         </div>
                       </div>
 
@@ -1669,35 +1581,6 @@ function Checkout() {
                 </div>
 
                 {/* Mobile Money Input Section */}
-                {['mpesa_prepay', 'airtel_money_prepay'].includes(formData.paymentSubMethod) && (
-                  <div className="pt-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Payment Phone Number *</label>
-                    <input
-                      type="tel"
-                      value={formData.mobileMoneyPhone}
-                      onInput={(e) => e.target.value = formatKenyanPhoneInput(e.target.value)}
-                      onChange={(e) => setFormData(prev => ({ ...prev, mobileMoneyPhone: e.target.value }))}
-                      placeholder="e.g., 0712345678"
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                    {formData.paymentMethod === 'prepay' && formData.paymentSubMethod !== 'mpesa' && (
-                      <button
-                        type="button"
-                        onClick={handleInitiatePrepay}
-                        disabled={loading || pollingPayment}
-                        className="w-full mt-4 py-3 bg-blue-600 text-white rounded-lg font-bold disabled:opacity-50"
-                      >
-                        {pollingPayment ? 'Waiting for confirmation...' : 'Initiate Payment'}
-                      </button>
-                    )}
-                    {paymentCompleted && (
-                      <div className="mt-3 p-3 bg-green-100 text-green-700 rounded-md text-sm font-bold flex items-center gap-2">
-                        <span>✓</span> Payment Confirmed!
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
 

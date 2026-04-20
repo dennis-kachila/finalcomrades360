@@ -208,7 +208,7 @@ async function notifyCustomerOrderPlaced(order, customer, itemsCount, itemNames)
     const siteUrl = process.env.FRONTEND_URL || 'https://comrades360.shop';
     const trackUrl = `${siteUrl}/account`;
 
-    const defaultTemplate = `Hello {name}, your order #{orderNumber} has been placed successfully! 🛍️\n\nItems:\n{itemsList}\n\nTotal: KES {total}\nPayment: {paymentMethod}\n\nDelivery Information:\nMethod: {deliveryMethod}\nLocation: {deliveryLocation}\n\nTrack your order here: {trackUrl}\n\nThank you for shopping with Comrades360!`;
+    const defaultTemplate = `Hello {name}, your order #{orderNumber} has been placed successfully! 🛍️\n\nItems:\n{itemsList}\n\nTotal: KES {total}\nPayment: {paymentMethod}\n\nDelivery Information:\nMethod: {deliveryMethod}\nLocation: {deliveryLocation}`;
 
     await sendCustomerNotificationAcrossChannels('orderPlaced', {
         name: customer.name || 'Customer',

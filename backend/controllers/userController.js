@@ -125,10 +125,11 @@ const requestPhoneOtp = async (req, res) => {
     }
 
     const otp = `${Math.floor(100000 + Math.random() * 900000)}`;
-    user.pendingPhone = norm;
-    user.phoneOtp = otp;
-    user.phoneOtpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await user.save();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Save OTP to the shared Otp table
+    await Otp.destroy({ where: { phone: norm } });
+    await Otp.create({ phone: norm, otp, expiresAt });
 
     // Send OTP to the NEW phone number
     try {
@@ -142,7 +143,6 @@ const requestPhoneOtp = async (req, res) => {
       console.error(`Error sending OTP via ${method || 'WhatsApp'}:`, err.message);
     }
 
-
     try { await Notification.create({ userId, title: 'Phone OTP', message: `An OTP was sent to your new phone number via ${method === 'sms' ? 'SMS' : 'WhatsApp'}.` }); } catch (err) { }
 
     res.json({ message: `OTP sent to your new phone via ${method === 'sms' ? 'SMS' : 'WhatsApp'}. Please confirm to update phone.` });
@@ -155,19 +155,37 @@ const requestPhoneOtp = async (req, res) => {
 // Confirm phone change with OTP
 const confirmPhoneOtp = async (req, res) => {
   const userId = req.user.id;
-  const { otp } = req.body || {};
+  const { otp, phone } = req.body || {};
   try {
     const user = await User.findByPk(userId);
     if (!user) return res.status(404).json({ message: 'User not found.' });
-    if (!user.phoneOtp || !user.pendingPhone) return res.status(400).json({ message: 'No phone change requested.' });
-    if (user.phoneOtp !== otp) return res.status(400).json({ message: 'Invalid OTP.' });
-    if (user.phoneOtpExpiresAt && new Date(user.phoneOtpExpiresAt) < new Date()) return res.status(400).json({ message: 'OTP expired.' });
-    user.phone = user.pendingPhone;
-    user.pendingPhone = null;
-    user.phoneOtp = null;
-    user.phoneOtpExpiresAt = null;
+
+    const targetPhone = phone || user.pendingPhone;
+    if (!targetPhone) return res.status(400).json({ message: 'Phone number context missing.' });
+
+    const norm = normalizeKenyanPhone(targetPhone);
+
+    const otpRecord = await Otp.findOne({
+      where: { phone: norm, otp }
+    });
+
+    if (!otpRecord) return res.status(400).json({ message: 'Invalid verification code.' });
+    if (new Date() > otpRecord.expiresAt) {
+      await otpRecord.destroy();
+      return res.status(400).json({ message: 'Verification code has expired.' });
+    }
+
+    user.phone = norm;
     user.phoneVerified = true;
+    user.pendingPhone = null;
     await user.save();
+
+    if (typeof user.recalculateIsVerified === 'function') {
+      await user.recalculateIsVerified();
+    }
+
+    await otpRecord.destroy();
+
     res.json({ message: 'Phone updated successfully.' });
   } catch (e) {
     res.status(500).json({ message: 'Server error confirming phone change.', error: e.message });

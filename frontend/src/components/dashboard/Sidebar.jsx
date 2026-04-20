@@ -166,8 +166,7 @@ const adminMenuItems = [
     icon: <FaCubes className="mr-3" />,
     roles: ['superadmin', 'super_admin'],
     children: [
-      { name: 'Back to Admin Dashboard', path: '/dashboard', icon: <FaTachometerAlt className="mr-2" /> },
-      { name: 'Active Assignments', path: '/delivery/orders', icon: <FaTruck className="mr-2" /> },
+      { name: 'Delivery Dashboard', path: '/delivery/orders', icon: <FaTruck className="mr-2" /> },
       { name: 'Service Provider', path: '/dashboard/service-provider', icon: <FaUserTie className="mr-2" /> },
       { name: 'Seller Dashboard', path: '/seller', icon: <FaStore className="mr-2" /> },
       { name: 'Customer Dashboard', path: '/customer', icon: <FaUser className="mr-2" /> },
@@ -338,9 +337,11 @@ const Sidebar = ({ onClose }) => {
     <nav className="h-full">
       <ul className="flex flex-col space-y-1 px-3 py-4 items-stretch">
         {menuItems.map((item) => {
-          const isActive = location.pathname === item.path ||
-            (item.path !== '/' && location.pathname.startsWith(item.path + '/')) ||
-            (item.children && item.children.some(child => location.pathname === child.path || location.pathname.startsWith(child.path + '/')));
+          const isExactActive = location.pathname === item.path;
+          const isChildActive = item.children && item.children.some(child => 
+            location.pathname === child.path || (child.path !== '/' && location.pathname.startsWith(child.path + '/'))
+          );
+          const isAnyActive = isExactActive || isChildActive;
 
           return (
             <li key={item.name} className="flex-shrink-0 lg:flex-shrink-1">
@@ -350,20 +351,22 @@ const Sidebar = ({ onClose }) => {
                     onClick={() => {
                       item.name === 'Product Management' ? handleProductManagementClick() : toggleExpanded(item.name);
                     }}
-                    className={`flex items-center gap-2 px-4 py-2 lg:py-3 lg:px-4 rounded-xl transition-all duration-200 text-xs lg:text-[15px] font-bold uppercase tracking-tight w-full text-left ${isActive 
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-105 z-10'
-                      : 'text-gray-500 hover:bg-gray-100 hover:text-blue-600'
+                    className={`flex items-center gap-2 px-4 py-2 lg:py-2.5 lg:px-4 rounded-xl transition-all duration-200 text-sm lg:text-[14px] font-semibold tracking-tight w-full text-left ${isExactActive 
+                      ? 'text-blue-600 bg-blue-50/50 z-10'
+                      : isChildActive
+                        ? 'text-gray-900 bg-gray-50/50'
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-blue-600'
                       }`}
                   >
-                    <span className="text-sm lg:text-lg opacity-80">{item.icon}</span>
+                    <span className={`text-sm lg:text-lg transition-colors ${isAnyActive ? 'text-blue-600' : 'opacity-80'}`}>{item.icon}</span>
                     <span className="inline">{item.name}</span>
                     <svg
-                      className={`hidden lg:block w-3 h-3 ml-auto transition-transform ${expandedItems.has(item.name) ? 'rotate-90' : ''}`}
+                      className={`hidden lg:block w-3.5 h-3.5 ml-auto transition-transform ${expandedItems.has(item.name) ? 'rotate-90' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                     </svg>
                   </button>
 
@@ -372,23 +375,26 @@ const Sidebar = ({ onClose }) => {
                     <ul className="ml-6 mt-1 border-l-2 border-gray-100 pl-2 space-y-1">
                       {item.children
                         .filter((child) => !child.roles || child.roles.some((role) => userRoles.includes(role)))
-                        .map((child) => (
-                          <li key={child.path}>
-                            <Link
-                              to={child.path}
-                              onClick={() => {
-                                if (onClose) onClose();
-                              }}
-                              className={`flex items-center py-2 px-3 rounded-lg text-[11px] lg:text-xs font-semibold transition-colors ${location.pathname === child.path
-                                ? 'bg-blue-50 text-blue-800'
-                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-                                }`}
-                            >
-                              <span className="mr-2 opacity-70">{child.icon}</span>
-                              {child.name}
-                            </Link>
-                          </li>
-                        ))}
+                        .map((child) => {
+                          const isChildExactActive = location.pathname === child.path;
+                          return (
+                            <li key={child.path}>
+                              <Link
+                                to={child.path}
+                                onClick={() => {
+                                  if (onClose) onClose();
+                                }}
+                                className={`flex items-center py-2 px-3 rounded-lg text-xs lg:text-[13px] font-medium transition-all ${isChildExactActive
+                                  ? 'text-blue-600 bg-blue-50/30'
+                                  : 'text-gray-500 hover:bg-gray-50 hover:text-blue-600'
+                                  }`}
+                              >
+                                <span className={`mr-2 transition-colors ${isChildExactActive ? 'text-blue-600' : 'opacity-70'}`}>{child.icon}</span>
+                                {child.name}
+                              </Link>
+                            </li>
+                          );
+                        })}
                     </ul>
                   )}
                 </div>
@@ -396,12 +402,12 @@ const Sidebar = ({ onClose }) => {
                 <Link
                   to={item.path}
                   onClick={onClose}
-                  className={`flex items-center gap-2 px-4 py-2 lg:py-3 lg:px-4 rounded-xl transition-all duration-200 text-xs lg:text-[15px] font-bold uppercase tracking-tight ${isActive
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-105 z-10'
-                    : 'text-gray-500 hover:bg-gray-100 hover:text-blue-600'
+                  className={`flex items-center gap-2 px-4 py-2 lg:py-2.5 lg:px-4 rounded-xl transition-all duration-200 text-sm lg:text-[14px] font-semibold tracking-tight ${isExactActive
+                    ? 'text-blue-600 bg-blue-50/50 z-10'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-blue-600'
                     }`}
                 >
-                  <span className="text-sm lg:text-lg opacity-80">{item.icon}</span>
+                  <span className={`text-sm lg:text-lg transition-colors ${isExactActive ? 'text-blue-600' : 'opacity-80'}`}>{item.icon}</span>
                   <span className="inline text-center">{item.name}</span>
                 </Link>
               )}

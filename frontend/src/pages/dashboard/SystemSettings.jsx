@@ -503,8 +503,9 @@ export default function SystemSettings() {
                 <h3 className="text-lg font-bold text-gray-800 mb-2">Africa's Talking (SMS Gateway)</h3>
                 <p className="text-sm text-gray-500 mb-6">Manage API keys for automated SMS communications.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormInput label="Username" value={settings.sms_config.username} onChange={(v) => setSettings(p => ({...p, sms_config: {...p.sms_config, username: v}}))} />
-                  <FormInput label="API Key" value={settings.sms_config.apiKey} type="password" onChange={(v) => setSettings(p => ({...p, sms_config: {...p.sms_config, apiKey: v}}))} />
+                  <FormInput label="Africatalking Username" value={settings.sms_config.username} onChange={(v) => setSettings(p => ({...p, sms_config: {...p.sms_config, username: v}}))} />
+                  <FormInput label="Africatalking API Key" value={settings.sms_config.apiKey} type="password" onChange={(v) => setSettings(p => ({...p, sms_config: {...p.sms_config, apiKey: v}}))} />
+                  <FormInput label="Sender ID (Optional)" value={settings.sms_config.senderId} onChange={(v) => setSettings(p => ({...p, sms_config: {...p.sms_config, senderId: v}}))} placeholder="e.g. AFRICASTK" />
                 </div>
                 <SaveButton onClick={() => updateSettings('sms_config', settings.sms_config)} loading={loading} />
               </section>
@@ -545,6 +546,19 @@ export default function SystemSettings() {
                     />
                   </div>
                 )}
+
+                <div className="md:col-span-2 flex justify-between items-center bg-blue-50/50 p-4 rounded-2xl border border-blue-100 mt-4">
+                  <div className="text-sm text-blue-700">
+                    <p className="font-bold">WhatsApp Action Needed:</p>
+                    <p className="opacity-80">Click save to apply changes and {settings.whatsapp_config.method === 'local' ? 'start the QR engine.' : 'activate Cloud API.'}</p>
+                  </div>
+                  <button 
+                    onClick={() => updateSettings('whatsapp_config', settings.whatsapp_config)}
+                    className={`px-8 py-3 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-lg active:scale-95 flex items-center gap-2 ${loading ? 'opacity-50' : ''}`}
+                  >
+                    {loading ? 'Saving...' : <>💾 Save WhatsApp Configuration</>}
+                  </button>
+                </div>
                 <div className="mt-6 border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm">
                   <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                     <div>
@@ -628,7 +642,15 @@ export default function SystemSettings() {
                       <div className="py-10">
                         <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-6"></div>
                         <h5 className="font-bold text-gray-800">Starting WhatsApp Engine...</h5>
-                        <p className="text-sm text-gray-500 max-w-xs mx-auto">The system is performing a cold-start of the messaging browser. This usually takes 15-30 seconds. The QR code will appear here automatically.</p>
+                        <p className="text-sm text-gray-500 max-w-xs mx-auto mb-6">The system is performing a cold-start of the messaging browser. This usually takes 15-30 seconds.</p>
+                        
+                        <div className="flex flex-col gap-2 items-center">
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">Stuck? Try a recovery action:</p>
+                          <div className="flex gap-2">
+                             <button onClick={handleRestartWhatsApp} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200">🔄 Soft Restart</button>
+                             <button onClick={handleLogoutWhatsApp} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100">🔥 Hard Reset</button>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -644,7 +666,7 @@ export default function SystemSettings() {
 
                 <hr className="my-8 border-gray-100" />
 
-                <section>
+                <section className="mt-8">
                   <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">📢 Customer & Marketing Notifications</h3>
                   <div className="max-w-xl">
                     <TemplateInput 
@@ -660,40 +682,6 @@ export default function SystemSettings() {
                 </section>
                 
                 <SaveButton onClick={() => updateSettings('whatsapp_config', settings.whatsapp_config)} loading={loading} />
-              </section>
-
-              <hr className="border-gray-100" />
-
-              {/* TEMPLATE QUICK OVERVIEW */}
-              <section>
-                <h3 className="text-lg font-bold text-gray-800 mb-4 font-mono">📜 Quick Template Review</h3>
-                <p className="text-sm text-gray-500 mb-6">A summary of the current messages being sent. Click "Edit" to jump to the corresponding tab.</p>
-                <div className="space-y-4">
-                  {[
-                    { label: 'Order Received', key: 'orderPlaced', tab: 'payment', icon: '💳' },
-                    { label: 'Welcome (Marketer Created)', key: 'WELCOME_MARKETER_CREATED', tab: 'messaging', icon: '📢' },
-                    { label: 'Withdrawal Status', key: 'withdrawalStatus', tab: 'finance', icon: '💰' },
-                    { label: 'In Transit', key: 'orderInTransit', tab: 'logistics', icon: '🚚' },
-                    { label: 'Ready for Pickup', key: 'orderReadyPickup', tab: 'logistics', icon: '📦' },
-                    { label: 'OTP Verification', key: 'phoneVerification', tab: 'security', icon: '🔒' },
-                    { label: 'Password Reset', key: 'passwordReset', tab: 'security', icon: '🔐' },
-                  ].map(item => (
-                    <div key={item.key} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                          <span>{item.icon}</span> {item.label}
-                        </p>
-                        <p className="text-sm text-gray-700 italic">"{(settings.whatsapp_config.templates?.[item.key] || 'No template set')}"</p>
-                      </div>
-                      <button 
-                        onClick={() => setActiveTab(item.tab)}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm transition-all"
-                      >
-                        Edit in {item.tab.toUpperCase()}
-                      </button>
-                    </div>
-                  ))}
-                </div>
               </section>
 
               <hr className="border-gray-100" />
@@ -1028,23 +1016,39 @@ export default function SystemSettings() {
   );
 }
 
-const FormInput = ({ label, value, onChange, type = "text", className = "", placeholder = "" }) => (
+const FormInput = ({ label, value, onChange, type = "text", className = "", placeholder = "" }) => {
+  const [show, setShow] = useState(false);
+  const isPassword = type === 'password';
 
-  <div className={className}>
-    <label className="block text-sm font-semibold text-gray-600 mb-1">{label}</label>
-    <input
-      type={type}
-      className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder-gray-300"
-      value={value || ''}
-      placeholder={placeholder}
-      onChange={(e) => onChange(type === 'number' ? parseFloat(e.target.value) : e.target.value)}
-    />
-  </div>
-);
+  return (
+    <div className={className}>
+      <label className="block text-sm font-semibold text-gray-600 mb-1">{label}</label>
+      <div className="relative">
+        <input
+          type={isPassword ? (show ? 'text' : 'password') : type}
+          className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder-gray-300 pr-12"
+          value={value || ''}
+          placeholder={placeholder}
+          onChange={(e) => onChange(type === 'number' ? parseFloat(e.target.value) : e.target.value)}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShow(!show)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-blue-600 transition-colors"
+            title={show ? "Hide" : "Show"}
+          >
+            {show ? '👁️' : '🕶️'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const TemplateInput = ({ label, value, onChange, templateKey, channels, onChannelChange }) => {
   const defaults = {
-    orderPlaced: `Hello {name}, your order #{orderNumber} has been placed successfully! 🛍️\n\nItems:\n{itemsList}\n\nTotal: KES {total}\nPayment: {paymentMethod}\n\nDelivery Information:\nMethod: {deliveryMethod}\nLocation: {deliveryLocation}\n\nThank you for shopping with Comrades360!`,
+    orderPlaced: `Hello {name}, your order #{orderNumber} has been placed successfully! 🛍️\n\nItems:\n{itemsList}\n\nTotal: KES {total}\nPayment: {paymentMethod}\n\nDelivery Information:\nMethod: {deliveryMethod}\nLocation: {deliveryLocation}`,
     sellerConfirmed: `Hello {name}, good news! 🥗\n\nYour order #{orderNumber} has been confirmed by {sellerName} and is now being prepared.\n\nWe will notify you as soon as it is handed over to our delivery agent.\n\nThank you for choosing Comrades360!`,
     orderInTransit: `Your order #{orderNumber} is on its way! 🚚\n\nHello {name}, your package has been collected by {agentName} ({agentPhone}) and is in transit.\n\nDelivery Information:\nMethod: {deliveryMethod}\nLocation: {deliveryAddress}\n\nPlease stay reachable for a smooth delivery!`,
     orderReadyPickup: `Your order #{orderNumber} is ready for collection! 📦\n\nHello {name}, your items have arrived at the pickup location and are ready for you.\n\nPickup Details:\nStation: {stationName}\nLocation: {stationLocation}\nContact: {stationPhone}\n\nSee you soon at Comrades360!`,

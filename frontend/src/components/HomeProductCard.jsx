@@ -4,7 +4,7 @@ import { useCart } from '../contexts/CartContext';
 import { useWishlist } from '../contexts/WishlistContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/use-toast';
-import { FaHeart, FaRegHeart } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaSpinner, FaShoppingCart, FaCheck } from 'react-icons/fa';
 import { resolveImageUrl, FALLBACK_IMAGE, getResizedImageUrl } from '../utils/imageUtils';
 import { useImageVersion } from '../hooks/useImageVersion';
 import { formatPrice } from '../utils/currency';
@@ -338,35 +338,49 @@ function HomeProductCard({
           </div>
         </div>
 
-        {/* Action Bar - Conditional rendering based on renderActions prop */}
+        {/* Action Bar - Stabilized for performance and zero layout shift */}
         {renderActions ? (
-          // Custom actions from parent component (e.g., ProductListingView)
           renderActions({ handleView, handleAddToCart, handleWishlistToggle })
         ) : (
-          // Default action bar for homepage and other standard views
-          <div className="flex items-center border-t border-gray-100 gap-1">
+          <div className="flex items-center border-t border-gray-100 gap-1 p-1 h-11 sm:h-12 bg-gray-50/30">
             <button
               onClick={handleAddToCart}
               disabled={product.stock <= 0 || isAdding}
-              className={`flex-1 min-w-0 px-1 py-1.5 sm:py-2 rounded font-bold transition-colors text-[10px] sm:text-xs truncate
-                ${(product.stock <= 0 || isAdding)
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : isInCart
-                  ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-                  : 'bg-orange-600 text-white hover:bg-orange-700'
+              className={`relative flex-1 h-full min-w-0 rounded-md font-bold transition-all duration-200 text-[10px] sm:text-xs overflow-hidden flex items-center justify-center
+                ${(product.stock <= 0)
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : isAdding
+                    ? 'bg-orange-100 text-orange-600'
+                    : isInCart
+                      ? 'bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 active:scale-95'
+                      : 'bg-orange-600 text-white hover:bg-orange-700 active:scale-95 shadow-sm'
                 }`}
             >
-              {product.stock <= 0 ? 'Out of Stock' : isAdding ? 'Adding...' : isInCart ? 'Remove' : (
-                <>
-                  <span className="sm:hidden">+ Cart</span>
-                  <span className="hidden sm:inline">Add to Cart</span>
-                </>
-              )}
+              {/* Stable Content Container */}
+              <div className="relative flex items-center justify-center w-full h-full px-1">
+                {product.stock <= 0 ? (
+                  <span className="truncate">Out of Stock</span>
+                ) : isAdding ? (
+                  <FaSpinner className="animate-spin text-lg" />
+                ) : isInCart ? (
+                  <span className="flex items-center gap-1 animate-in zoom-in duration-200">
+                    <FaCheck className="hidden sm:inline" /> Remove
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 animate-in fade-in duration-300">
+                    <FaShoppingCart className="hidden sm:inline" />
+                    <span className="truncate">
+                      <span className="sm:hidden">+ Cart</span>
+                      <span className="hidden sm:inline">Add to Cart</span>
+                    </span>
+                  </span>
+                )}
+              </div>
             </button>
 
             <button
               onClick={handleView}
-              className="flex-1 min-w-0 px-1 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-white bg-blue-800 hover:bg-blue-900 rounded transition-colors truncate"
+              className="flex-1 h-full min-w-0 font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-md transition-all active:scale-95 text-[10px] sm:text-xs flex items-center justify-center shadow-sm"
             >
               View
             </button>

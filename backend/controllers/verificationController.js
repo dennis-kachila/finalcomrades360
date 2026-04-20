@@ -1,4 +1,6 @@
-const { User } = require('../models');
+const { User, Otp } = require('../models');
+const { sendMessage } = require('../utils/messageService');
+const { normalizeKenyanPhone } = require('../middleware/validators');
 
 /**
  * Calculate and return user verification status
@@ -44,12 +46,12 @@ const getVerificationStatus = async (req, res) => {
         const allVerified = Object.values(essentialChecks).every(v => v === true);
 
         // Update isVerified field if status changed
-        await user.recalculateIsVerified();
+        if (typeof user.recalculateIsVerified === 'function') {
+            await user.recalculateIsVerified();
+        }
 
         // Determine missing steps for better UX
         const missingSteps = [];
-        // Profile and Address are now optional for account verification status but still recommended
-        // We only add mandatory missing steps here
         if (!checks.emailVerified) {
             missingSteps.push({
                 step: 'emailVerified',
@@ -67,7 +69,6 @@ const getVerificationStatus = async (req, res) => {
             });
         }
         if (!checks.nationalIdApproved) {
-            // Determine the state to show correct message
             const status = user.nationalIdStatus || 'none';
             let title = 'Upload National ID';
             let description = 'Upload a copy of your National ID for verification';
@@ -85,17 +86,15 @@ const getVerificationStatus = async (req, res) => {
                 title,
                 description,
                 link: '/account/id-upload',
-                status: status // Pass status to frontend
+                status: status
             });
         }
-
-        console.log('[Verification] Status:', user.nationalIdStatus);
 
         res.json({
             success: true,
             isFullyVerified: allVerified,
             checks,
-            nationalIdStatus: user.nationalIdStatus, // Return explicit status
+            nationalIdStatus: user.nationalIdStatus,
             nationalIdRejectionReason: user.nationalIdRejectionReason,
             missingSteps,
             completionPercentage: Math.round((Object.values(essentialChecks).filter(v => v).length / Object.keys(essentialChecks).length) * 100),
@@ -123,51 +122,93 @@ const getVerificationStatus = async (req, res) => {
 };
 
 /**
- * Verify Firebase ID Token and update user phone verification status
+ * Request Phone Verification OTP
  */
-const verifyFirebaseToken = async (req, res) => {
-  try {
-    const { idToken, phone } = req.body;
-    
-    if (!idToken) {
-      return res.status(400).json({ success: false, message: 'Firebase ID token is required' });
+const requestPhoneVerificationOtp = async (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) return res.status(400).json({ message: 'Phone number is required' });
+
+        const normalizedPhone = normalizeKenyanPhone(phone);
+        if (!normalizedPhone) return res.status(400).json({ message: 'Invalid Kenyan phone number' });
+
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        // Clear existing OTPs for this phone
+        await Otp.destroy({ where: { phone: normalizedPhone } });
+
+        // Create new OTP
+        await Otp.create({
+            phone: normalizedPhone,
+            otp,
+            expiresAt
+        });
+
+        // Send OTP via SMS
+        console.log(`[Verification] 🚀 Sending OTP ${otp} to ${normalizedPhone}`);
+        await sendMessage(
+            normalizedPhone,
+            `Your Comrades360 verification code is: ${otp}. Valid for 10 minutes.`,
+            'sms'
+        );
+
+        res.json({ success: true, message: 'Verification code sent successfully' });
+    } catch (error) {
+        console.error('[Verification] OTP Request Error:', error);
+        res.status(500).json({ message: 'Failed to send verification code' });
     }
+};
 
-    // Verify the ID token using Firebase Admin
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    const firebasePhone = decodedToken.phone_number;
+/**
+ * Verify Phone OTP and update user
+ */
+const verifyPhoneOtp = async (req, res) => {
+    try {
+        const { phone, otp } = req.body;
+        const userId = req.user.id;
 
-    if (!firebasePhone) {
-      return res.status(400).json({ success: false, message: 'Token does not contain a verified phone number' });
+        if (!phone || !otp) return res.status(400).json({ message: 'Phone and OTP are required' });
+
+        const normalizedPhone = normalizeKenyanPhone(phone);
+        if (!normalizedPhone) return res.status(400).json({ message: 'Invalid phone format' });
+
+        // Check if OTP is valid
+        const otpRecord = await Otp.findOne({
+            where: { phone: normalizedPhone, otp }
+        });
+
+        if (!otpRecord) return res.status(400).json({ message: 'Invalid verification code' });
+        if (new Date() > otpRecord.expiresAt) {
+            await otpRecord.destroy();
+            return res.status(400).json({ message: 'Verification code has expired' });
+        }
+
+        // OTP is valid, update user
+        const user = await User.findByPk(userId);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        user.phone = normalizedPhone;
+        user.phoneVerified = true;
+        await user.save();
+
+        if (typeof user.recalculateIsVerified === 'function') {
+            await user.recalculateIsVerified();
+        }
+
+        // Cleanup
+        await otpRecord.destroy();
+
+        res.json({
+            success: true,
+            message: 'Phone number verified successfully',
+            phone: normalizedPhone
+        });
+    } catch (error) {
+        console.error('[Verification] OTP Verify Error:', error);
+        res.status(500).json({ message: 'Failed to verify phone' });
     }
-
-    // Normalize phone numbers for comparison
-    const user = await User.findByPk(req.user.id);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    // Update user record
-    user.phone = firebasePhone;
-    user.phoneVerified = true;
-    await user.save();
-
-    console.log(`✅ [Firebase Verify] User ${user.id} verified phone: ${firebasePhone}`);
-
-    res.json({
-      success: true,
-      message: 'Phone number verified successfully',
-      phone: firebasePhone
-    });
-
-  } catch (error) {
-    console.error('❌ [Firebase Verify] Verification failed:', error);
-    res.status(401).json({
-      success: false,
-      message: 'Phone verification failed',
-      error: error.message
-    });
-  }
 };
 
 const approveNationalId = async (req, res) => {
@@ -178,6 +219,10 @@ const approveNationalId = async (req, res) => {
 
         user.nationalIdStatus = 'approved';
         await user.save();
+
+        if (typeof user.recalculateIsVerified === 'function') {
+            await user.recalculateIsVerified();
+        }
 
         res.json({ message: 'National ID approved successfully' });
     } catch (error) {
@@ -196,6 +241,10 @@ const rejectNationalId = async (req, res) => {
         user.nationalIdRejectionReason = reason;
         await user.save();
 
+        if (typeof user.recalculateIsVerified === 'function') {
+            await user.recalculateIsVerified();
+        }
+
         res.json({ message: 'National ID rejected successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error rejecting National ID', error: error.message });
@@ -203,5 +252,9 @@ const rejectNationalId = async (req, res) => {
 };
 
 module.exports = {
-    getVerificationStatus
+    getVerificationStatus,
+    requestPhoneVerificationOtp,
+    verifyPhoneOtp,
+    approveNationalId,
+    rejectNationalId
 };

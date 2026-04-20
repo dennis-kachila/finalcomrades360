@@ -55,7 +55,12 @@ const updateProfile = async (req, res) => {
       if (!normalizedPhone) {
         return res.status(400).json({ message: 'Invalid Kenyan phone number format. Use 01... or 07... (10 digits) or +254... (13 digits)' });
       }
-      updateData.phone = normalizedPhone;
+      
+      // If phone is changing, reset verification status
+      if (user.phone !== normalizedPhone) {
+        updateData.phone = normalizedPhone;
+        updateData.phoneVerified = false;
+      }
     }
 
     if (gender !== undefined) updateData.gender = gender === 'undefined' ? null : gender;
@@ -64,6 +69,11 @@ const updateProfile = async (req, res) => {
     if (profileVisibility !== undefined) updateData.profileVisibility = profileVisibility === 'undefined' ? 'public' : profileVisibility;
 
     await user.update(updateData);
+
+    // Recalculate verification status
+    if (typeof user.recalculateIsVerified === 'function') {
+      await user.recalculateIsVerified();
+    }
 
     res.json({
       message: 'Profile updated successfully',

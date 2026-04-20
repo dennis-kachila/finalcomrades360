@@ -12,7 +12,9 @@ const googleClient = new OAuth2Client(); // Audience verified in method
 const { isValidEmail, normalizeKenyanPhone } = require('../middleware/validators');
 const { sendEmail } = require('../utils/mailer');
 
-const { sendSms } = require('../utils/sms');
+const { 
+  sendMessage 
+} = require('../utils/messageService');
 const { 
   notifyCustomerMarketerCreated, 
   notifyCustomerGoogleSignup 
@@ -652,9 +654,10 @@ const sendRegistrationOtp = async (req, res) => {
       return res.json({ success: true, message: 'Verification code has been sent to your email.', method: 'email' });
     } else {
       // Send via SMS (Non-blocking)
-      sendSms(
+      sendMessage(
         normalizedPhone, 
-        `Your Comrades360 registration code is: ${otp}. Expires in ${process.env.OTP_EXPIRY_MINUTES || 10} mins.`
+        `Your Comrades360 registration code is: ${otp}. Expires in ${process.env.OTP_EXPIRY_MINUTES || 10} mins.`,
+        'sms'
       ).catch(err => console.error('[authController] Background SMS error:', err));
       return res.json({ success: true, message: 'Verification code has been sent to your phone via SMS.', method: 'sms' });
     }

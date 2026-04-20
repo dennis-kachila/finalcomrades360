@@ -5,7 +5,9 @@ const { calculateCommission: createCommissionRecords } = require('./commissionCo
 const { isValidTransition, getValidTransitionsForOrder, autoCreateDeliveryTask } = require('./orderTransitionController');
 const { calculateItemCommission } = require('../utils/commissionUtils');
 const { sendEmail } = require('../utils/mailer');
-const { sendSms } = require('../utils/sms');
+const { 
+  sendMessage 
+} = require('../utils/messageService');
 const { 
   notifyCustomerReadyForPickupStation,
   notifyCustomerSellerConfirmed,
@@ -252,7 +254,7 @@ const notifyLifecycleStatusChange = async (orderId, status) => {
         await sendEmail(customer.email, title, message);
       }
       if (customer.phone) {
-        await sendSms(customer.phone, message);
+        await sendMessage(customer.phone, message, 'sms');
         // WhatsApp Notification
         await notifyCustomerReadyForPickupStation(order, pickupDestination);
       }
@@ -288,7 +290,7 @@ const notifyLifecycleStatusChange = async (orderId, status) => {
         await sendEmail(customer.email, title, message);
       }
       if (customer.phone) {
-        await sendSms(customer.phone, message);
+        await sendMessage(customer.phone, message, 'sms');
         // WhatsApp Notification
         await notifyCustomerOutForDelivery(order, order.deliveryAgent);
       }

@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const { sendEmail } = require('../utils/mailer');
-const { sendSms } = require('../utils/sms');
+const { sendMessage } = require('../utils/messageService');
 // Dynamically import json2csv to handle module loading issues, but stay quiet if it's missing
 let Parser;
 try {
@@ -92,7 +92,7 @@ Comrades360 Team`;
     const smsText = `Your Comrades360 account has been created successfully. Use email: ${email} and password: ${password} to login. Visit: https://comrades360.com/login`;
 
     try {
-      await sendSms(phone, smsText);
+      await sendMessage(phone, smsText, 'sms');
       console.log(`Welcome SMS sent to ${phone}`);
     } catch (smsError) {
       console.error('Failed to send welcome SMS:', smsError);
@@ -443,6 +443,7 @@ router.patch('/users/:userId', auth, adminOnly, async (req, res) => {
       email,
       phone,
       role,
+      roles,
       county,
       town,
       estate,
@@ -453,6 +454,8 @@ router.patch('/users/:userId', auth, adminOnly, async (req, res) => {
       phoneVerified,
       accessRestrictions,
       isDeactivated,
+      isFrozen,
+      isVerified,
       banReason
     } = req.body;
 
@@ -466,42 +469,63 @@ router.patch('/users/:userId', auth, adminOnly, async (req, res) => {
       return res.status(403).json({ message: 'Cannot change super_admin role' });
     }
 
-    // Prevent deactivating super_admin
-    if (user.role === 'super_admin' && isDeactivated === true) {
-      return res.status(403).json({ message: 'Cannot deactivate super_admin' });
+    // Prevent deactivating/freezing super_admin
+    if (user.role === 'super_admin' && (isDeactivated === true || isFrozen === true)) {
+      return res.status(403).json({ message: 'Cannot deactivate or freeze super_admin' });
     }
 
     // Update user fields
     const updateData = {};
     if (name) updateData.name = name;
+    
+    // Only update email/phone if they actually changed (to avoid unnecessary uniqueness checks)
+    if (email !== undefined && email !== user.email) updateData.email = email;
+    if (phone !== undefined && phone !== user.phone) updateData.phone = phone;
 
-    // IMPORTANT: When a super_admin uses this endpoint, we do NOT
-    // touch email or phone. This allows them to upgrade roles and
-    // auto-verify users without triggering uniqueness checks.
-    if (!req.user || req.user.role !== 'super_admin') {
-      // Only update email/phone if they actually changed
-      if (email !== undefined && email !== user.email) updateData.email = email;
-      if (phone !== undefined && phone !== user.phone) updateData.phone = phone;
+    // Handle Roles
+    if (roles && Array.isArray(roles)) {
+      // If the frontend sends the whole roles array, use it directly (standardizes role management)
+      updateData.roles = roles;
+      // If a primary role isn't explicitly provided, default to the last one in the list or 'customer'
+      if (!role) {
+        updateData.role = roles[roles.length - 1] || 'customer';
+      }
     }
-    if (role && user.role !== 'super_admin') {
+    
+    // If a single role is provided but roles array isn't, use additive logic (legacy support)
+    if (role && (!roles || !Array.isArray(roles))) {
       updateData.role = role;
-      // Add new role to roles array
       let currentRoles = user.roles || ['customer'];
       if (!Array.isArray(currentRoles)) {
         currentRoles = [user.role || 'customer'];
       }
       updateData.roles = [...new Set([...currentRoles, role])];
     }
+
     if (county !== undefined) updateData.county = county;
     if (town !== undefined) updateData.town = town;
     if (estate !== undefined) updateData.estate = estate;
     if (houseNumber !== undefined) updateData.houseNumber = houseNumber;
-    if (gender !== undefined) updateData.gender = gender;
+    
+    // Handle Gender ENUM crash: Convert empty string to null
+    if (gender !== undefined) {
+      updateData.gender = (gender === '' || gender === null) ? null : gender;
+    }
+
     if (campus !== undefined) updateData.campus = campus;
     if (emailVerified !== undefined) updateData.emailVerified = emailVerified;
     if (phoneVerified !== undefined) updateData.phoneVerified = phoneVerified;
     if (accessRestrictions !== undefined) updateData.accessRestrictions = accessRestrictions;
     if (isDeactivated !== undefined) updateData.isDeactivated = isDeactivated;
+    
+    // Handle Freeze status
+    if (isFrozen !== undefined) {
+      updateData.isFrozen = isFrozen;
+      // When a user is frozen, they should also be deactivated
+      if (isFrozen) updateData.isDeactivated = true;
+    }
+    
+    if (isVerified !== undefined) updateData.isVerified = isVerified;
     if (banReason !== undefined) updateData.banReason = banReason;
 
     // If a super admin is assigning/changing a role via this endpoint,
@@ -572,9 +596,10 @@ router.patch('/users/:userId/verification', auth, adminOnly, async (req, res) =>
       try {
         const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-        await sendSms(
+        await sendMessage(
           user.phone,
-          `Your Comrades360 verification code is: ${verificationCode}`
+          `Your Comrades360 verification code is: ${verificationCode}`,
+          'sms'
         );
 
         await user.update({ phoneVerificationCode: verificationCode });

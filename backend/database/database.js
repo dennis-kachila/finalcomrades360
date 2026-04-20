@@ -8,22 +8,26 @@ const rootEnv = path.resolve(__dirname, '..', '..', '.env');
 const rootEnvProd = path.resolve(__dirname, '..', '..', '.env.production');
 const backendEnv = path.resolve(__dirname, '..', '.env');
 
-if (fs.existsSync(rootEnvProd)) {
-  console.log(`[Database] Loading production env from: ${rootEnvProd}`);
-  dotenv.config({ path: rootEnvProd });
-} else if (fs.existsSync(rootEnv)) {
-  console.log(`[Database] Loading env from: ${rootEnv}`);
+// 1. Load basic .env first
+if (fs.existsSync(rootEnv)) {
+  console.log(`[Database] Loading base env from: ${rootEnv}`);
   dotenv.config({ path: rootEnv });
 } else if (fs.existsSync(backendEnv)) {
   console.log(`[Database] Loading fallback backend env from: ${backendEnv}`);
   dotenv.config({ path: backendEnv });
-} else {
-  console.warn(`⚠️ Warning: No .env found. Using process.env defaults.`);
 }
 
-const isProd = process.env.NODE_ENV === 'production';
-const env = isProd ? 'production' : 'development';
-console.log(`[Database] Mode: ${env}`);
+// 2. If we are in production mode, selectively override with production vars
+const requestedEnv = process.env.NODE_ENV || 'development';
+if (requestedEnv === 'production' && fs.existsSync(rootEnvProd)) {
+  console.log(`[Database] Overriding with production settings from: ${rootEnvProd}`);
+  dotenv.config({ path: rootEnvProd, override: true });
+} else if (requestedEnv === 'production' && !fs.existsSync(rootEnvProd)) {
+  console.warn(`[Database] ⚠️ PRODUCTION mode requested but .env.production missing!`);
+}
+
+const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+console.log(`[Database] Final Operating Mode: ${env}`);
 
 // Database configuration
 const config = {

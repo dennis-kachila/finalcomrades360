@@ -12,12 +12,18 @@ const fs = require('fs');
 const rootEnv = path.resolve(__dirname, '..', '.env');
 const rootEnvProd = path.resolve(__dirname, '..', '.env.production');
 
-if (fs.existsSync(rootEnvProd)) {
-  dotenv.config({ path: rootEnvProd });
-} else if (fs.existsSync(rootEnv)) {
+// 1. Load basic .env first
+if (fs.existsSync(rootEnv)) {
   dotenv.config({ path: rootEnv });
-} else {
-  console.warn('⚠️ Warning: No root .env or .env.production found.');
+}
+
+// 2. If we are definitively in production mode, selectively override with production vars
+const requestedEnv = process.env.NODE_ENV || 'development';
+if (requestedEnv === 'production' && fs.existsSync(rootEnvProd)) {
+  console.log(`[Server] Overriding with production settings from: ${rootEnvProd}`);
+  dotenv.config({ path: rootEnvProd, override: true });
+} else if (!fs.existsSync(rootEnv) && !fs.existsSync(rootEnvProd)) {
+  console.warn('⚠️ Warning: No root .env or .env.production found. Using defaults.');
   dotenv.config();
 }
 
@@ -426,9 +432,90 @@ const io = new Server(server, {
 
 setIO(io);
 
+// Socket.IO Connection Handler
+function setupSocketHandlers(io) {
+  io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+
+    socket.on('join_user', (userId) => {
+      if (userId) {
+        socket.join(`user_${userId}`);
+        socket.join(`user:${userId}`);
+        console.log(`User ${userId} joined their room`);
+      }
+    });
+
+    socket.on('join_admin', () => {
+      socket.join('admin_room');
+      socket.join('admin');
+      console.log('Admin connected to admin room');
+    });
+
+    socket.on('delivery_message_send', async (data) => {
+      const { receiverId } = data;
+      io.to(`user_${receiverId}`).emit('delivery_message_receive', data);
+    });
+
+    socket.on('delivery_typing', (data) => {
+      const { receiverId, orderId, isTyping } = data;
+      io.to(`user_${receiverId}`).emit('delivery_typing_receive', {
+        senderId: data.senderId,
+        orderId,
+        isTyping
+      });
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Client disconnected:', socket.id);
+    });
+  });
+}
+
+// Common Background Services Initialization
+async function initializeServices(io) {
+  try {
+    console.error('🔄 [Init] Beginning background service initialization...');
+    
+    // 1. Initialize Database Connection & Sync
+    const { testConnection } = require('./database/database');
+    try {
+      await testConnection();
+      console.error('✅ Database connected and verified successfully');
+    } catch (dbError) {
+      console.error('⚠️ Critical Database Initialization Failure:', dbError.message);
+    }
+
+    // 2. Initialize Cache (Redis)
+    try {
+      const cache = require('./scripts/services/cacheService');
+      await cache.connect();
+    } catch (cacheErr) {
+      console.error('⚠️ Redis initialization skipped:', cacheErr.message);
+    }
+
+    // 3. Initialize OTP services (including WhatsApp Free Client)
+    require('./utils/messageService');
+    
+    // 4. Start Cron and Workers
+    const { initScheduledTasks } = require('./cron/scheduledTasks');
+    initScheduledTasks();
+    
+    const { startBatchAutomation } = require('./services/batchAutomation');
+    const { runAutoHandoverWorker } = require('./services/autoHandoverService');
+    startBatchAutomation();
+    runAutoHandoverWorker();
+    
+    console.error('✨ ALL SERVICES INITIALIZED. Application is fully operational.');
+  } catch (err) {
+    console.error('⚠️ Critical Error during service initialization:', err.message);
+  }
+}
+
 async function startServer() {
-  // Use the DEFAULT_PORT defined in the outer scope
   console.error(`🚀 ULTRA-FAST BOOT: Starting server bind sequence for port ${DEFAULT_PORT}...`);
+
+  // MANDATORY: Register Socket.IO handlers BEFORE starting listen or in any startup path
+  setupSocketHandlers(io);
 
   // Start the server ONLY if not already listening (prevents Passenger/Double-init crashes)
   if (!server.listening) {
@@ -437,85 +524,7 @@ async function startServer() {
         console.error(`🚀 Server bound to port ${DEFAULT_PORT} - REBOOT SUCCESSFUL - Version: ${Date.now()}`);
         
         // DEFERRED INITIALIZATION: Start heavy services after the port is open
-        setImmediate(async () => {
-          try {
-            console.error('🔄 [Init] Beginning deferred service initialization...');
-            
-            // 1. Initialize Database Connection & Sync
-            const { testConnection } = require('./database/database');
-            try {
-              await testConnection();
-              console.error('✅ Database connected and verified successfully');
-            } catch (dbError) {
-              console.error('⚠️ Critical Database Initialization Failure:', dbError.message);
-            }
-
-            // Routes are now initialized immediately above startServer
-
-            // 3. Initialize Socket.IO connection handling
-            io.on('connection', (socket) => {
-              console.log('Client connected:', socket.id);
-
-              socket.on('join_user', (userId) => {
-                if (userId) {
-                  socket.join(`user_${userId}`);
-                  socket.join(`user:${userId}`);
-                  console.log(`User ${userId} joined their room`);
-                }
-              });
-
-              socket.on('join_admin', () => {
-                socket.join('admin_room');
-                socket.join('admin');
-                console.log('Admin connected to admin room');
-              });
-
-              socket.on('delivery_message_send', async (data) => {
-                const { receiverId } = data;
-                io.to(`user_${receiverId}`).emit('delivery_message_receive', data);
-              });
-
-              socket.on('delivery_typing', (data) => {
-                const { receiverId, orderId, isTyping } = data;
-                io.to(`user_${receiverId}`).emit('delivery_typing_receive', {
-                  senderId: data.senderId,
-                  orderId,
-                  isTyping
-                });
-              });
-
-              socket.on('disconnect', () => {
-                console.log('Client disconnected:', socket.id);
-              });
-            });
-
-            console.error('🔄 Initializing deferred services (WhatsApp, Redis, Workers, Cron)...');
-            
-            // 4. Initialize Cache (Redis)
-            try {
-              const cache = require('./scripts/services/cacheService');
-              await cache.connect();
-            } catch (cacheErr) {
-              console.error('⚠️ Redis initialization skipped:', cacheErr.message);
-            }
-
-            // 5. Initialize OTP services (including WhatsApp Free Client)
-            require('./utils/messageService');
-            
-            const { initScheduledTasks } = require('./cron/scheduledTasks');
-            initScheduledTasks();
-            
-            // 6. Start Heavy Workers
-            const { startBatchAutomation } = require('./services/batchAutomation');
-            const { runAutoHandoverWorker } = require('./services/autoHandoverService');
-            startBatchAutomation();
-            runAutoHandoverWorker();
-            
-            console.error('✨ ALL SERVICES INITIALIZED. Application is fully operational.');
-          } catch (deferredErr) {
-            console.error('⚠️ Critical Error during deferred initialization:', deferredErr.message);
-          }
-        });
+        setImmediate(() => initializeServices(io));
       });
     } catch (listenError) {
       if (listenError.message.includes('once') || listenError.code === 'EADDRINUSE') {
@@ -526,29 +535,8 @@ async function startServer() {
     }
   } else {
     console.error('ℹ️ Server already listening (Passenger managed), skipping manual listen call.');
-    // Managed environment: Start everything with a small stagger to prevent CPU/Process spikes
-    setTimeout(async () => {
-      try {
-        console.error('⏳ Starting deferred initialization (Managed env)...');
-        const { testConnection } = require('./database/database');
-        await testConnection();
-        
-        const cache = require('./scripts/services/cacheService');
-        await cache.connect();
-        
-        require('./utils/messageService');
-        const { initScheduledTasks } = require('./cron/scheduledTasks');
-        initScheduledTasks();
-
-        const { startBatchAutomation } = require('./services/batchAutomation');
-        const { runAutoHandoverWorker } = require('./services/autoHandoverService');
-        startBatchAutomation();
-        runAutoHandoverWorker();
-        console.error('✨ Managed environment initialization complete.');
-      } catch (err) {
-        console.error('⚠️ Error in Passenger deferred init:', err.message);
-      }
-    });
+    // Managed environment: Start everything as a light background task
+    setImmediate(() => initializeServices(io));
   }
 
   // Handle server errors

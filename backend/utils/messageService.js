@@ -59,10 +59,11 @@ const initWhatsApp = async () => {
     }
 
     // 2. Guard: skip if explicitly disabled or set to cloud
-    const isEnabled = process.env.WHATSAPP_ENABLED !== 'false'; // Default to true if missing
+    const isEnabled = process.env.WHATSAPP_ENABLED !== 'false'; 
     if (!isEnabled || method === 'cloud') {
         whatsappStatus = method === 'cloud' ? 'cloud_active' : 'disabled';
         logWhatsApp(`SKIPPING: method=${method}, enabled=${isEnabled}`);
+        isInitializing = false; // Reset flag so it can be re-triggered manually if needed
         return;
     }
 
@@ -118,8 +119,10 @@ const initWhatsApp = async () => {
                 whatsappStatus = 'disconnected';
                 isInitializing = false;
                 
+                // Simplified reconnect logic to avoid rapid loops
                 if (shouldReconnect) {
-                    setTimeout(initWhatsApp, 5000);
+                    logWhatsApp('RETRY: Reconnecting in 10s...');
+                    setTimeout(initWhatsApp, 10000); 
                 }
             }
         });
@@ -202,7 +205,22 @@ const logoutWhatsApp = async () => {
     return { success: true };
 };
 
+/**
+ * Normalizes phone numbers to E.164 format for WhatsApp and SMS (Kenyan focus)
+ */
+const normalizePhone = (phone) => {
+    let clean = String(phone || '').replace(/[\s\-\(\)\+]/g, '');
+    if (clean.startsWith('0')) {
+        clean = '254' + clean.substring(1);
+    }
+    // Prefix with + if not already present for international standard
+    return clean.startsWith('254') ? `+${clean}` : `+${clean}`;
+};
+
 const sendMessage = async (to, message, method = 'whatsapp') => {
+    const formattedPhone = normalizePhone(to);
+    console.log(`[Messaging] 🚀 ROUTING: ${method.toUpperCase()} | TARGET: ${formattedPhone}`);
+
     if (method === 'whatsapp') {
         try {
             const { PlatformConfig } = require('../models');
@@ -210,13 +228,15 @@ const sendMessage = async (to, message, method = 'whatsapp') => {
             if (configRecord) {
                 const dbConfig = typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value;
                 if (dbConfig.method === 'cloud') {
-                    return sendWhatsAppCloud(to, message, dbConfig);
+                    return sendWhatsAppCloud(formattedPhone, message, dbConfig);
                 }
             }
-        } catch (err) {}
-        return sendWhatsAppLocal(to, message);
+        } catch (err) {
+            logWhatsApp(`ERROR in sendMessage (cloud-check): ${err.message}`);
+        }
+        return sendWhatsAppLocal(formattedPhone, message);
     } else {
-        return sendSms(to, message);
+        return sendSms(formattedPhone, message);
     }
 };
 
@@ -226,12 +246,7 @@ const sendWhatsAppLocal = async (to, message) => {
     }
 
     try {
-        let cleanedPhone = to.replace(/[\s\-\(\)\+]/g, '');
-        if (cleanedPhone.startsWith('0')) {
-            cleanedPhone = '254' + cleanedPhone.substring(1);
-        }
-        
-        const jid = `${cleanedPhone}@s.whatsapp.net`;
+        const jid = `${to.replace('+', '')}@s.whatsapp.net`;
         console.log(`[Baileys WhatsApp] Sending to: ${jid}...`);
         
         const result = await sock.sendMessage(jid, { text: message });
@@ -244,31 +259,65 @@ const sendWhatsAppLocal = async (to, message) => {
 };
 
 const sendSms = async (to, message) => {
-    let username = (process.env.AFRICASTALKING_USERNAME || '').trim();
-    let apiKey = (process.env.AFRICASTALKING_API_KEY || '').trim();
+    // 1. Check Dashboard (Database) Settings first
+    let username = '';
+    let apiKey = '';
+    let from = '';
 
     try {
         const { PlatformConfig } = require('../models');
         const configRecord = await PlatformConfig.findOne({ where: { key: 'sms_config' } });
         if (configRecord) {
             const dbConfig = typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value;
-            if (dbConfig.username) username = dbConfig.username.trim();
-            if (dbConfig.apiKey) apiKey = dbConfig.apiKey.trim();
+            username = (dbConfig.username || '').trim();
+            apiKey = (dbConfig.apiKey || '').trim();
+            from = (dbConfig.senderId || dbConfig.from || '').trim();
         }
-    } catch (err) {}
+    } catch (err) {
+        console.error('[SMS Service] Failed to fetch database config:', err.message);
+    }
 
+    // 2. Fallback to .env if Database is empty
+    if (!username) username = (process.env.AFRICASTALKING_USERNAME || '').trim();
+    if (!apiKey) apiKey = (process.env.AFRICASTALKING_API_KEY || '').trim();
+    if (!from) from = (process.env.AFRICASTALKING_FROM || '').trim();
+
+    // 3. Fallback to Mock if still empty
     if (!username || !apiKey) {
-        console.log(`[MOCK SMS] To: ${to}, Message: ${message}`);
+        console.log(`⚠️ [SMS MOCK] Credentials missing. To: ${to}, Message: ${message}`);
         return { success: true, mock: true };
     }
 
     const at = africastalking({ username, apiKey });
     try {
-        const result = await at.SMS.send({ to: [to], message, enqueue: true });
-        console.log('✅ [SMS] Sent:', JSON.stringify(result));
+        console.log(`[Africatalking SMS] Dispatching to: ${to} (Sender: ${from || 'Default'})...`);
+        
+        const options = { 
+            to: [to], 
+            message, 
+            enqueue: true 
+        };
+        
+        // Only add 'from' if it's explicitly set to avoid AT errors with empty strings
+        if (from) options.from = from;
+
+        const result = await at.SMS.send(options);
+        
+        console.log('✅ [SMS] Africatalking Response:', JSON.stringify(result, null, 2));
+
+        const recipients = result?.SMSMessageData?.Recipients || [];
+        const failed = recipients.filter(r => r.status !== 'Success' && r.status !== 'Enqueued');
+        
+        if (failed.length > 0) {
+            console.error('❌ [SMS] Delivery Failure for some recipients:', JSON.stringify(failed));
+        }
+
         return { success: true, data: result };
     } catch (error) {
-        console.error('❌ [SMS] Error:', error);
+        console.error('❌ [SMS] Africatalking FATAL Error:', error);
+        if (error.response) {
+            console.error('❌ [SMS] Error Data:', error.response.data);
+        }
         throw error;
     }
 };

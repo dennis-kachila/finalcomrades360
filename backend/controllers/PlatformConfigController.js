@@ -183,6 +183,13 @@ exports.updateConfig = async (req, res) => {
             });
         }
 
+        // Trigger WhatsApp re-initialization if config changes
+        if (key === 'whatsapp_config') {
+            console.log('[PlatformConfigController] WhatsApp config updated. Triggering re-init...');
+            const { restartWhatsApp } = require('../utils/messageService');
+            restartWhatsApp().catch(err => console.error('Restart Error:', err));
+        }
+
         res.json({ success: true, message: 'Settings updated successfully', data: value });
     } catch (error) {
         console.error('Update Config Error:', error);

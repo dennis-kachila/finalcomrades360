@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { FaMapMarkedAlt, FaClock, FaCheckCircle, FaDollarSign, FaSpinner, FaChevronDown, FaChevronUp, FaBox, FaStore, FaTruck, FaClipboardCheck } from 'react-icons/fa';
 import api from '../../../services/api';
 import { formatPrice } from '../../../utils/currency';
@@ -355,12 +356,20 @@ const DeliveryAgentAvailable = () => {
                       ))}
                     </div>
                   )}
-                  <button
-                    onClick={fetchAvailableOrders}
-                    className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    Check Status Again
-                  </button>
+                  <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <button
+                      onClick={fetchAvailableOrders}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      Check Status Again
+                    </button>
+                    <Link
+                      to="/delivery/account"
+                      className="inline-flex items-center px-4 py-2 border border-red-200 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                    >
+                      Set Delivery Profile
+                    </Link>
+                  </div>
                 </div>
               ) : availableOrders.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">

@@ -16,7 +16,7 @@ import {
   FaSearch,
   FaMobileAlt
 } from 'react-icons/fa';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, Link } from 'react-router-dom';
 import api from '../../../services/api';
 import { resolveImageUrl } from '../../../utils/imageUtils';
 import { formatPrice } from '../../../utils/currency';
@@ -585,12 +585,20 @@ const DeliveryAgentOrders = () => {
                   ))}
                 </div>
               )}
-              <button
-                onClick={() => loadMyDeliveries()}
-                className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                Check Status Again
-              </button>
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <button
+                  onClick={() => loadMyDeliveries()}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  Check Status Again
+                </button>
+                <Link
+                  to="/delivery/account"
+                  className="inline-flex items-center px-4 py-2 border border-red-200 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                >
+                  Set Delivery Profile
+                </Link>
+              </div>
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center py-12 text-gray-500">

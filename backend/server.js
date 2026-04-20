@@ -218,6 +218,7 @@ function initializeRoutes(app) {
   const fastFoodRoutes = require('./routes/fastFoodRoutes');
   app.use('/api/fast-food', fastFoodRoutes);
   app.use('/api/fastfood', fastFoodRoutes);
+  app.use('/api/batches', require('./routes/batchRoutes'));
 
   app.use('/api/marketing', require('./routes/marketingRoutes'));
   app.use('/api/image', require('./routes/imageRoutes'));

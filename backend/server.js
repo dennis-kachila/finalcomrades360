@@ -66,6 +66,16 @@ const app = express();
 app.set('trust proxy', true);
 console.log('[Init] Express Trust Proxy set to:', app.get('trust proxy'));
 
+// IMMEDIATE HEALTH CHECK (Must be before any heavy middleware or routes)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    message: 'Server is reachable',
+    timestamp: new Date().toISOString(),
+    version: '1.0.2-prod-stable'
+  });
+});
+
 // Set server timeout to 60 seconds (60000ms)
 app.set('timeout', 60000);
 
@@ -473,14 +483,15 @@ function setupSocketHandlers(io) {
 
 // Common Background Services Initialization
 async function initializeServices(io) {
+  const step = (msg) => console.error(`[BOOT-STEP] ${msg}`);
   try {
-    console.error('🔄 [Init] Beginning background service initialization...');
+    step('1/4: Beginning background service initialization...');
     
     // 1. Initialize Database Connection & Sync
     const { testConnection } = require('./database/database');
     try {
       await testConnection();
-      console.error('✅ Database connected and verified successfully');
+      step('2/4: Database connected and verified');
     } catch (dbError) {
       console.error('⚠️ Critical Database Initialization Failure:', dbError.message);
     }
@@ -489,6 +500,7 @@ async function initializeServices(io) {
     try {
       const cache = require('./scripts/services/cacheService');
       await cache.connect();
+      step('3/4: Cache service connected');
     } catch (cacheErr) {
       console.error('⚠️ Redis initialization skipped:', cacheErr.message);
     }
@@ -505,45 +517,45 @@ async function initializeServices(io) {
     startBatchAutomation();
     runAutoHandoverWorker();
     
-    console.error('✨ ALL SERVICES INITIALIZED. Application is fully operational.');
+    step('4/4: ALL BACKGROUND SERVICES INITIALIZED.');
   } catch (err) {
     console.error('⚠️ Critical Error during service initialization:', err.message);
   }
 }
 
 async function startServer() {
-  console.error(`🚀 ULTRA-FAST BOOT: Starting server bind sequence for port ${DEFAULT_PORT}...`);
+  console.error(`🚀 BOOT: Starting server bind sequence for port ${DEFAULT_PORT}...`);
 
-  // MANDATORY: Register Socket.IO handlers BEFORE starting listen or in any startup path
+  // MANDATORY: Register Socket.IO handlers BEFORE anything else
   setupSocketHandlers(io);
+  console.error('✅ Step 1: Socket.IO handlers registered.');
 
-  // Start the server ONLY if not already listening (prevents Passenger/Double-init crashes)
-  if (!server.listening) {
-    try {
-      server.listen(DEFAULT_PORT, () => {
-        console.error(`🚀 Server bound to port ${DEFAULT_PORT} - REBOOT SUCCESSFUL - Version: ${Date.now()}`);
-        
-        // DEFERRED INITIALIZATION: Start heavy services after the port is open
-        setImmediate(() => initializeServices(io));
-      });
-    } catch (listenError) {
-      if (listenError.message.includes('once') || listenError.code === 'EADDRINUSE') {
-        console.error('ℹ️ Server already listening or binding, skipping extra listen call.');
-      } else {
-        throw listenError;
-      }
+  // Unified startup: Passenger intercepts the listen call. 
+  // We ALWAYS call listen but handle address-in-use gracefully.
+  try {
+    server.listen(DEFAULT_PORT, () => {
+      console.error(`🚀 Step 2: Server bound to port ${DEFAULT_PORT} - SUCCESS`);
+      
+      // DEFERRED INITIALIZATION: Start heavy services after the port is open
+      setImmediate(() => initializeServices(io));
+    });
+  } catch (listenError) {
+    if (listenError.code === 'EADDRINUSE') {
+      console.error('ℹ️ Server already bound (Managed environment), starting background services...');
+      setImmediate(() => initializeServices(io));
+    } else {
+      console.error('❌ FATAL: Server failed to start:', listenError);
+      throw listenError;
     }
-  } else {
-    console.error('ℹ️ Server already listening (Passenger managed), skipping manual listen call.');
-    // Managed environment: Start everything as a light background task
-    setImmediate(() => initializeServices(io));
   }
 
   // Handle server errors
   server.on('error', (err) => {
-    console.error('❌ Server error:', err);
     if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${DEFAULT_PORT} is already in use.`);
+       // Handled in try/catch for initial listen, but keep here for runtime errors
+       console.error(`[Runtime] Port ${DEFAULT_PORT} is in use.`);
+    } else {
+       console.error('❌ Server runtime error:', err);
     }
   });
 
@@ -554,7 +566,7 @@ async function startServer() {
 
   // Handle SIGTERM
   process.on('SIGTERM', () => {
-    console.log('SIGTERM received. Shutting down gracefully');
+    console.error('SIGTERM received. Shutting down gracefully');
     server.close(() => console.log('Process terminated'));
   });
 }
@@ -568,4 +580,5 @@ if (global.__serverStarted) {
 }
 
 // Export for cPanel/Passenger
-module.exports = app;
+// We export the SERVER which has Socket.io attached, ensuring connectivity.
+module.exports = server;

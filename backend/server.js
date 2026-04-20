@@ -244,6 +244,15 @@ function initializeRoutes(app) {
   app.use('/api/handover', require('./routes/handoverRoutes'));
   app.use('/api/images', require('./routes/imageRoutes'));
 
+  // Newly mounted forgotten modules
+  app.use('/api/admin/marketing', require('./routes/adminMarketingRoutes'));
+  app.use('/api/commissions', require('./routes/commissionRoutes'));
+  app.use('/api/delivery-messages', require('./routes/deliveryMessageRoutes'));
+  app.use('/api/returns', require('./routes/returnRoutes'));
+  app.use('/api/sharing', require('./routes/sharingRoutes'));
+  app.use('/api/superadmin', require('./routes/superAdminSecurityRoutes'));
+  app.use('/api/2fa', require('./routes/twoFactorAuthRoutes'));
+
   console.error('✅ 35+ Route modules successfully lazy-loaded.');
 }
 

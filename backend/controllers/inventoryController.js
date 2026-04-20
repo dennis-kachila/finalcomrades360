@@ -263,7 +263,7 @@ const checkLowStockAndNotify = async () => {
       },
       include: [
         { model: Product, attributes: ['id', 'name', 'sellerId'] },
-        { model: Warehouse, attributes: ['id', 'name', 'location'] }
+        { model: Warehouse, attributes: ['id', 'name', 'town'] }
       ]
     });
 
@@ -487,7 +487,7 @@ const bulkStockExport = async (req, res) => {
         where: { warehouseId },
         include: [
           { model: Product, attributes: ['id', 'name', 'sku', 'price', 'lowStockThreshold'] },
-          { model: Warehouse, attributes: ['name', 'location'] }
+          { model: Warehouse, attributes: ['name', 'town'] }
         ]
       });
 
@@ -496,7 +496,7 @@ const bulkStockExport = async (req, res) => {
         productName: ws.Product.name,
         sku: ws.Product.sku,
         warehouse: ws.Warehouse.name,
-        location: ws.Warehouse.location,
+        location: ws.Warehouse.town || 'N/A',
         quantity: ws.quantity,
         reserved: ws.reserved,
         available: ws.quantity - ws.reserved,
@@ -551,7 +551,7 @@ const getStockAuditTrail = async (req, res) => {
       where,
       include: [
         { model: Product, attributes: ['id', 'name', 'sku'] },
-        { model: Warehouse, attributes: ['name', 'location'] },
+        { model: Warehouse, attributes: ['name', 'town'] },
         { model: User, attributes: ['name', 'email'] }
       ],
       order: [['createdAt', 'DESC']],

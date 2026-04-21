@@ -47,7 +47,7 @@ export default function UserManagement() {
       if (status !== 'all') params.append('status', status);
       if (role) params.append('role', role);
       
-      const response = await api.get(`/api/admin/users?${params.toString()}`);
+      const response = await api.get(`/admin/users?${params.toString()}`);
       const usersData = response.data.users || [];
       
       setUsers(usersData);
@@ -77,7 +77,7 @@ export default function UserManagement() {
     
     resetAlerts();
     try {
-      await api.patch(`/api/admin/users/${userId}/role`, { role: newRole });
+      await api.patch(`/admin/users/${userId}/role`, { role: newRole });
       setSuccess('User role updated successfully');
       loadUsers();
     } catch (e) {
@@ -94,7 +94,7 @@ export default function UserManagement() {
     resetAlerts();
     try {
       setLoading(true);
-      await api.delete(`/api/admin/users/${userId}`);
+      await api.delete(`/admin/users/${userId}`);
       setSuccess(`User ${userName} deleted successfully`);
       loadUsers();
     } catch (e) {

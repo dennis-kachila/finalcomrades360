@@ -9,10 +9,15 @@ const PhoneVerification = ({ currentPhone, onVerified }) => {
   const [step, setStep] = useState(1); // 1: Input Phone, 2: Input OTP
   const [method, setMethod] = useState('whatsapp'); // 'sms' or 'whatsapp'
   const [showDndHint, setShowDndHint] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   
   const handleSendOtp = async (e) => {
     if (e) e.preventDefault();
-    if (!phoneNumber) return toast.error("Please enter a phone number");
+    setErrorMsg('');
+    if (!phoneNumber) {
+      setErrorMsg("Please enter a phone number");
+      return toast.error("Please enter a phone number");
+    }
 
     setLoading(true);
     try {
@@ -38,6 +43,7 @@ const PhoneVerification = ({ currentPhone, onVerified }) => {
     } catch (error) {
       console.error("Error sending OTP:", error);
       const msg = error.response?.data?.message || "Failed to send verification code.";
+      setErrorMsg(msg);
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -46,12 +52,23 @@ const PhoneVerification = ({ currentPhone, onVerified }) => {
 
   const handleVerifyOtp = async (e) => {
     if (e) e.preventDefault();
-    if (!verificationCode) return toast.error("Please enter the verification code");
+    setErrorMsg('');
+    if (!verificationCode) {
+      setErrorMsg("Please enter the verification code");
+      return toast.error("Please enter the verification code");
+    }
 
     setLoading(true);
     try {
+      // Normalize number just like in the request step
+      let formattedPhone = phoneNumber.trim();
+      if (!formattedPhone.startsWith('+')) {
+         formattedPhone = `+254${formattedPhone.replace(/^0/, '')}`;
+      }
+
       const response = await api.post('/users/me/phone-otp/confirm', { 
-        otp: verificationCode 
+        otp: verificationCode,
+        phone: formattedPhone
       });
 
       if (response.data) {
@@ -61,6 +78,7 @@ const PhoneVerification = ({ currentPhone, onVerified }) => {
     } catch (error) {
       console.error("Error verifying OTP:", error);
       const msg = error.response?.data?.message || "Invalid or expired verification code";
+      setErrorMsg(msg);
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -71,6 +89,7 @@ const PhoneVerification = ({ currentPhone, onVerified }) => {
       setStep(1);
       setVerificationCode('');
       setShowDndHint(false);
+      setErrorMsg('');
   };
 
   const handleKeyDown = (e, callback) => {
@@ -187,6 +206,13 @@ const PhoneVerification = ({ currentPhone, onVerified }) => {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-[13px] leading-tight text-red-700 animate-in fade-in zoom-in font-medium flex items-start gap-2">
+           <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+           <span>{errorMsg}</span>
         </div>
       )}
     </div>

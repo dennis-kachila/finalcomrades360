@@ -1233,11 +1233,28 @@ const listMarketers = async (_req, res) => {
 const suspendMarketer = async (req, res) => {
   try {
     const { userId } = req.params;
+    const { adminPassword } = req.body;
+
+    // Security Verification
+    if (!adminPassword) {
+      return res.status(401).json({ message: 'Admin password is required for this action' });
+    }
+
+    const masterPassword = (process.env.ADMIN_PASSWORD || 'comrades360admin').trim();
+    const adminUser = await User.findByPk(req.user.id);
+    const isMasterValid = adminPassword.trim() === masterPassword;
+    const isAccountValid = adminUser && adminUser.password ? await bcrypt.compare(adminPassword.trim(), adminUser.password) : false;
+
+    if (!isMasterValid && !isAccountValid) {
+      return res.status(403).json({ message: 'Incorrect admin password' });
+    }
+
     const user = await User.findByPk(userId);
     if (!user || user.role !== 'marketer') return res.status(404).json({ message: 'Marketer not found' });
-    user.isDeactivated = true;
+    user.isMarketerSuspended = true;
+    user.isDeactivated = false; // Ensure they can still login as customers
     await user.save();
-    res.json({ message: 'Marketer suspended', userId: user.id });
+    res.json({ message: 'Marketer suspended from dashboard access', userId: user.id });
   } catch (e) {
     res.status(500).json({ message: 'Error suspending marketer', error: e.message });
   }
@@ -1248,11 +1265,99 @@ const reactivateMarketer = async (req, res) => {
     const { userId } = req.params;
     const user = await User.findByPk(userId);
     if (!user || user.role !== 'marketer') return res.status(404).json({ message: 'Marketer not found' });
-    user.isDeactivated = false;
+    user.isMarketerSuspended = false;
     await user.save();
     res.json({ message: 'Marketer reactivated', userId: user.id });
   } catch (e) {
     res.status(500).json({ message: 'Error reactivating marketer', error: e.message });
+  }
+};
+
+const suspendSeller = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { adminPassword } = req.body;
+
+    // Security Verification
+    if (!adminPassword) {
+      return res.status(401).json({ message: 'Admin password is required for this action' });
+    }
+
+    const masterPassword = (process.env.ADMIN_PASSWORD || 'comrades360admin').trim();
+    const adminUser = await User.findByPk(req.user.id);
+    const isMasterValid = adminPassword.trim() === masterPassword;
+    const isAccountValid = adminUser && adminUser.password ? await bcrypt.compare(adminPassword.trim(), adminUser.password) : false;
+
+    if (!isMasterValid && !isAccountValid) {
+      return res.status(403).json({ message: 'Incorrect admin password' });
+    }
+
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    
+    user.isSellerSuspended = true;
+    user.isDeactivated = false; // Ensure they can still login as customers
+    await user.save();
+    res.json({ message: 'Seller suspended from dashboard access', userId: user.id });
+  } catch (e) {
+    res.status(500).json({ message: 'Error suspending seller', error: e.message });
+  }
+};
+
+const reactivateSeller = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    user.isSellerSuspended = false;
+    await user.save();
+    res.json({ message: 'Seller reactivated', userId: user.id });
+  } catch (e) {
+    res.status(500).json({ message: 'Error reactivating seller', error: e.message });
+  }
+};
+
+const suspendDeliveryAgent = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { adminPassword } = req.body;
+
+    // Security Verification
+    if (!adminPassword) {
+      return res.status(401).json({ message: 'Admin password is required for this action' });
+    }
+
+    const masterPassword = (process.env.ADMIN_PASSWORD || 'comrades360admin').trim();
+    const adminUser = await User.findByPk(req.user.id);
+    const isMasterValid = adminPassword.trim() === masterPassword;
+    const isAccountValid = adminUser && adminUser.password ? await bcrypt.compare(adminPassword.trim(), adminUser.password) : false;
+
+    if (!isMasterValid && !isAccountValid) {
+      return res.status(403).json({ message: 'Incorrect admin password' });
+    }
+
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    
+    user.isDeliverySuspended = true;
+    user.isDeactivated = false; // Ensure they can still login as customers
+    await user.save();
+    res.json({ message: 'Delivery agent suspended from dashboard access', userId: user.id });
+  } catch (e) {
+    res.status(500).json({ message: 'Error suspending delivery agent', error: e.message });
+  }
+};
+
+const reactivateDeliveryAgent = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    user.isDeliverySuspended = false;
+    await user.save();
+    res.json({ message: 'Delivery agent reactivated', userId: user.id });
+  } catch (e) {
+    res.status(500).json({ message: 'Error reactivating delivery agent', error: e.message });
   }
 };
 
@@ -1261,6 +1366,22 @@ const generateReferralCode = () => `REF - ${Math.random().toString(36).slice(2, 
 const revokeReferralCode = async (req, res) => {
   try {
     const { userId } = req.params;
+    const { adminPassword } = req.body;
+
+    // Security Verification
+    if (!adminPassword) {
+      return res.status(401).json({ message: 'Admin password is required for this action' });
+    }
+
+    const masterPassword = (process.env.ADMIN_PASSWORD || 'comrades360admin').trim();
+    const adminUser = await User.findByPk(req.user.id);
+    const isMasterValid = adminPassword.trim() === masterPassword;
+    const isAccountValid = adminUser && adminUser.password ? await bcrypt.compare(adminPassword.trim(), adminUser.password) : false;
+
+    if (!isMasterValid && !isAccountValid) {
+      return res.status(403).json({ message: 'Incorrect admin password' });
+    }
+
     const user = await User.findByPk(userId);
     if (!user || user.role !== 'marketer') return res.status(404).json({ message: 'Marketer not found' });
     user.referralCode = null;
@@ -1908,6 +2029,10 @@ module.exports = {
   listMarketers,
   suspendMarketer,
   reactivateMarketer,
+  suspendSeller,
+  reactivateSeller,
+  suspendDeliveryAgent,
+  reactivateDeliveryAgent,
   revokeReferralCode,
   assignReferralCode,
   updateProductCommissionRate,

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { resolveImageUrl, FALLBACK_IMAGE, getProductMainImage } from '../utils/imageUtils';
 import { ensureArray, normalizeIngredient } from '../utils/parsingUtils';
-import { FaBox, FaTruck, FaCheckCircle, FaClock, FaMapMarkerAlt, FaCreditCard, FaArrowLeft, FaRoute, FaUser } from 'react-icons/fa';
+import { FaBox, FaTruck, FaCheckCircle, FaClock, FaMapMarkerAlt, FaCreditCard, FaArrowLeft, FaRoute, FaUser, FaUserTie } from 'react-icons/fa';
 import DeliveryTrackingMap from '../components/DeliveryTrackingMap';
 
 export default function OrderTracking() {
@@ -142,7 +142,14 @@ export default function OrderTracking() {
           <div className="flex justify-between items-end">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Order Tracking</h1>
-              <p className="mt-2 text-gray-600">Track your order #{tracking.orderNumber}</p>
+              <div className="flex items-center gap-3">
+                <p className="mt-2 text-gray-600">Track your order #{tracking.orderNumber}</p>
+                {(order?.isMarketingOrder || order?.marketerId) && (
+                  <span className="mt-2 flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-black uppercase rounded-lg border border-blue-200">
+                    <FaUserTie size={10} /> Marketer Order
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -383,6 +390,30 @@ export default function OrderTracking() {
                   {tracking.deliveryAgent.phone && (
                     <p><strong>Phone:</strong> {tracking.deliveryAgent.phone}</p>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Marketer Information */}
+            {(order?.isMarketingOrder || order?.marketerId || order?.marketer) && (
+              <div className="bg-blue-50 rounded-lg shadow-sm p-6 border border-blue-100">
+                <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+                  <FaUserTie className="mr-2 text-blue-600" />
+                  Marketer Information
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <p><strong>Name:</strong> {order?.marketer?.name || (order?.isMarketingOrder ? 'Authorized Marketer' : 'System Marketer')}</p>
+                  {order?.marketer?.phone ? (
+                    <p><strong>Phone:</strong> {order.marketer.phone}</p>
+                  ) : (order?.isMarketingOrder && (
+                    <p className="text-xs text-gray-400 italic">Phone contact not provided</p>
+                  ))}
+                  {order?.marketer?.email && (
+                    <p><strong>Email:</strong> {order.marketer.email}</p>
+                  )}
+                  <div className="mt-4 p-2 bg-blue-100/50 rounded text-blue-700 text-xs font-medium text-center">
+                    This order was placed on your behalf by an authorized marketer.
+                  </div>
                 </div>
               </div>
             )}

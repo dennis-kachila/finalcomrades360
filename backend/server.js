@@ -136,7 +136,17 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     const isAllowed = allowedOrigins.some(o => origin === o || origin.startsWith(o));
-    if (isAllowed) {
+    
+    // In development, also allow any local network IP addresses (mobile testing)
+    const isLocalIP = IS_DEV && (
+      origin.startsWith('http://192.168.') || 
+      origin.startsWith('http://10.') || 
+      origin.startsWith('http://172.') ||
+      origin.includes('localhost') || 
+      origin.includes('127.0.0.1')
+    );
+
+    if (isAllowed || isLocalIP) {
       callback(null, true);
     } else {
       if (IS_DEV) console.warn(`[CORS] Blocked: ${origin}`);
@@ -187,6 +197,10 @@ initializeRoutes(app);
 // -----------------------------------------------------------------
 // Route Initialization Function (Lazy Loaded)
 function initializeRoutes(app) {
+  // CRITICAL: Prioritize modules that reported 404s
+  app.use('/api/social-media', require('./routes/socialMediaAccountRoutes'));
+  app.use('/api/social-media-accounts', require('./routes/socialMediaAccountRoutes'));
+
   console.error('ℹ️ Registering core API routes...');
   app.use('/api/auth', require('./routes/authRoutes'));
   app.use('/api/users', require('./routes/userRoutes'));
@@ -210,7 +224,6 @@ function initializeRoutes(app) {
   app.use('/api/admin', require('./routes/adminRoutes'));
   app.use('/api/services', require('./routes/serviceRoutes'));
   app.use('/api/profile', require('./routes/profileRoutes'));
-  app.use('/api/social-media', require('./routes/socialMediaAccountRoutes'));
   app.use('/api/contact', require('./routes/contactRoutes'));
   app.use('/api/product-inquiries', require('./routes/productInquiryRoutes'));
   

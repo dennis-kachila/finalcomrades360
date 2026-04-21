@@ -13,6 +13,7 @@ const {
   notifyCustomerSellerConfirmed,
   notifyCustomerOrderCancelled,
   notifyCustomerOrderPlaced,
+  notifyMarketerOrderPlaced,
   logNotify
 } = require('../utils/notificationHelpers');
 const { Op } = require('sequelize');
@@ -657,10 +658,12 @@ const createOrderFromCart = async (req, res) => {
           effectiveMarketerId = userId; // The original userId from token is the marketer
         } else {
           console.log(`⚠️ Marketing order: No existing customer found for email/phone. Creating as guest order.`);
+          effectiveUserId = null; // Fix: do not assign to marketer
           effectiveMarketerId = userId;
         }
       } catch (findErr) {
         console.warn('Failed to search for target customer by email/phone:', findErr);
+        effectiveUserId = null;
         effectiveMarketerId = userId;
       }
     }
@@ -917,7 +920,7 @@ const createOrderFromCart = async (req, res) => {
     // Step 9: Create commission records if payment confirmed
     if (paymentConfirmed) {
       try {
-        await createCommissionRecords(order.id, effectiveReferralCode, { transaction: t });
+        await createCommissionRecords(order.id, effectiveReferralCode, secondaryReferralCode, { transaction: t });
       } catch (commErr) {
         console.warn(`Failed to create commission for order ${order.id}:`, commErr);
       }
@@ -1030,6 +1033,15 @@ const createOrderFromCart = async (req, res) => {
           // Pass the order and customer (even if null) to the helper which handles fallbacks
           await notifyCustomerOrderPlaced(order, customer, cartItems.length, itemNames);
           
+          // NEW: Also notify the MARKETER who placed this order
+          if (order.isMarketingOrder && order.marketerId) {
+            logNotify(`📢 [Marketer Notif] Notifying marketer ID=${order.marketerId}`);
+            const marketerUser = await User.findByPk(order.marketerId);
+            if (marketerUser) {
+              await notifyMarketerOrderPlaced(order, marketerUser, (customer?.name || order.customerName));
+            }
+          }
+          
         } catch (innerError) {
           logNotify(`⚠️ [Customer Notif] Inner failure: ${innerError.message}`);
           console.warn('⚠️ [Customer Notif] Detailed background notification error:', innerError.message);
@@ -1112,8 +1124,17 @@ const myOrders = async (req, res) => {
 
     // Visibility refinement:
     if (req.query.marketing === 'true') {
-      // Marketing dashboard: orders PLACED BY this marketer
-      whereClause = { marketerId: userId };
+      // Marketing dashboard: show orders PLACED BY this marketer OR referral orders matching their code
+      const marketerReferralCode = req.user.referralCode;
+      whereClause = {
+        [Op.or]: [
+          { marketerId: userId },
+          ...(marketerReferralCode ? [
+            { primaryReferralCode: marketerReferralCode },
+            { secondaryReferralCode: marketerReferralCode }
+          ] : [])
+        ]
+      };
     } else {
       // Personal history: orders where user is the RECIPIENT (not the marketer)
       // Include marketing orders placed FOR this user by a marketer, but exclude orders where this user IS the marketer
@@ -1126,8 +1147,8 @@ const myOrders = async (req, res) => {
       };
     }
 
-    // 1. Fetch orders first with basic info
-    const orders = await Order.findAll({
+    // 1. Fetch orders first with basic info - Using unscoped() to prevent hidden OrderItems joins from crashing
+    const orders = await Order.unscoped().findAll({
       where: whereClause,
       include: [
         { model: User, as: 'seller', attributes: ['id', 'name', 'email', 'phone', 'businessName'] },
@@ -1139,7 +1160,8 @@ const myOrders = async (req, res) => {
           required: false,
           include: [{ model: User, as: 'deliveryAgent', attributes: ['id', 'name', 'phone', 'businessName'] }]
         },
-        { model: require('../models').Batch, as: 'batch', attributes: ['id', 'name', 'expectedDelivery'], required: false }
+        { model: Batch, as: 'batch', attributes: ['id', 'name', 'expectedDelivery'], required: false },
+        { model: User, as: 'marketer', attributes: ['id', 'name', 'phone', 'email'], required: false }
       ],
       order: [
         ['createdAt', 'DESC'],
@@ -1179,14 +1201,19 @@ const myOrders = async (req, res) => {
         {
           model: Product,
           required: false,
-          attributes: ['id', 'name', 'coverImage', 'galleryImages', 'images', 'sellerId'],
+          attributes: ['id', 'name', 'images', 'coverImage', 'sellerId', 'marketingCommission', 'marketingCommissionType', 'marketingEnabled'],
           include: [{ model: User, as: 'seller', attributes: ['id', 'name', 'businessName'] }]
         },
         {
           model: FastFood,
           required: false,
-          attributes: ['id', 'name', 'mainImage', 'vendor', 'ingredients', 'allergens'],
+          attributes: ['id', 'name', 'mainImage', 'vendor', 'marketingCommission', 'marketingCommissionType', 'marketingEnabled'],
           include: [{ model: User, as: 'vendorDetail', attributes: ['id', 'name', 'businessName'] }]
+        },
+        {
+          model: Service,
+          required: false,
+          attributes: ['id', 'title', 'coverImage', 'marketingCommission', 'marketingCommissionType', 'marketingEnabled']
         }
       ]
     });
@@ -1237,8 +1264,16 @@ const myOrders = async (req, res) => {
 
     res.json(rows);
   } catch (error) {
-    console.error('Error fetching orders:', error);
-    res.status(500).json({ message: 'Failed to fetch orders' });
+    console.error('❌ [OrderController] Error fetching myOrders:', {
+      message: error.message,
+      stack: error.stack,
+      query: req.query,
+      userId: req.user?.id
+    });
+    res.status(500).json({ 
+      message: 'Failed to fetch orders', 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 };
 
@@ -1660,8 +1695,8 @@ const updateOrderStatus = async (req, res) => {
   await notifyLifecycleStatusChange(order.id, status);
 
   // Trigger commission when transitioning to paid
-  if (prevStatus !== 'paid' && status === 'paid' && order.referralCode) {
-    try { await createCommissionRecords(order.id, order.referralCode); } catch (_) { }
+  if (prevStatus !== 'paid' && status === 'paid' && (order.primaryReferralCode || order.secondaryReferralCode)) {
+    try { await createCommissionRecords(order.id, order.primaryReferralCode, order.secondaryReferralCode); } catch (_) { }
   }
   // Clawback: cancel pending commissions when order is cancelled
   if (status === 'cancelled') {
@@ -4059,6 +4094,12 @@ const getOrderDetails = async (req, res) => {
               required: false,
               attributes: ['id', 'name', 'mainImage', 'vendor', 'ingredients', 'allergens', 'basePrice', 'deliveryFee'],
               include: [{ model: User, as: 'vendorDetail', attributes: ['id', 'name', 'businessName'] }]
+            },
+            {
+              model: Service,
+              required: false,
+              attributes: ['id', 'title', 'coverImage', 'marketingCommission', 'marketingCommissionType', 'marketingEnabled'],
+              include: [{ model: User, as: 'provider', attributes: ['id', 'name', 'businessName'] }]
             }
           ]
         },
@@ -4073,13 +4114,14 @@ const getOrderDetails = async (req, res) => {
           required: false,
           include: [{ model: User, as: 'deliveryAgent', attributes: ['id', 'name', 'email', 'phone', 'businessPhone', 'businessName'] }]
         },
-        { model: Batch, as: 'batch' }
+        { model: Batch, as: 'batch' },
+        { model: User, as: 'marketer', attributes: ['id', 'name', 'phone', 'email'], required: false }
     ];
 
     if (orderId && String(orderId).includes('group')) {
       const gId = orderId.replace('group-', '');
 
-      const orders = await Order.findAll({
+      const orders = await Order.unscoped().findAll({
         where: {
           [Op.or]: [
             { checkoutGroupId: gId },
@@ -4116,7 +4158,7 @@ const getOrderDetails = async (req, res) => {
         status: orders.every(o => o.status === first.status) ? first.status : 'delivered'
       };
     } else {
-      const dbOrder = await Order.findByPk(orderId, { 
+      const dbOrder = await Order.unscoped().findByPk(orderId, { 
         include,
         order: [[{ model: DeliveryTask, as: 'deliveryTasks' }, 'createdAt', 'DESC']]
       });

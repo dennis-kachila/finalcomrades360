@@ -4,7 +4,7 @@ module.exports = (sequelize, DataTypes) => {
 
   const Order = sequelize.define("Order", {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    userId: { type: DataTypes.INTEGER, allowNull: false },
+    userId: { type: DataTypes.INTEGER, allowNull: true },
     orderNumber: { type: DataTypes.STRING, allowNull: false, unique: true },
     checkoutGroupId: { type: DataTypes.STRING, allowNull: true }, // Links multiple split orders from one checkout
     checkoutOrderNumber: { type: DataTypes.STRING, allowNull: true }, // Unified order number for the customer

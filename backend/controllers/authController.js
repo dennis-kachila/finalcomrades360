@@ -168,12 +168,12 @@ const register = async (req, res) => {
     }
 
     if (validatedIsMarketerRegistration) {
-      try {
-        const marketerName = req.user?.name || 'A Marketer';
-        await notifyCustomerMarketerCreated(newUser.id, tempPassword, email || normalizedPhone, marketerName);
-      } catch (notifErr) {
-        console.error('[authController] Failed to send welcome notification:', notifErr.message);
-      }
+      // Fire-and-forget: background the notification so the API responds immediately
+      const marketerName = req.user?.name || 'A Marketer';
+      setImmediate(() => {
+        notifyCustomerMarketerCreated(newUser, tempPassword, email || normalizedPhone, marketerName)
+          .catch(notifErr => console.error('[authController] Background welcome notification failed:', notifErr.message));
+      });
     }
 
     // Auto-login after registration

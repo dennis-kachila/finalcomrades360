@@ -71,6 +71,7 @@ export const AuthProvider = ({ children }) => {
           } else {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+            sessionStorage.clear();
             setUser(null);
           }
         }
@@ -181,6 +182,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('cartState'); // Ensure no guest cart remains
     localStorage.removeItem('cartState_personal');
     localStorage.removeItem('cartState_marketing');
+    sessionStorage.clear();
     setUser(null);
     setVerificationRequired(false);
     setVerificationMessage('');

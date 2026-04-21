@@ -21,6 +21,10 @@ const {
   listMarketers,
   suspendMarketer,
   reactivateMarketer,
+  suspendSeller,
+  reactivateSeller,
+  suspendDeliveryAgent,
+  reactivateDeliveryAgent,
   revokeReferralCode,
   assignReferralCode,
   updateProductCommissionRate,
@@ -124,12 +128,18 @@ router.post('/marketers/:userId/reactivate', adminOnly, reactivateMarketer);
 router.post('/marketers/:userId/referral/revoke', adminOnly, revokeReferralCode);
 router.post('/marketers/:userId/referral/assign', adminOnly, assignReferralCode);
 
+// Seller management
+router.post('/sellers/:userId/suspend', adminOnly, suspendSeller);
+router.post('/sellers/:userId/reactivate', adminOnly, reactivateSeller);
+
 // Delivery agents management
 router.get('/delivery/agents', adminOrLogistics, adminListDeliveryAgents);
 router.get('/delivery/agents/available/:orderId', adminOrLogistics, getAvailableAgentsForOrder);
 router.get('/delivery/agents/:agentId/detail', adminOrLogistics, getAdminAgentDetail);
 router.get('/delivery/agents/:agentId/history', adminOrLogistics, getAdminAgentHistory);
 router.patch('/delivery/agents/:agentId/toggle-status', adminOrLogistics, toggleAgentActiveStatus);
+router.post('/delivery/agents/:userId/suspend', adminOnly, suspendDeliveryAgent);
+router.post('/delivery/agents/:userId/reactivate', adminOnly, reactivateDeliveryAgent);
 router.get('/delivery/global-map-data', adminOrLogistics, adminGetGlobalMapData);
 router.post('/delivery/requests/bulk-approve', adminOrLogistics, adminBulkApproveRequests);
 router.post('/delivery/requests/bulk-reject', adminOrLogistics, adminBulkRejectRequests);

@@ -653,7 +653,7 @@ const handleMpesaCallback = async (req, res) => {
 
             // Create commission records for each order
             try {
-              await createCommissionRecords(ord.id, ord.referralCode, t);
+              await createCommissionRecords(ord.id, ord.primaryReferralCode, ord.secondaryReferralCode, { transaction: t });
             } catch (ce) {
               console.warn(`Failed commission for order ${ord.id}:`, ce);
             }
@@ -667,7 +667,7 @@ const handleMpesaCallback = async (req, res) => {
 
           // Create commission records
           try {
-            await createCommissionRecords(payment.order.id, payment.order.referralCode, t);
+            await createCommissionRecords(payment.order.id, payment.order.primaryReferralCode, payment.order.secondaryReferralCode, { transaction: t });
             
             // NEW: Credit delivery agent immediately if assigned
             await creditAgentByOrder(payment.order.id, t);

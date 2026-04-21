@@ -81,6 +81,24 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: false
     },
+    isMarketerSuspended: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: 'Role-specific suspension for marketers. Does not block customer-level access.'
+    },
+    isSellerSuspended: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: 'Role-specific suspension for sellers.'
+    },
+    isDeliverySuspended: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: 'Role-specific suspension for delivery agents.'
+    },
     isFrozen: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

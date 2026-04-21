@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { validateKenyanPhone, PHONE_VALIDATION_ERROR, formatKenyanPhoneInput } from '../../utils/validation'
 import SystemFeedbackModal from '../ui/SystemFeedbackModal'
 import { GoogleLogin } from '@react-oauth/google'
+import { Eye, EyeOff } from 'lucide-react'
 
 export default function RegisterForm({ onSuccess, initialReferralCode, isModal = false }) {
     const location = useLocation()
@@ -16,7 +17,7 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
     const [contactType, setContactType] = useState('')  // 'email' | 'phone' | ''
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
-    const [referralCode, setReferralCode] = useState(initialReferralCode || '')
+    const [referralCode, setReferralCode] = useState(initialReferralCode || localStorage.getItem('referrerCode') || '')
     const [showPassword, setShowPassword] = useState(false)
 
     // ── Password rules ────────────────────────────────────────────────────────
@@ -358,10 +359,10 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
                         <button
                             type="button"
                             onClick={() => setShowPassword(v => !v)}
-                            className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 text-sm"
+                            className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
                             tabIndex={-1}
                         >
-                            {showPassword ? 'Hide' : 'Show'}
+                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                         </button>
                     </div>
                     {/* Live password checklist */}
@@ -384,17 +385,27 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
                 {/* Confirm Password */}
                 <div className="mb-4">
                     <label className="block mb-1 font-medium text-sm">Confirm Password</label>
-                    <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={e => setConfirmPassword(e.target.value)}
-                        className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${
-                            confirmPassword && confirmPassword !== password ? 'border-red-400' : ''
-                        }`}
-                        placeholder="Re-enter your password"
-                        required
-                        autoComplete="new-password"
-                    />
+                    <div className="relative">
+                        <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={e => setConfirmPassword(e.target.value)}
+                            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition pr-10 ${
+                                confirmPassword && confirmPassword !== password ? 'border-red-400' : ''
+                            }`}
+                            placeholder="Re-enter your password"
+                            required
+                            autoComplete="new-password"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(v => !v)}
+                            className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
+                            tabIndex={-1}
+                        >
+                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
+                    </div>
                     {confirmPassword && confirmPassword !== password && (
                         <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
                     )}
@@ -408,13 +419,13 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
                             type="text"
                             value={referralCode}
                             onChange={e => setReferralCode(e.target.value)}
-                            readOnly={!!initialReferralCode}
+                            readOnly={!!initialReferralCode || !!localStorage.getItem('referrerCode')}
                             className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${
-                                initialReferralCode ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+                                (initialReferralCode || localStorage.getItem('referrerCode')) ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
                             }`}
                             placeholder="Enter a referral code"
                         />
-                        {initialReferralCode && (
+                        {(initialReferralCode || localStorage.getItem('referrerCode')) && (
                             <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
                                 <span className="text-gray-400 text-xs">Locked</span>
                             </div>

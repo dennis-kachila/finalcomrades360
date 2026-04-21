@@ -152,6 +152,13 @@ const adminOrLogisticsOrSeller = (req, res, next) => {
   if (!isAuthorized) {
     return res.status(403).json({ message: 'Admin, Logistics Manager or Seller access required' });
   }
+
+  // Role-specific suspension check
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin');
+  if (!isAdmin && (userRole === 'seller' || userRoles.includes('seller')) && req.user.isSellerSuspended) {
+    return res.status(403).json({ message: 'Your seller portal access has been suspended. You can still use the platform as a customer.' });
+  }
+
   next();
 };
 
@@ -184,6 +191,13 @@ const adminOrSeller = (req, res, next) => {
   if (!isAuthorized) {
     return res.status(403).json({ message: 'Admin or Seller access required' });
   }
+
+  // Role-specific suspension check
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin');
+  if (!isAdmin && (userRole === 'seller' || userRoles.includes('seller')) && req.user.isSellerSuspended) {
+    return res.status(403).json({ message: 'Your seller portal access has been suspended. You can still use the platform as a customer.' });
+  }
+
   next();
 };
 
@@ -226,6 +240,20 @@ const checkRole = (roles = []) => {
       const hasRequiredRole = normalizedRequired.some(role => userRoles.includes(role) || userRole === role);
       if (!hasRequiredRole) {
         return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Check for role-specific suspension
+      const isAdmin = userRole === 'superadmin' || userRoles.includes('superadmin') || userRoles.includes('super_admin') || userRole === 'admin' || userRoles.includes('admin');
+      if (!isAdmin) {
+        if (normalizedRequired.includes('marketer') && req.user.isMarketerSuspended) {
+          return res.status(403).json({ message: 'Your marketer portal access has been suspended.' });
+        }
+        if (normalizedRequired.includes('seller') && req.user.isSellerSuspended) {
+          return res.status(403).json({ message: 'Your seller portal access has been suspended.' });
+        }
+        if (normalizedRequired.some(r => ['delivery', 'delivery_agent', 'driver'].includes(r)) && req.user.isDeliverySuspended) {
+          return res.status(403).json({ message: 'Your delivery portal access has been suspended.' });
+        }
       }
     }
     next();
@@ -274,6 +302,11 @@ const checkSellerProfile = async (req, res, next) => {
     });
   }
 
+  // Suspension check
+  if (!isAdmin && req.user.isSellerSuspended) {
+    return res.status(403).json({ message: 'Your seller portal access has been suspended.' });
+  }
+
   next();
 };
 
@@ -293,6 +326,11 @@ const marketerOnly = (req, res, next) => {
   if (!isMarketer) {
     return res.status(403).json({ message: 'Marketer access required' });
   }
+
+  if (req.user.isMarketerSuspended) {
+    return res.status(403).json({ message: 'Your marketer portal access has been suspended. You can still use the platform as a customer.' });
+  }
+
   next();
 };
 
@@ -329,6 +367,14 @@ const requirePermission = (permission) => {
     });
 
     if (allPerms.includes('*') || allPerms.includes(permission)) {
+      // Check for delivery agent suspension if the permission is delivery-related
+      const isDeliveryRole = userRoles.some(r => ['delivery', 'delivery_agent', 'driver'].includes(r));
+      const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin');
+      
+      if (isDeliveryRole && !isAdmin && req.user.isDeliverySuspended) {
+        return res.status(403).json({ message: 'Your delivery portal access has been suspended. You can still use the platform as a customer.' });
+      }
+
       return next();
     }
     return res.status(403).json({ message: `Forbidden: missing permission ${permission}` });

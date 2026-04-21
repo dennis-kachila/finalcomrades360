@@ -654,7 +654,7 @@ const MarketerDashboard = () => {
       try {
         setLoadingLeaderboard(true);
         // Replace with your actual API endpoint
-        const response = await productApi.get('/marketing/leaderboard');
+        const response = await api.get('/marketing/leaderboard');
         setLeaderboardData(response.data || []);
       } catch (error) {
         console.error('Error fetching leaderboard data:', error);
@@ -1317,7 +1317,9 @@ const MarketerDashboard = () => {
                         <div className="flex flex-col">
                           <span className="font-medium">{order.customerName || order.user?.name || 'Unknown'}</span>
                           {(order.customerPhone || order.user?.phone) && (
-                            <span className="text-xs text-gray-500">{order.customerPhone || order.user?.phone}</span>
+                            <span className="text-xs text-gray-500">
+                              {(order.customerPhone || order.user?.phone).toString().slice(0, -4) + '****'}
+                            </span>
                           )}
                         </div>
                       </td>
@@ -1356,7 +1358,7 @@ const MarketerDashboard = () => {
 
       {/* Order Details Modal */}
       {showOrderModal && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[150] p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full my-8 relative flex flex-col max-h-[90vh]">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-xl">
@@ -1390,11 +1392,9 @@ const MarketerDashboard = () => {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-xs text-gray-500 uppercase font-medium">Phone</p>
-                          <p className="text-sm font-semibold text-gray-800">{selectedOrder.customerPhone || selectedOrder.user?.phone || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 uppercase font-medium">Email</p>
-                          <p className="text-sm font-semibold text-gray-800 break-all">{selectedOrder.customerEmail || selectedOrder.user?.email || 'N/A'}</p>
+                          <p className="text-sm font-semibold text-gray-800">
+                            {(selectedOrder.customerPhone || selectedOrder.user?.phone) ? (selectedOrder.customerPhone || selectedOrder.user?.phone).toString().slice(0, -4) + '****' : 'N/A'}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -1735,7 +1735,6 @@ const MarketerDashboard = () => {
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
                           <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">Customer</th>
-                          <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider hidden sm:table-cell">Email</th>
                           <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider hidden md:table-cell">Referral Code</th>
                           <th className="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">Orders</th>
                           <th className="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider">Status</th>
@@ -1775,14 +1774,14 @@ const MarketerDashboard = () => {
                                     </div>
                                     <div className="min-w-0">
                                       <p className="font-semibold text-gray-900 truncate">{customer.name || 'Guest Customer'}</p>
-                                      {customer.phone && <p className="text-xs text-gray-400 flex items-center gap-1"><FaPhone className="w-2.5 h-2.5" />{customer.phone}</p>}
+                                      {customer.phone && (
+                                        <p className="text-xs text-gray-400 flex items-center gap-1">
+                                          <FaPhone className="w-2.5 h-2.5" />
+                                          {customer.phone.toString().slice(0, -4) + '****'}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
-                                </td>
-                                <td className="px-4 py-3 hidden sm:table-cell">
-                                  <span className="text-gray-600 text-xs">
-                                    {customer.email && !customer.email.includes('@comrades360.auto') ? customer.email : <span className="text-gray-300 italic">—</span>}
-                                  </span>
                                 </td>
                                 <td className="px-4 py-3 hidden md:table-cell">
                                   {customer.referralCode
@@ -1938,7 +1937,7 @@ const MarketerDashboard = () => {
                 className="w-full flex items-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 text-[10px] font-black uppercase tracking-widest text-red-600 hover:bg-red-50"
               >
                 <span className="text-sm">🏠</span>
-                <span>Exit Marketing</span>
+                <span>Exit Mode</span>
               </button>
             </li>
           </ul>
@@ -1993,11 +1992,14 @@ const MarketerDashboard = () => {
                   </Link>
                 )}
                 <button
-                  onClick={() => window.location.href = '/'}
+                  onClick={() => {
+                    localStorage.removeItem('marketing_mode');
+                    window.location.href = '/';
+                  }}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm hover:bg-gray-50 transition-all border border-gray-200"
                 >
                   <span>🏠</span>
-                  <span>Exit Home</span>
+                  <span>Exit Mode</span>
                 </button>
               </div>
             </div>
@@ -2014,7 +2016,7 @@ const MarketerDashboard = () => {
 
       {/* Modals remain same but use backdrop blur */}
       {showShareModal && sharingItem && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[100] p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[150] p-4">
           {/* Modal content remains same as before */}
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col relative">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">

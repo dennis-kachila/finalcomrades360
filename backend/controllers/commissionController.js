@@ -3,6 +3,64 @@ const { calculateItemCommission } = require('../utils/commissionUtils');
 const { Op } = require('sequelize');
 const { creditPending } = require('../utils/walletHelpers');
 
+// Admin: get all commissions with optional filters
+const getAllCommissions = async (req, res) => {
+  try {
+    const { status, marketerId, from, to, limit = 100, offset = 0 } = req.query;
+    const where = {};
+    if (status) where.status = status;
+    if (marketerId) where.marketerId = Number(marketerId);
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt[Op.gte] = new Date(from);
+      if (to) where.createdAt[Op.lte] = new Date(to);
+    }
+
+    const { count, rows } = await Commission.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'marketer', attributes: ['id', 'name', 'email', 'referralCode'] },
+        { model: Order, attributes: ['orderNumber', 'createdAt'] },
+        { model: Product, attributes: ['name'], required: false },
+        { model: FastFood, attributes: ['name'], required: false },
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: Number(limit),
+      offset: Number(offset),
+    });
+
+    const totalPending = await Commission.sum('commissionAmount', { where: { status: 'pending' } }) || 0;
+    const totalPaid = await Commission.sum('commissionAmount', { where: { status: 'paid' } }) || 0;
+
+    res.json({ commissions: rows, total: count, totalPending, totalPaid });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Admin/Finance: bulk pay all pending commissions for a single marketer (or all)
+const bulkPayCommissions = async (req, res) => {
+  try {
+    const { marketerId } = req.body;
+    const where = { status: 'pending' };
+    if (marketerId) where.marketerId = Number(marketerId);
+
+    const pending = await Commission.findAll({ where });
+    if (pending.length === 0) {
+      return res.json({ message: 'No pending commissions to pay.', count: 0 });
+    }
+
+    await Commission.update(
+      { status: 'paid', paidAt: new Date() },
+      { where }
+    );
+
+    res.json({ message: `${pending.length} commission(s) marked as paid.`, count: pending.length });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Calculate commission when order is completed
 // Supports dual referral system:
 // - Primary referral (checkout): 60% of commission
@@ -131,10 +189,10 @@ const calculateCommission = async (orderId, primaryReferralCode = null, secondar
       }
 
       // Check if marketing is enabled for this product/item
-      // if (!itemDetails.marketingEnabled) {
-      //   console.log(`ℹ️ Marketing not enabled for item: ${itemDetails.name}`);
-      //   continue;
-      // }
+      if (!itemDetails.marketingEnabled) {
+        console.log(`ℹ️ Marketing not enabled for item: ${itemDetails.name}`);
+        continue;
+      }
 
       const price = Number(item.price || 0);
       const quantity = item.quantity || 0;
@@ -347,5 +405,7 @@ const payCommission = async (req, res) => {
 module.exports = {
   calculateCommission,
   getCommissionHistory,
-  payCommission
+  payCommission,
+  getAllCommissions,
+  bulkPayCommissions
 };

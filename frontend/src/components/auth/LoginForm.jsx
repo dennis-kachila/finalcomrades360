@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { formatKenyanPhoneInput } from '../../utils/validation'
 import SystemFeedbackModal from '../ui/SystemFeedbackModal'
 import { GoogleLogin } from '@react-oauth/google'
+import { Eye, EyeOff } from 'lucide-react'
 
 export default function LoginForm({ onSuccess, isModal = false, initialMode = 'user', lockMode = false }) {
     const { login, googleLogin } = useAuth()
@@ -20,6 +21,7 @@ export default function LoginForm({ onSuccess, isModal = false, initialMode = 'u
     const [successMessage, setSuccessMessage] = useState('')
     const [showErrorModal, setShowErrorModal] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
 
     useEffect(() => {
         // Check if we have a success message from password reset
@@ -163,14 +165,25 @@ export default function LoginForm({ onSuccess, isModal = false, initialMode = 'u
                 </div>
                 <div className="mb-6">
                     <label className="block mb-1 font-medium">{loginMode === 'station' ? 'Contact Phone (as secret)' : 'Password'}</label>
-                    <input
-                        type={loginMode === 'station' ? 'text' : 'password'}
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder={loginMode === 'station' ? 'Use the station contact phone' : ''}
-                        required
-                    />
+                    <div className="relative">
+                        <input
+                            type={showPassword || loginMode === 'station' ? 'text' : 'password'}
+                            value={form.password}
+                            onChange={(e) => setForm({ ...form, password: e.target.value })}
+                            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
+                            placeholder={loginMode === 'station' ? 'Use the station contact phone' : ''}
+                            required
+                        />
+                        {loginMode !== 'station' && (
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                            >
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex justify-center w-full mt-6">

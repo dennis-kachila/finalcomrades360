@@ -297,6 +297,9 @@ const Sidebar = ({ onClose }) => {
     }
 
     if (userRoles.includes('logistics_manager') || userRoles.includes('delivery_agent') || userRoles.includes('warehouse_manager') || userRoles.includes('pickup_station_manager')) {
+      if (!isAdmin && user.isDeliverySuspended) {
+        return adminMenuItems.filter(item => item.name === 'Notifications & Alerts');
+      }
       return adminMenuItems.filter(item =>
         item.name === 'Order Management' || item.name === 'Delivery & Logistics' || item.name === 'Notifications & Alerts'
       );
@@ -311,6 +314,9 @@ const Sidebar = ({ onClose }) => {
     }
 
     if (userRoles.includes('marketer')) {
+      if (!isAdmin && user.isMarketerSuspended) {
+        return adminMenuItems.filter(item => item.name === 'Notifications & Alerts');
+      }
       return adminMenuItems.filter(item => item.name === 'Notifications & Alerts' || item.roles.includes('marketer'));
     }
 

@@ -27,6 +27,7 @@ export default function MarketingNavbar() {
     const { toast } = useToast();
     const categoriesRef = useRef(null);
     const [copied, setCopied] = useState(false);
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
     // Maintenance Visibility Logic
     const [maintenance, setMaintenance] = useState(() => {
@@ -137,9 +138,18 @@ export default function MarketingNavbar() {
                 <div className="flex justify-between items-center h-14 md:h-16 gap-4">
 
                     {/* Left: Branding & Categories */}
-                    <div className="flex items-center space-x-6">
-                        <Link to="/" className="text-xl font-bold tracking-tight flex items-center gap-2 flex-shrink-0">
-                            <span className="bg-white text-blue-900 px-2 py-1 rounded text-xs uppercase font-black tracking-widest hidden md:block">Marketing Mode</span>
+                    <div className="flex items-center space-x-1 sm:space-x-4">
+                        {/* Mobile Hamburger */}
+                        <button 
+                            onClick={() => setIsDrawerOpen(true)}
+                            className="p-2 -ml-2 text-blue-100 hover:text-white sm:hidden"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                            </svg>
+                        </button>
+
+                        <Link to="/" className="text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2 flex-shrink-0">
                             <span>Comrades360</span>
                         </Link>
 
@@ -147,10 +157,10 @@ export default function MarketingNavbar() {
                         <div className="relative pointer-events-auto" ref={categoriesRef}>
                             <button
                                 onClick={() => setShowCategories(!showCategories)}
-                                className="px-3 py-2 hover:bg-blue-800 rounded flex items-center transition-colors text-sm font-medium"
+                                className="px-1.5 sm:px-3 py-2 hover:bg-blue-800 rounded flex items-center transition-colors text-xs sm:text-sm font-medium"
                             >
-                                <span>Categories</span>
-                                <span className="ml-1">▾</span>
+                                <span className="inline">Categories</span>
+                                <span className="ml-0.5 sm:ml-1">▾</span>
                             </button>
 
                             {showCategories && (
@@ -220,16 +230,16 @@ export default function MarketingNavbar() {
                         </div>
                     </div>
 
-                    {/* Center: Search Bar */}
+                    {/* Center: Search Bar (Desktop Only) */}
                     <div className="flex-1 max-w-xl mx-auto px-4 hidden md:block">
-                        <div className="relative flex w-full text-gray-900">
+                        <div className="relative flex w-full text-gray-900 shadow-sm transition-shadow focus-within:shadow-md">
                             <input
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                                 placeholder="Search products, services, food..."
-                                className="w-full px-4 py-2 rounded-l-md border-0 focus:ring-2 focus:ring-blue-300 outline-none"
+                                className="w-full px-4 py-2 rounded-l-md border-0 focus:ring-2 focus:ring-blue-300 outline-none text-sm bg-white"
                             />
                             <button
                                 onClick={handleSearch}
@@ -241,7 +251,20 @@ export default function MarketingNavbar() {
                     </div>
 
                     {/* Right: Actions */}
-                    <div className="flex items-center space-x-4 flex-shrink-0">
+                    <div className="flex items-center space-x-1 sm:space-x-3 flex-shrink-0">
+                        {/* Cart Icon */}
+                        <Link
+                            to="/cart"
+                            className="relative flex items-center space-x-1 p-2 text-blue-100 hover:text-white transition-colors"
+                            title="View Cart"
+                        >
+                            <FaShoppingCart className="text-xl sm:text-2xl" />
+                            {cartBadgeCount > 0 && (
+                                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full h-4.5 w-4.5 sm:h-5 sm:w-5 flex items-center justify-center border-2 border-blue-900 shadow-sm">
+                                    {cartBadgeCount > 9 ? '9+' : cartBadgeCount}
+                                </span>
+                            )}
+                        </Link>
                         {/* Marketing Orders Link */}
                         {isDashboardVisible('marketer') && (
                         <Link
@@ -252,12 +275,12 @@ export default function MarketingNavbar() {
                         </Link>
                         )}
 
-                        {/* Exit Button */}
+                        {/* Exit Button - Desktop Only (hidden on small mobile to favor hamburger) */}
                         <button
                             onClick={handleExit}
-                            className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-bold text-sm transition-transform active:scale-95 shadow-sm whitespace-nowrap"
+                            className="hidden sm:flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-bold text-sm transition-transform active:scale-95 shadow-sm whitespace-nowrap"
                         >
-                            <span className="hidden sm:inline">Exit Mode</span>
+                            <span className="hidden md:inline">Exit Mode</span>
                             <FaSignOutAlt />
                         </button>
 
@@ -270,36 +293,14 @@ export default function MarketingNavbar() {
                             {copied ? <FaCheck className="w-3 h-3" /> : <FaLink className="w-3 h-3" />}
                             <span className="hidden lg:inline">{copied ? 'Copied' : 'Copy Link'}</span>
                         </button>
-                        {/* Mobile Search Icon (visible only on small screens) */}
-                        <button
-                            onClick={() => navigate('/search')}
-                            className="md:hidden p-2 text-blue-100 hover:text-white"
-                        >
-                            <FaSearch className="text-xl" />
-                        </button>
-
-                        {/* Cart Icon */}
-                        <Link
-                            to="/cart"
-                            className="relative flex items-center space-x-1 p-2 text-blue-100 hover:text-white transition-colors"
-                            title="View Cart"
-                        >
-                            <FaShoppingCart className="text-2xl" />
-                            {cartBadgeCount > 0 && (
-                                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-blue-900">
-                                    {cartBadgeCount > 9 ? '9+' : cartBadgeCount}
-                                </span>
-                            )}
-                        </Link>
-
                     </div>
                 </div>
+            </div>
 
-                {/* Mobile Search Bar (visible only on small screens) */}
-                {!isDashboardRoute && !isDetailRoute && (
-                    <div className="md:hidden pb-2.5">
-
-                    <div className="relative flex w-full text-gray-900">
+            {/* Mobile Search Bar (visible only on small screens) */}
+            {!isDashboardRoute && !isDetailRoute && (
+                <div className="md:hidden px-3 pb-3">
+                    <div className="relative flex w-full text-gray-900 shadow-sm">
                         <input
                             type="text"
                             value={searchQuery}
@@ -315,10 +316,63 @@ export default function MarketingNavbar() {
                             <FaSearch />
                         </button>
                     </div>
-                    </div>
-                )}
-            </div>
-        </nav>
+                </div>
+            )}
 
+            {/* Mobile Sidebar Drawer Overlay */}
+            {isDrawerOpen && (
+                <>
+                    <div 
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] sm:hidden transition-opacity duration-300"
+                        onClick={() => setIsDrawerOpen(false)}
+                    />
+                    <div className="fixed inset-y-0 left-0 w-[280px] bg-white text-gray-900 shadow-2xl z-[70] sm:hidden transform transition-transform duration-300 p-0 flex flex-col">
+                        <div className="p-6 bg-blue-900 text-white flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-bold">Marketing</h3>
+                                <p className="text-[10px] opacity-70 uppercase tracking-widest font-black">Menu</p>
+                            </div>
+                            <button onClick={() => setIsDrawerOpen(false)} className="p-2 hover:bg-blue-800 rounded-full">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 py-4 px-3 space-y-2 overflow-y-auto">
+                            <Link 
+                                to="/marketing?tab=orders" 
+                                className="flex items-center gap-4 px-4 py-3.5 rounded-xl hover:bg-blue-50 text-gray-700 font-bold transition-all active:scale-95 shadow-sm border border-gray-100"
+                                onClick={() => setIsDrawerOpen(false)}
+                            >
+                                <div className="p-2.5 bg-blue-100 text-blue-600 rounded-lg">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                    </svg>
+                                </div>
+                                <span className="text-base font-bold">My Orders</span>
+                            </Link>
+
+                            <button 
+                                onClick={() => {
+                                    handleExit();
+                                    setIsDrawerOpen(false);
+                                }}
+                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl hover:bg-red-50 text-red-600 font-bold transition-all active:scale-95 text-left shadow-sm border border-red-50"
+                            >
+                                <div className="p-2.5 bg-red-100 text-red-600 rounded-lg">
+                                    <FaSignOutAlt className="w-5 h-5" />
+                                </div>
+                                <span className="text-base font-bold">Exit Mode</span>
+                            </button>
+                        </div>
+
+                        <div className="p-6 border-t border-gray-100 bg-gray-50 text-center">
+                            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">Comrades360 v2.0</p>
+                        </div>
+                    </div>
+                </>
+            )}
+        </nav>
     );
 }

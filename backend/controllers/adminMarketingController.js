@@ -163,6 +163,20 @@ const getMarketerProfile = async (req, res) => {
     const marketerId = Number(req.params.id);
     const dateWhere = getDateRange(req.query);
 
+    // Fetch full user details for profile
+    const user = await User.findByPk(marketerId, {
+      attributes: [
+        'id', 'name', 'email', 'phone', 'role', 'referralCode', 'isDeactivated',
+        'gender', 'dateOfBirth', 'campus', 'county', 'town', 'estate', 'houseNumber',
+        'nationalIdNumber', 'nationalIdStatus', 'nationalIdUrl', 'profileImage'
+      ],
+      raw: true
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Marketer not found' });
+    }
+
     // KPIs from commissions
     const commissions = await Commission.findAll({ where: { marketerId, ...dateWhere }, raw: true });
     const totalCommission = commissions.reduce((s,c)=> s + (c.commissionAmount||0), 0);
@@ -174,35 +188,91 @@ const getMarketerProfile = async (req, res) => {
     const totalClicks = actions.filter(a=>a.actionType==='click').length;
     const totalConversions = commissions.length; // conservative: confirmed by commission records
 
-    // Product breakdown
-    const byProduct = {};
+    // Group performance by product/fastfood/service
+    const performanceMap = {};
+    const getGroupId = (c) => {
+      if (c.productId) return `prod_${c.productId}`;
+      if (c.fastFoodId) return `ff_${c.fastFoodId}`;
+      if (c.serviceId) return `svc_${c.serviceId}`;
+      return 'other';
+    };
+
     for (const c of commissions) {
-      const p = byProduct[c.productId] || { productId: c.productId, revenue: 0, commission: 0, conversions: 0 };
-      p.revenue += (c.saleAmount||0);
-      p.commission += (c.commissionAmount||0);
-      p.conversions += 1;
-      byProduct[c.productId] = p;
+      const gId = getGroupId(c);
+      const row = performanceMap[gId] || {
+        productId: c.productId,
+        fastFoodId: c.fastFoodId,
+        serviceId: c.serviceId,
+        revenue: 0,
+        commission: 0,
+        conversions: 0,
+        shares: 0,
+        clicks: 0
+      };
+      row.revenue += (c.saleAmount || 0);
+      row.commission += (c.commissionAmount || 0);
+      row.conversions += 1;
+      performanceMap[gId] = row;
     }
 
-    // add clicks/shares per product
+    // Add clicks/shares from MarketingAnalytics
     for (const a of actions) {
-      const p = byProduct[a.productId] || { productId: a.productId, revenue: 0, commission: 0, conversions: 0 };
-      if (a.actionType === 'click') p.clicks = (p.clicks||0) + 1;
-      if (a.actionType === 'share') p.shares = (p.shares||0) + 1;
-      byProduct[a.productId] = p;
+      const gId = getGroupId(a);
+      if (performanceMap[gId]) {
+        if (a.actionType === 'click') performanceMap[gId].clicks += 1;
+        if (a.actionType === 'share') performanceMap[gId].shares += 1;
+      } else {
+        // Even if no conversion, track activity
+        performanceMap[gId] = {
+          productId: a.productId,
+          fastFoodId: a.fastFoodId,
+          serviceId: a.serviceId,
+          revenue: 0,
+          commission: 0,
+          conversions: 0,
+          shares: (a.actionType === 'share' ? 1 : 0),
+          clicks: (a.actionType === 'click' ? 1 : 0)
+        };
+      }
     }
 
-    // Attach product meta
-    const productIds = Object.keys(byProduct).map(Number).filter(Boolean);
-    const products = await Product.findAll({ where: { id: { [Op.in]: productIds } }, attributes: ['id','name','categoryId'], raw: true });
-    const cats = await Category.findAll({ attributes: ['id','name'], raw: true });
-    const catById = new Map(cats.map(c=>[c.id, c.name]));
-    const items = productIds.map(pid => {
-      const row = byProduct[pid];
-      const prod = products.find(p=>p.id===pid) || {};
-      const ctr = row.shares ? (row.clicks||0)/row.shares : 0;
-      const cvr = row.clicks ? (row.conversions||0)/row.clicks : 0;
-      return { ...row, productName: prod.name || `Product #${pid}` , categoryName: catById.get(prod.categoryId) || 'Uncategorized', ctr, cvr };
+    // Attach metadata (names) for all items
+    const productIds = Object.values(performanceMap).map(r => r.productId).filter(Boolean);
+    const fastFoodIds = Object.values(performanceMap).map(r => r.fastFoodId).filter(Boolean);
+
+    const [products, fastfoods] = await Promise.all([
+      Product.findAll({ where: { id: { [Op.in]: productIds } }, attributes: ['id', 'name', 'categoryId'], raw: true }),
+      FastFood.findAll({ where: { id: { [Op.in]: fastFoodIds } }, attributes: ['id', 'name'], raw: true })
+    ]);
+
+    const cats = await Category.findAll({ attributes: ['id', 'name'], raw: true });
+    const catById = new Map(cats.map(c => [c.id, c.name]));
+
+    const items = Object.values(performanceMap).map(row => {
+      let itemName = 'Unknown Item';
+      let categoryName = 'Uncategorized';
+      let itemType = 'other';
+
+      if (row.productId) {
+        const p = products.find(prod => prod.id === row.productId);
+        itemName = p ? p.name : `Product #${row.productId}`;
+        categoryName = p ? (catById.get(p.categoryId) || 'Uncategorized') : 'Uncategorized';
+        itemType = 'product';
+      } else if (row.fastFoodId) {
+        const ff = fastfoods.find(f => f.id === row.fastFoodId);
+        itemName = ff ? ff.name : `FastFood #${row.fastFoodId}`;
+        categoryName = 'Fast Food';
+        itemType = 'fastfood';
+      } else if (row.serviceId) {
+        itemName = `Service #${row.serviceId}`;
+        categoryName = 'Service';
+        itemType = 'service';
+      }
+
+      const ctr = row.shares ? (row.clicks || 0) / row.shares : 0;
+      const cvr = row.clicks ? (row.conversions || 0) / row.clicks : 0;
+
+      return { ...row, productName: itemName, categoryName, itemType, ctr, cvr };
     });
 
     const ctr = totalShares ? (totalClicks / totalShares) : 0;
@@ -211,6 +281,7 @@ const getMarketerProfile = async (req, res) => {
 
     return res.json({
       marketerId,
+      profile: user,
       kpis: { totalShares, totalClicks, totalConversions, totalRevenue, totalCommission, ctr, cvr, epc },
       productPerformance: items,
     });

@@ -175,6 +175,7 @@ function Checkout() {
   const [pickStations, setPickStations] = useState([]);
   const [loadingStations, setLoadingStations] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
+  const [isReferralLocked, setIsReferralLocked] = useState(!!localStorage.getItem('referrerCode'));
 
   // Fetch pick stations from API
   useEffect(() => {
@@ -276,6 +277,7 @@ function Checkout() {
         ...prev,
         referralCode: refCode
       }));
+      setIsReferralLocked(true);
     }
   }, [formData.referralCode]);
 
@@ -1410,16 +1412,28 @@ function Checkout() {
                           </div>
                         </div>
                       ) : (
-                        <textarea
-                          name="deliveryAddress"
-                          value={formData.deliveryAddress}
-                          onChange={handleInputChange}
-                          placeholder="Enter your full delivery address (street, building, area, city)"
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          rows="3"
-                          required={formData.deliveryMethod === 'home_delivery'}
-                          readOnly={!formData.isEditingAddress && formData.deliveryAddress.trim() !== ''}
-                        />
+                        <div className="relative">
+                          <textarea
+                            name="deliveryAddress"
+                            value={formData.deliveryAddress}
+                            placeholder="No delivery address set. Please use the 'Edit Address' button."
+                            className="w-full border border-gray-200 rounded-md px-3 py-2 bg-gray-50 text-gray-700 focus:outline-none cursor-not-allowed"
+                            rows="3"
+                            required={formData.deliveryMethod === 'home_delivery'}
+                            readOnly
+                          />
+                          {!formData.deliveryAddress.trim() && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/50 rounded-md">
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, isEditingAddress: true }))}
+                                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-blue-700 transition-colors"
+                              >
+                                + Set Delivery Address
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       )
                     )}
                   </div>
@@ -1588,15 +1602,24 @@ function Checkout() {
             <div className="bg-orange-50 md:rounded-lg shadow-sm border border-orange-100 p-4 md:p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-orange-800 mb-1">Referral Code (Optional)</label>
-                <input
-                  type="text"
-                  name="referralCode"
-                  value={formData.referralCode}
-                  onChange={handleInputChange}
-                  readOnly={localStorage.getItem('marketing_mode') === 'true'}
-                  placeholder={localStorage.getItem('marketing_mode') === 'true' ? "Referral code locked" : "Enter code..."}
-                  className="w-full border border-orange-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="referralCode"
+                    value={formData.referralCode}
+                    onChange={handleInputChange}
+                    readOnly={isReferralLocked || localStorage.getItem('marketing_mode') === 'true'}
+                    placeholder={(isReferralLocked || localStorage.getItem('marketing_mode') === 'true') ? "Referral code locked" : "Enter code..."}
+                    className={`w-full border border-orange-200 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 transition-colors ${
+                      (isReferralLocked || localStorage.getItem('marketing_mode') === 'true') ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white'
+                    }`}
+                  />
+                  {(isReferralLocked || localStorage.getItem('marketing_mode') === 'true') && formData.referralCode && (
+                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                      <span className="text-[10px] uppercase font-black tracking-widest text-orange-400">Locked</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {!user?.phoneVerified ? (

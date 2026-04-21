@@ -151,6 +151,7 @@ api.interceptors.response.use(
         console.log('[api] 401 encountered, Clearing auth and redirecting to login');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        sessionStorage.clear();
         // Only redirect if not already on the login page
         const loginPath = window.location.pathname.startsWith('/station') ? '/station/login' : '/login';
         if (window.location.pathname !== loginPath) {
@@ -239,6 +240,7 @@ productsClient.interceptors.response.use(
       if (error.response.status === 401) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        sessionStorage.clear();
         const loginPath = window.location.pathname.startsWith('/station') ? '/station/login' : '/login';
         if (window.location.pathname !== loginPath) {
           window.location.href = loginPath;
@@ -288,6 +290,7 @@ adminClient.interceptors.response.use(
       if (error.response.status === 401) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        sessionStorage.clear();
         const loginPath = window.location.pathname.startsWith('/station') ? '/station/login' : '/login';
         if (window.location.pathname !== loginPath) {
           window.location.href = loginPath;

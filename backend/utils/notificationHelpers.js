@@ -42,14 +42,24 @@ async function sendCustomerNotificationAcrossChannels(templateKey, data, custome
                     customer = fullUser;
                     logNotify(`SELF-HEAL: Resolved User=${customer.name}`);
                 }
+            } else if (order) {
+                logNotify(`SELF-HEAL: No User ID, using direct order details (Marketing/Guest)`);
             }
         }
 
         const message = await getDynamicMessage(templateKey, data.defaultTemplate || '', data);
         
-        // Priority for phone/email: 1. Order direct (Guest/Marketing) 2. Resolved User
-        const customerPhone = order?.customerPhone || order?.marketingPhone || customer.phone || order?.User?.phone;
-        const customerEmail = order?.customerEmail || order?.marketingEmail || customer.email || order?.User?.email;
+        // Priority for phone/email: 
+        // 1. Order direct (Guest/Marketing) -> This is critical as Marketing orders use req.body fields
+        // 2. Resolved User (if available)
+        const rawPhone = order?.customerPhone || order?.marketingPhone || customer.phone || order?.User?.phone;
+        const rawEmail = order?.customerEmail || order?.marketingEmail || customer.email || order?.User?.email;
+
+        // Strip placeholder values created when a user registers without phone/email
+        const isPlaceholderPhone = !rawPhone || String(rawPhone).startsWith('nophone_');
+        const isPlaceholderEmail = !rawEmail || String(rawEmail).startsWith('noemail_');
+        const customerPhone = isPlaceholderPhone ? null : rawPhone;
+        const customerEmail = isPlaceholderEmail ? null : rawEmail;
 
         logNotify(`RECIPIENT: ID=${userId || 'GUEST'} | Phone=${customerPhone || 'MISSING'} | Email=${customerEmail || 'MISSING'}`);
 
@@ -334,21 +344,31 @@ async function notifyCustomerDeliveryUpdate(customerId, orderNumber, status, mes
 /**
  * Notify customer that their account has been created by a marketer
  */
-async function notifyCustomerMarketerCreated(userId, tempPassword, loginIdentifier, marketerName = 'A Marketer') {
-    const defaultTemplate = `Hello {name}, your account has been created by {marketerName}. Your temporary password is: {tempPassword}. Please login at {loginUrl} and change your password immediately.`;
+async function notifyCustomerMarketerCreated(userOrId, tempPassword, loginIdentifier, marketerName = 'A Marketer') {
+    // Accept either a full User object (fast path, no extra DB query) or a plain userId
+    let user;
+    if (userOrId && typeof userOrId === 'object' && userOrId.id) {
+        user = userOrId;
+    } else {
+        user = await User.findByPk(userOrId);
+    }
+    const customerName = user?.name || 'Customer';
+    const userId = user?.id || userOrId;
+
+    const defaultTemplate = `HELLO {name}, Your Comrades360 Account has been successfully created by {marketerName}. \n\nYour temporary password is: {tempPassword}\n\nPlease login at {loginUrl} and change your password immediately to secure your account.\n\nWelcome to the Comrades360 family!`;
     
     const loginUrl = `${process.env.FRONTEND_URL || 'https://comrades360.shop'}/login`;
 
     await sendCustomerNotificationAcrossChannels('WELCOME_MARKETER_CREATED', {
-        name: 'Customer', // Fallback name
+        name: customerName,
         marketerName,
         loginIdentifier,
         tempPassword,
         loginUrl,
-        title: 'Account Created! 🛍️',
+        title: 'Your Comrades360 Account! 🛍️',
         type: 'success',
         defaultTemplate
-    }, { id: userId });
+    }, user || { id: userId });
 }
 
 /**
@@ -366,6 +386,26 @@ async function notifyCustomerGoogleSignup(user, tempPassword) {
     }, user);
 }
 
+/**
+ * Notify marketer that they have successfully placed an order for a customer
+ */
+async function notifyMarketerOrderPlaced(order, marketer, customerName) {
+    if (!marketer || !order) return;
+
+    const defaultTemplate = `Success! 🚀 You have successfully placed order #{orderNumber} for {customerName}.\n\nTotal: KES {total}\nItems: {itemsCount}\n\nKeep growing your network on Comrades360!`;
+
+    await sendCustomerNotificationAcrossChannels('marketerOrderPlaced', {
+        name: marketer.name || 'Marketer',
+        orderNumber: order.orderNumber,
+        customerName: customerName || order.customerName || 'your customer',
+        total: order.total?.toLocaleString() || '0',
+        itemsCount: order.itemsCount || 'the selected items',
+        title: 'Order Placed Successfully! 🚀',
+        type: 'success',
+        defaultTemplate
+    }, marketer, null); // We pass null as order here because we want to notify the MARKETER directly using their details
+}
+
 module.exports = { 
     createNotification,
     notifyDeliveryAgentAssignment,
@@ -378,6 +418,7 @@ module.exports = {
     notifyCustomerOrderCancelled,
     notifyCustomerMarketerCreated,
     notifyCustomerGoogleSignup,
+    notifyMarketerOrderPlaced,
     logNotify,
     sendCustomerNotificationAcrossChannels
 };

@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const { Op } = require("sequelize");
-const { User, UserRole, Notification, Order } = require("../models");
+const { User, UserRole, Notification, Order, Otp } = require("../models");
 const { isValidEmail, normalizeKenyanPhone } = require("../middleware/validators");
 const { sendEmail } = require("../utils/mailer");
 const { sendMessage } = require("../utils/messageService");

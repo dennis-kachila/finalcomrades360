@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaBox, FaTruck, FaCheckCircle, FaClock, FaMapMarkerAlt, FaCreditCard, FaEye, FaTimes, FaEdit, FaMotorcycle, FaStore, FaHistory, FaUndo } from 'react-icons/fa';
+import { FaBox, FaTruck, FaCheckCircle, FaClock, FaMapMarkerAlt, FaCreditCard, FaEye, FaTimes, FaEdit, FaMotorcycle, FaStore, FaHistory, FaUndo, FaUserTie } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { getSocket, joinUserRoom } from '../../services/socket';
@@ -257,6 +257,9 @@ export default function CustomerOrders() {
               paymentMethod: order.paymentMethod,
               paymentType: order.paymentType,
               paymentConfirmed: Boolean(order.paymentConfirmed),
+              isMarketingOrder: order.isMarketingOrder,
+              marketerId: order.marketerId,
+              marketer: order.marketer,
               total: 0,
               orders: []
             };
@@ -515,9 +518,16 @@ export default function CustomerOrders() {
                             </button>
                           )}
                         </div>
-                        <p className="text-[10px] sm:text-xs text-gray-500 font-bold uppercase tracking-wider">
-                          {formatDate(order.createdAt)}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-[10px] sm:text-xs text-gray-500 font-bold uppercase tracking-wider">
+                            {formatDate(order.createdAt)}
+                          </p>
+                          {(order.isMarketingOrder || order.marketerId) && (
+                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[8px] sm:text-[9px] font-black uppercase rounded-md border border-blue-100 shadow-sm">
+                              <FaUserTie size={8} /> Marketer Order
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -742,6 +752,43 @@ export default function CustomerOrders() {
                             })()}
                           </div>
                         </div>
+
+                        {/* Marketer Information (if applicable) */}
+                        {(order.isMarketingOrder || order.marketerId || order.marketer) && (
+                          <div className="col-span-1 sm:col-span-2 md:col-span-1">
+                            <h4 className="text-[10px] sm:text-xs font-black text-gray-400 mb-2.5 uppercase tracking-widest flex items-center">
+                              <FaUserTie className="mr-2" />
+                              Marketer Information
+                            </h4>
+                            <div className="text-[10px] sm:text-sm text-gray-600 space-y-2 bg-blue-50/30 p-3 sm:p-4 rounded-2xl border border-blue-100/50">
+                              <div className="flex justify-between items-center">
+                                <span className="text-gray-400 font-medium">Placed By</span>
+                                <span className="font-black text-gray-900 uppercase">
+                                  {order.marketer?.name || (order.isMarketingOrder ? 'Authorized Marketer' : 'System Marketer')}
+                                </span>
+                              </div>
+                              {order.marketer?.phone ? (
+                                <div className="flex justify-between items-center pt-1 border-t border-blue-100/30">
+                                  <span className="text-gray-400 font-medium">Contact</span>
+                                  <span className="font-bold text-blue-600">{order.marketer.phone}</span>
+                                </div>
+                              ) : (order.isMarketingOrder && (
+                                <div className="pt-1 border-t border-blue-100/30 text-[9px] text-gray-400 italic">
+                                  Contact information not provided
+                                </div>
+                              ))}
+                              {order.marketer?.email && (
+                                <div className="flex justify-between items-center pt-1">
+                                  <span className="text-gray-400 font-medium">Email</span>
+                                  <span className="text-xs font-medium text-gray-500 italic">{order.marketer.email}</span>
+                                </div>
+                              )}
+                              <div className="mt-2 text-[8px] sm:text-[10px] text-blue-500 font-bold uppercase tracking-widest bg-blue-50 px-2 py-1 rounded-lg text-center">
+                                Placed on your behalf
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Order Items */}

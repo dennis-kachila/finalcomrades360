@@ -361,7 +361,7 @@ function HomeProductCard({
                 {product.stock <= 0 ? (
                   <span className="truncate">Out of Stock</span>
                 ) : isAdding ? (
-                  <FaSpinner className="animate-spin text-lg" />
+                  <FaShoppingCart className="text-lg opacity-50" />
                 ) : isInCart ? (
                   <span className="flex items-center gap-1 animate-in zoom-in duration-200">
                     <FaCheck className="hidden sm:inline" /> Remove

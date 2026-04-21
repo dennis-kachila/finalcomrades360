@@ -41,6 +41,26 @@ const ProtectedRoute = ({ children, requiredRole }) => {
             // User doesn't have the right role, redirect to a safe place
             return <Navigate to="/" replace />;
         }
+
+        // Role-specific suspension check
+        const isMarketerRoute = normalizedRequired.includes('marketer') || location.pathname.startsWith('/marketer');
+        const isSellerRoute = normalizedRequired.includes('seller') || location.pathname.startsWith('/seller');
+        const isDeliveryRoute = normalizedRequired.some(r => ['delivery', 'delivery_agent', 'driver'].includes(r)) || location.pathname.startsWith('/delivery');
+
+        if (isMarketerRoute && user.isMarketerSuspended && !isAdmin) {
+            console.warn(`[ProtectedRoute] Suspended marketer redirected to home`);
+            return <Navigate to="/" state={{ suspended: 'marketer' }} replace />;
+        }
+
+        if (isSellerRoute && user.isSellerSuspended && !isAdmin) {
+            console.warn(`[ProtectedRoute] Suspended seller redirected to home`);
+            return <Navigate to="/" state={{ suspended: 'seller' }} replace />;
+        }
+
+        if (isDeliveryRoute && user.isDeliverySuspended && !isAdmin) {
+            console.warn(`[ProtectedRoute] Suspended delivery agent redirected to home`);
+            return <Navigate to="/" state={{ suspended: 'delivery' }} replace />;
+        }
     }
 
     // New: Check for seller profile completeness

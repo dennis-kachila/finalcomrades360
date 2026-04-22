@@ -9,23 +9,40 @@ const path = require('path');
 const fs = require('fs');
 
 // Load environment variables with robust path detection
-const rootEnv = path.resolve(__dirname, '..', '.env');
-const rootEnvProd = path.resolve(__dirname, '..', '.env.production');
+const envPaths = [
+  path.resolve(__dirname, '.env'),
+  path.resolve(__dirname, '.env.production'),
+  path.resolve(__dirname, '..', '.env'),
+  path.resolve(__dirname, '..', '.env.production')
+];
 
-// 1. Load basic .env first
-if (fs.existsSync(rootEnv)) {
-  dotenv.config({ path: rootEnv });
-}
+envPaths.forEach(envPath => {
+  if (fs.existsSync(envPath)) {
+    console.error(`[Init] Loading env from: ${envPath}`);
+    dotenv.config({ path: envPath, override: true });
+  }
+});
 
-// 2. If we are definitively in production mode, selectively override with production vars
-const requestedEnv = process.env.NODE_ENV || 'development';
-if (requestedEnv === 'production' && fs.existsSync(rootEnvProd)) {
-  console.log(`[Server] Overriding with production settings from: ${rootEnvProd}`);
-  dotenv.config({ path: rootEnvProd, override: true });
-} else if (!fs.existsSync(rootEnv) && !fs.existsSync(rootEnvProd)) {
-  console.warn('⚠️ Warning: No root .env or .env.production found. Using defaults.');
-  dotenv.config();
-}
+// Redirect console logs to file for production debugging
+const logFile = path.join(__dirname, 'error.log');
+const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+
+const originalLog = console.log;
+const originalError = console.error;
+
+console.log = function(...args) {
+  const msg = `[${new Date().toISOString()}] [LOG] ${args.join(' ')}\n`;
+  logStream.write(msg);
+  originalLog.apply(console, args);
+};
+
+console.error = function(...args) {
+  const msg = `[${new Date().toISOString()}] [ERROR] ${args.join(' ')}\n`;
+  logStream.write(msg);
+  originalError.apply(console, args);
+};
+
+console.error('🚀 SERVER RESTARTED - LOGGING INITIALIZED');
 
 // DETECT STATIC PATHS GLOBALLY
 const IS_PROD = process.env.NODE_ENV === 'production';

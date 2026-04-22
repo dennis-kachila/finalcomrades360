@@ -36,7 +36,7 @@ const AdminInquiryModal = ({ item, itemType = 'fastfood', isOpen, onClose, onSuc
         recipient: 'admin'
       };
 
-      await api.post('/support/inquiries', inquiryData);
+      await api.post('/product-inquiries', inquiryData);
       
       onSuccess?.(inquiryData);
       setFormData({

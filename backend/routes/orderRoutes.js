@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrderFromCart, myOrders, getSuperAdminProductOrders, listAllOrders, updateOrderStatus, bulkUpdateOrderStatus, bulkAssignDeliveryAgent, bulkMarkReadyAtPickupStation, markReadyAtPickupStation, assignDeliveryAgent, unassignDeliveryAgent, cancelOrder, updateOrderAddress, addTrackingUpdate, getOrderTracking, publicTrackOrder, getOrderDetails, sellerConfirmOrder, superAdminConfirmOrder, sendOrderMessage, getOrderCommunication, sellerUpdateStatus, sellerHandoverOrder, getOrderPayments, acquireOrderActionLock, releaseOrderActionLock, getOrderAnalysis, getOrdersByBatch } = require('../controllers/orderController');
+const { createOrderFromCart, myOrders, getSuperAdminProductOrders, listAllOrders, updateOrderStatus, bulkUpdateOrderStatus, bulkAssignDeliveryAgent, bulkMarkReadyAtPickupStation, bulkWarehouseReceived, markReadyAtPickupStation, assignDeliveryAgent, unassignDeliveryAgent, cancelOrder, updateOrderAddress, addTrackingUpdate, getOrderTracking, publicTrackOrder, getOrderDetails, sellerConfirmOrder, superAdminConfirmOrder, sendOrderMessage, getOrderCommunication, sellerUpdateStatus, sellerHandoverOrder, getOrderPayments, acquireOrderActionLock, releaseOrderActionLock, getOrderAnalysis, getOrdersByBatch } = require('../controllers/orderController');
 const { auth, adminOnly, requirePermission } = require('../middleware/auth');
 const { transitionOrderStatus, getValidTransitions } = require('../controllers/orderTransitionController');
 const { validate } = require('../middleware/validation');
@@ -60,6 +60,7 @@ router.get('/', auth, requirePermission('orders.view'), listAllOrders);
 router.patch('/bulk-status', auth, requirePermission('orders.updateStatus'), bulkUpdateOrderStatus);
 router.patch('/bulk-assign', auth, requirePermission('orders.assign'), bulkAssignDeliveryAgent);
 router.post('/bulk-ready-at-station', auth, requirePermission('orders.updateStatus'), bulkMarkReadyAtPickupStation);
+router.post('/bulk-warehouse-received', auth, requirePermission('orders.updateStatus'), bulkWarehouseReceived);
 router.patch('/:orderId/status', auth, requirePermission('orders.updateStatus'), updateOrderStatus);
 router.patch('/:orderId/assign', auth, requirePermission('orders.assign'), assignDeliveryAgent);
 router.patch('/:orderId/unassign', auth, requirePermission('orders.assign'), unassignDeliveryAgent);

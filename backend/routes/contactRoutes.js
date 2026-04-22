@@ -10,22 +10,13 @@ router.post('/', optionalAuth, async (req, res) => {
   try {
     const { name, email, subject, message } = req.body;
 
-    if (!message) {
-      return res.status(400).json({ message: 'Please provide a message' });
-    }
-
-    const fallbackName = req.user?.name || req.user?.username || null;
-    const fallbackEmail = req.user?.email || null;
-    const finalName = name || fallbackName;
-    const finalEmail = email || fallbackEmail;
-
-    if (!finalName || !finalEmail) {
-      return res.status(400).json({ message: 'Please provide name and email' });
+    if (!name || !email || !message) {
+      return res.status(400).json({ message: 'Please provide name, email, and message' });
     }
 
     const newMessage = await ContactMessage.create({
-      name: finalName,
-      email: finalEmail,
+      name,
+      email,
       subject,
       message,
       userId: req.user ? req.user.id : null,

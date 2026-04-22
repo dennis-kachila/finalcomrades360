@@ -836,6 +836,8 @@ const getAllUsers = async (req, res) => {
     const textCast = isSqlite ? 'TEXT' : 'CHAR';
     const quote = isSqlite ? '"' : '`';
 
+    console.error(`[getAllUsers] Debug: Starting query with limit=${limitNum}, dialect=${sequelize.options.dialect}`);
+
     const { count, rows: users } = await User.findAndCountAll({
       where,
       attributes: { 
@@ -892,6 +894,9 @@ const getAllUsers = async (req, res) => {
         totalPages
       }
     });
+
+    console.error(`[getAllUsers] Debug: Query completed. Found ${users.length} users.`);
+
   } catch (error) {
     res.status(500).json({ message: 'Server error while fetching users.', error: error.message });
   }

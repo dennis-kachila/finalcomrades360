@@ -843,38 +843,8 @@ const getAllUsers = async (req, res) => {
       attributes: { 
         exclude: ['password'],
         include: [
-          [
-            literal(`(
-              SELECT COUNT(DISTINCT ${quote}identifier${quote})
-              FROM (
-                SELECT CAST(${quote}id${quote} AS ${textCast}) as ${quote}identifier${quote}
-                FROM ${quote}User${quote} as ${quote}u2${quote}
-                WHERE ${quote}u2${quote}.${quote}referredByReferralCode${quote} = ${quote}User${quote}.${quote}referralCode${quote}
-                
-                UNION
-                
-                SELECT CAST(${quote}userId${quote} AS ${textCast}) as ${quote}identifier${quote}
-                FROM ${quote}Order${quote} as ${quote}o${quote}
-                WHERE ${quote}o${quote}.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote} AND ${quote}o${quote}.${quote}userId${quote} IS NOT NULL
-                
-                UNION
-                
-                SELECT ${quote}customerEmail${quote} as ${quote}identifier${quote}
-                FROM ${quote}Order${quote} as ${quote}o2${quote}
-                WHERE ${quote}o2${quote}.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote} AND ${quote}o2${quote}.${quote}userId${quote} IS NULL AND ${quote}o2${quote}.${quote}customerEmail${quote} IS NOT NULL
-              ) as referrals
-            )`),
-            'referralCount'
-          ],
-          [
-            literal(`(
-              SELECT COALESCE(SUM(${quote}commissionAmount${quote}), 0)
-              FROM ${quote}Commission${quote} AS c
-              WHERE c.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote}
-              AND c.${quote}status${quote} != 'cancelled'
-            )`),
-            'totalCommission'
-          ]
+          [literal('0'), 'referralCount'],
+          [literal('0'), 'totalCommission']
         ]
       },
       order: [['createdAt', 'DESC']],
@@ -1277,47 +1247,9 @@ const listMarketers = async (_req, res) => {
       attributes: {
         exclude: ['password'],
         include: [
-          [
-            literal(`(
-              SELECT COUNT(DISTINCT ${quote}identifier${quote})
-              FROM (
-                SELECT CAST(${quote}id${quote} AS ${textCast}) as ${quote}identifier${quote}
-                FROM ${quote}User${quote} as ${quote}u2${quote}
-                WHERE ${quote}u2${quote}.${quote}referredByReferralCode${quote} = ${quote}User${quote}.${quote}referralCode${quote}
-                
-                UNION
-                
-                SELECT CAST(${quote}userId${quote} AS ${textCast}) as ${quote}identifier${quote}
-                FROM ${quote}Order${quote} as ${quote}o${quote}
-                WHERE ${quote}o${quote}.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote} AND ${quote}o${quote}.${quote}userId${quote} IS NOT NULL
-                
-                UNION
-                
-                SELECT ${quote}customerEmail${quote} as ${quote}identifier${quote}
-                FROM ${quote}Order${quote} as ${quote}o2${quote}
-                WHERE ${quote}o2${quote}.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote} AND ${quote}o2${quote}.${quote}userId${quote} IS NULL AND ${quote}o2${quote}.${quote}customerEmail${quote} IS NOT NULL
-              ) as referrals
-            )`),
-            'referralCount'
-          ],
-          [
-            literal(`(
-              SELECT COALESCE(SUM(${quote}commissionAmount${quote}), 0)
-              FROM ${quote}Commission${quote} AS c
-              WHERE c.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote}
-              AND c.${quote}status${quote} != 'cancelled'
-            )`),
-            'totalCommission'
-          ],
-          [
-            literal(`(
-              SELECT COALESCE(SUM(${quote}total${quote}), 0)
-              FROM ${quote}Order${quote} AS o3
-              WHERE o3.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote}
-              AND o3.${quote}status${quote} NOT IN ('cancelled', 'failed')
-            )`),
-            'totalRevenue'
-          ]
+          [literal('0'), 'referralCount'],
+          [literal('0'), 'totalCommission'],
+          [literal('0'), 'totalRevenue']
         ]
       }
     });

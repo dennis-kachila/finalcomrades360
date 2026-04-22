@@ -149,8 +149,9 @@ app.use(cors({
     if (isAllowed || isLocalIP) {
       callback(null, true);
     } else {
-      if (IS_DEV) console.warn(`[CORS] Blocked: ${origin}`);
-      callback(new Error(`CORS policy blockage`));
+      // ALWAYS log blocked origins in production to debug CORS issues
+      console.error(`[CORS Blocked] Origin: ${origin} | Allowed: ${allowedOrigins.join(', ')}`);
+      callback(new Error(`CORS policy blockage: ${origin} is not allowed`));
     }
   },
   credentials: true,

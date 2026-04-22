@@ -93,6 +93,8 @@ api.interceptors.request.use(
         token = null;
       } else {
         config.headers.Authorization = `Bearer ${token}`;
+        // Duplicate as a custom header to bypass server-side stripping of 'Authorization'
+        config.headers['X-Access-Token'] = token;
       }
     }
 

@@ -832,6 +832,10 @@ const getAllUsers = async (req, res) => {
       ];
     }
 
+    const isSqlite = sequelize.options.dialect === 'sqlite';
+    const textCast = isSqlite ? 'TEXT' : 'CHAR';
+    const quote = isSqlite ? '"' : '`';
+
     const { count, rows: users } = await User.findAndCountAll({
       where,
       attributes: { 
@@ -839,33 +843,33 @@ const getAllUsers = async (req, res) => {
         include: [
           [
             literal(`(
-              SELECT COUNT(DISTINCT \`identifier\`)
+              SELECT COUNT(DISTINCT ${quote}identifier${quote})
               FROM (
-                SELECT CAST(\`id\` AS TEXT) as \`identifier\`
-                FROM \`User\` as \`u2\`
-                WHERE \`u2\`.\`referredByReferralCode\` = \`User\`.\`referralCode\`
+                SELECT CAST(${quote}id${quote} AS ${textCast}) as ${quote}identifier${quote}
+                FROM ${quote}User${quote} as ${quote}u2${quote}
+                WHERE ${quote}u2${quote}.${quote}referredByReferralCode${quote} = ${quote}User${quote}.${quote}referralCode${quote}
                 
                 UNION
                 
-                SELECT CAST(\`userId\` AS TEXT) as \`identifier\`
-                FROM \`Order\` as \`o\`
-                WHERE \`o\`.\`marketerId\` = \`User\`.\`id\` AND \`o\`.\`userId\` IS NOT NULL
+                SELECT CAST(${quote}userId${quote} AS ${textCast}) as ${quote}identifier${quote}
+                FROM ${quote}Order${quote} as ${quote}o${quote}
+                WHERE ${quote}o${quote}.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote} AND ${quote}o${quote}.${quote}userId${quote} IS NOT NULL
                 
                 UNION
                 
-                SELECT \`customerEmail\` as \`identifier\`
-                FROM \`Order\` as \`o2\`
-                WHERE \`o2\`.\`marketerId\` = \`User\`.\`id\` AND \`o2\`.\`userId\` IS NULL AND \`o2\`.\`customerEmail\` IS NOT NULL
-              )
+                SELECT ${quote}customerEmail${quote} as ${quote}identifier${quote}
+                FROM ${quote}Order${quote} as ${quote}o2${quote}
+                WHERE ${quote}o2${quote}.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote} AND ${quote}o2${quote}.${quote}userId${quote} IS NULL AND ${quote}o2${quote}.${quote}customerEmail${quote} IS NOT NULL
+              ) as referrals
             )`),
             'referralCount'
           ],
           [
             literal(`(
-              SELECT COALESCE(SUM(commissionAmount), 0)
-              FROM "Commission" AS c
-              WHERE c.marketerId = "User".id
-              AND c.status != 'cancelled'
+              SELECT COALESCE(SUM(${quote}commissionAmount${quote}), 0)
+              FROM ${quote}Commission${quote} AS c
+              WHERE c.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote}
+              AND c.${quote}status${quote} != 'cancelled'
             )`),
             'totalCommission'
           ]
@@ -1259,6 +1263,10 @@ const referralAnalytics = async (_req, res) => {
 // =====================
 const listMarketers = async (_req, res) => {
   try {
+    const isSqlite = sequelize.options.dialect === 'sqlite';
+    const textCast = isSqlite ? 'TEXT' : 'CHAR';
+    const quote = isSqlite ? '"' : '`';
+
     const marketers = await User.findAll({
       where: { role: 'marketer' },
       attributes: {
@@ -1266,42 +1274,42 @@ const listMarketers = async (_req, res) => {
         include: [
           [
             literal(`(
-              SELECT COUNT(DISTINCT \`identifier\`)
+              SELECT COUNT(DISTINCT ${quote}identifier${quote})
               FROM (
-                SELECT CAST(\`id\` AS TEXT) as \`identifier\`
-                FROM \`User\` as \`u2\`
-                WHERE \`u2\`.\`referredByReferralCode\` = \`User\`.\`referralCode\`
+                SELECT CAST(${quote}id${quote} AS ${textCast}) as ${quote}identifier${quote}
+                FROM ${quote}User${quote} as ${quote}u2${quote}
+                WHERE ${quote}u2${quote}.${quote}referredByReferralCode${quote} = ${quote}User${quote}.${quote}referralCode${quote}
                 
                 UNION
                 
-                SELECT CAST(\`userId\` AS TEXT) as \`identifier\`
-                FROM \`Order\` as \`o\`
-                WHERE \`o\`.\`marketerId\` = \`User\`.\`id\` AND \`o\`.\`userId\` IS NOT NULL
+                SELECT CAST(${quote}userId${quote} AS ${textCast}) as ${quote}identifier${quote}
+                FROM ${quote}Order${quote} as ${quote}o${quote}
+                WHERE ${quote}o${quote}.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote} AND ${quote}o${quote}.${quote}userId${quote} IS NOT NULL
                 
                 UNION
                 
-                SELECT \`customerEmail\` as \`identifier\`
-                FROM \`Order\` as \`o2\`
-                WHERE \`o2\`.\`marketerId\` = \`User\`.\`id\` AND \`o2\`.\`userId\` IS NULL AND \`o2\`.\`customerEmail\` IS NOT NULL
-              )
+                SELECT ${quote}customerEmail${quote} as ${quote}identifier${quote}
+                FROM ${quote}Order${quote} as ${quote}o2${quote}
+                WHERE ${quote}o2${quote}.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote} AND ${quote}o2${quote}.${quote}userId${quote} IS NULL AND ${quote}o2${quote}.${quote}customerEmail${quote} IS NOT NULL
+              ) as referrals
             )`),
             'referralCount'
           ],
           [
             literal(`(
-              SELECT COALESCE(SUM(commissionAmount), 0)
-              FROM "Commission" AS c
-              WHERE c.marketerId = "User".id
-              AND c.status != 'cancelled'
+              SELECT COALESCE(SUM(${quote}commissionAmount${quote}), 0)
+              FROM ${quote}Commission${quote} AS c
+              WHERE c.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote}
+              AND c.${quote}status${quote} != 'cancelled'
             )`),
             'totalCommission'
           ],
           [
             literal(`(
-              SELECT COALESCE(SUM(total), 0)
-              FROM "Order" AS o3
-              WHERE o3.marketerId = "User".id
-              AND o3.status NOT IN ('cancelled', 'failed')
+              SELECT COALESCE(SUM(${quote}total${quote}), 0)
+              FROM ${quote}Order${quote} AS o3
+              WHERE o3.${quote}marketerId${quote} = ${quote}User${quote}.${quote}id${quote}
+              AND o3.${quote}status${quote} NOT IN ('cancelled', 'failed')
             )`),
             'totalRevenue'
           ]

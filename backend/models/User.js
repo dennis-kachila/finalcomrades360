@@ -81,23 +81,28 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: false
     },
+    suspendedRoles: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+      comment: 'Array of roles that are suspended for this user (e.g., ["marketer", "seller"])'
+    },
     isMarketerSuspended: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
-      comment: 'Role-specific suspension for marketers. Does not block customer-level access.'
+      comment: 'DEPRECATED: Use suspendedRoles instead.'
     },
     isSellerSuspended: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
-      comment: 'Role-specific suspension for sellers.'
+      comment: 'DEPRECATED: Use suspendedRoles instead.'
     },
     isDeliverySuspended: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
-      comment: 'Role-specific suspension for delivery agents.'
+      comment: 'DEPRECATED: Use suspendedRoles instead.'
     },
     isFrozen: {
       type: DataTypes.BOOLEAN,

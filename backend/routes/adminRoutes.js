@@ -25,6 +25,8 @@ const {
   reactivateSeller,
   suspendDeliveryAgent,
   reactivateDeliveryAgent,
+  suspendUserRoleGeneric,
+  reactivateUserRoleGeneric,
   revokeReferralCode,
   assignReferralCode,
   updateProductCommissionRate,
@@ -145,6 +147,10 @@ router.post('/delivery/requests/bulk-approve', adminOrLogistics, adminBulkApprov
 router.post('/delivery/requests/bulk-reject', adminOrLogistics, adminBulkRejectRequests);
 router.post('/delivery/requests/:taskId/approve', adminOrLogistics, adminApproveRequest);
 router.post('/delivery/requests/:taskId/reject', adminOrLogistics, adminRejectRequest);
+
+// Generic role-based suspension
+router.post('/users/:userId/roles/suspend', adminOnly, suspendUserRoleGeneric);
+router.post('/users/:userId/roles/reactivate', adminOnly, reactivateUserRoleGeneric);
 
 // User Analytics
 router.get('/analytics/users', adminOnly, getUserAnalytics);

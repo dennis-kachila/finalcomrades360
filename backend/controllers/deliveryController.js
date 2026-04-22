@@ -1835,7 +1835,7 @@ const adminListDeliveryAgents = async (req, res) => {
     const agents = await User.findAll({
       where,
       attributes: [
-        'id', 'name', 'email', 'phone', 'role',
+        'id', 'name', 'email', 'phone', 'role', 'isDeliverySuspended', 'isDeactivated',
         [
           sequelize.literal(`(
             SELECT COUNT(*)
@@ -1869,6 +1869,8 @@ const adminListDeliveryAgents = async (req, res) => {
       email: a.email,
       phone: a.phone,
       role: a.role,
+      isDeliverySuspended: a.isDeliverySuspended,
+      isDeactivated: a.isDeactivated,
       deliveryProfile: a.deliveryProfile || null,
       activeAssignments: parseInt(a.getDataValue('activeAssignments') || '0', 10),
       activeTasks: parseInt(a.getDataValue('activeTasks') || '0', 10),

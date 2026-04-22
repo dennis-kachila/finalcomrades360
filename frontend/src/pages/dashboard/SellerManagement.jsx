@@ -27,25 +27,26 @@ export default function SellerManagement() {
     }, []);
 
     const suspendSeller = async (userId) => {
-        if (!window.confirm('Are you sure you want to suspend this seller?')) return;
+        const password = window.prompt('Please enter admin password to suspend this seller:');
+        if (!password) return;
         resetAlerts();
         try {
-            await adminApi.updateUserStatus(userId, true);
-            setSuccess('Seller suspended');
+            await adminApi.suspendSeller(userId, { adminPassword: password });
+            setSuccess('Seller suspended from dashboard access');
             loadSellers();
         } catch (e) {
-            setError('Failed to suspend seller');
+            setError(e.response?.data?.message || 'Failed to suspend seller');
         }
     };
 
     const reactivateSeller = async (userId) => {
         resetAlerts();
         try {
-            await adminApi.updateUserStatus(userId, false);
+            await adminApi.reactivateSeller(userId);
             setSuccess('Seller reactivated');
             loadSellers();
         } catch (e) {
-            setError('Failed to reactivate seller');
+            setError(e.response?.data?.message || 'Failed to reactivate seller');
         }
     };
 
@@ -93,17 +94,17 @@ export default function SellerManagement() {
                                                     <td className="p-3">{seller.email}</td>
                                                     <td className="p-3">{seller.phone}</td>
                                                     <td className="p-3">
-                                                        <span className={`px-2 py-1 rounded text-xs ${!seller.isDeactivated && !seller.isFrozen
+                                                        <span className={`px-2 py-1 rounded text-xs ${!seller.isSellerSuspended && !seller.isDeactivated
                                                                 ? 'bg-green-100 text-green-800'
                                                                 : 'bg-red-100 text-red-800'
                                                             }`}>
-                                                            {!seller.isDeactivated && !seller.isFrozen ? 'Active' : 'Suspended/Frozen'}
+                                                            {seller.isSellerSuspended ? 'Seller Suspended' : seller.isDeactivated ? 'Global Deactivated' : 'Active'}
                                                         </span>
                                                     </td>
                                                     <td className="p-3 text-gray-500 italic">N/A</td>
                                                     <td className="p-3">
                                                         <div className="flex gap-2">
-                                                            {(!seller.isDeactivated && !seller.isFrozen) ? (
+                                                            {!seller.isSellerSuspended ? (
                                                                 <button
                                                                     className="btn-warning btn-xs"
                                                                     onClick={() => suspendSeller(seller.id)}

@@ -1,7 +1,8 @@
 const express = require('express');
 const { auth, checkRole, checkSellerProfile } = require('../middleware/auth');
 const { getMyOrders, getMyProducts, getMyProductById, updateMyProduct, duplicateCheck, getMyKpis, getOverview } = require('../controllers/sellerController');
-const { getSellerWallet, withdraw } = require('../controllers/sellerWalletController');
+const { getSellerWallet } = require('../controllers/sellerWalletController');
+const { withdraw } = require('../controllers/walletController');
 const { uploadProductMedia } = require('../config/multer');
 const { compressUploadedImages } = require('../utils/imageCompression');
 

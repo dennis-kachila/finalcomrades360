@@ -130,11 +130,18 @@ export default function DeliveryAgents() {
     }
   }, [drawerOpen, selectedAgentId, activeTab]);
 
-  const toggleStatus = async (agentId, currentStatus) => {
+  const toggleStatus = async (agentId, currentSuspendedStatus) => {
     try {
-      const newStatus = !currentStatus;
-      await api.patch(`/admin/delivery/agents/${agentId}/toggle-status`, { isActive: newStatus });
-      setSuccess(`Agent ${newStatus ? 'activated' : 'deactivated'} successfully`);
+      const isSuspending = !currentSuspendedStatus;
+      if (isSuspending) {
+        const password = window.prompt('Please enter admin password to suspend this delivery agent:');
+        if (!password) return;
+        await adminApi.suspendDeliveryAgent(agentId, { adminPassword: password });
+        setSuccess('Delivery agent suspended from dashboard access');
+      } else {
+        await adminApi.reactivateDeliveryAgent(agentId);
+        setSuccess('Delivery agent reactivated');
+      }
       
       // Refresh local state
       if (agentDetail && agentDetail.agent.id === agentId) {
@@ -142,14 +149,14 @@ export default function DeliveryAgents() {
           ...agentDetail,
           agent: {
             ...agentDetail.agent,
-            deliveryProfile: { ...agentDetail.agent.deliveryProfile, isActive: newStatus }
+            isDeliverySuspended: isSuspending
           }
         });
       }
       loadAgents();
       setTimeout(() => setSuccess(''), 3000);
     } catch (e) {
-      setError('Failed to update status');
+      setError(e.response?.data?.message || 'Failed to update suspension status');
     }
   };
 
@@ -365,7 +372,12 @@ export default function DeliveryAgents() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <StatusBadge isActive={prof.isActive} isAvailable={isAvailable} />
+                          <StatusBadge 
+                            isActive={prof.isActive} 
+                            isSuspended={agent.isDeliverySuspended} 
+                            isDeactivated={agent.isDeactivated}
+                            isAvailable={isAvailable} 
+                          />
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button className="p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-gray-400 hover:text-blue-600">
@@ -431,20 +443,20 @@ export default function DeliveryAgents() {
           {/* Status Bar */}
           <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${agentDetail?.agent?.deliveryProfile?.isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></span>
+              <span className={`w-2.5 h-2.5 rounded-full ${!agentDetail?.agent?.isDeliverySuspended ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></span>
               <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">
-                {agentDetail?.agent?.deliveryProfile?.isActive ? 'Profile Active' : 'Profile Suspended'}
+                {agentDetail?.agent?.isDeliverySuspended ? 'Access Suspended' : 'Access Active'}
               </span>
             </div>
             <button 
-              onClick={() => toggleStatus(agentDetail.agent.id, agentDetail.agent.deliveryProfile.isActive)}
+              onClick={() => toggleStatus(agentDetail.agent.id, agentDetail.agent.isDeliverySuspended)}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
-                agentDetail?.agent?.deliveryProfile?.isActive 
+                !agentDetail?.agent?.isDeliverySuspended 
                   ? 'bg-red-50 text-red-600 hover:bg-red-100 ring-1 ring-red-100' 
                   : 'bg-green-50 text-green-600 hover:bg-green-100 ring-1 ring-green-100'
               }`}
             >
-              {agentDetail?.agent?.deliveryProfile?.isActive ? 'Suspend Agent' : 'Activate Agent'}
+              {agentDetail?.agent?.isDeliverySuspended ? 'Activate Access' : 'Suspend Access'}
             </button>
           </div>
 
@@ -685,10 +697,20 @@ function FilterGroup({ label, children }) {
   );
 }
 
-function StatusBadge({ isActive, isAvailable }) {
-  if (!isActive) return (
+function StatusBadge({ isActive, isSuspended, isDeactivated, isAvailable }) {
+  if (isDeactivated) return (
+    <span className="px-2.5 py-1 bg-red-100 text-red-800 rounded-full text-[10px] font-bold border border-red-200 uppercase tracking-wide">
+      Deactivated
+    </span>
+  );
+  if (isSuspended) return (
     <span className="px-2.5 py-1 bg-red-50 text-red-600 rounded-full text-[10px] font-bold border border-red-100 uppercase tracking-wide">
       Suspended
+    </span>
+  );
+  if (!isActive) return (
+    <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold border border-gray-200 uppercase tracking-wide">
+      Inactive
     </span>
   );
   if (isAvailable) return (
@@ -698,7 +720,7 @@ function StatusBadge({ isActive, isAvailable }) {
   );
   return (
     <span className="px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold border border-amber-100 uppercase tracking-wide">
-      Active (Off Shift)
+      On Shift
     </span>
   );
 }

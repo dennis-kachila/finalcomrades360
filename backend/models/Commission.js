@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
     saleAmount: { type: DataTypes.FLOAT, allowNull: false },
     commissionRate: { type: DataTypes.FLOAT, allowNull: false }, // percentage
     commissionAmount: { type: DataTypes.FLOAT, allowNull: false },
-    status: { type: DataTypes.ENUM('pending', 'paid', 'cancelled'), defaultValue: 'pending' },
+    status: { type: DataTypes.ENUM('pending', 'success', 'paid', 'cancelled'), defaultValue: 'pending' },
     referralCode: { type: DataTypes.STRING, allowNull: false },
     commissionType: { type: DataTypes.ENUM('full_100', 'primary_60', 'secondary_40'), defaultValue: 'full_100' },
     paidAt: { type: DataTypes.DATE },

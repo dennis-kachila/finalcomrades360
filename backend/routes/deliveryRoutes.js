@@ -20,7 +20,8 @@ const {
   markArrivedAtCustomer,
   updateMyCurrentLocation
 } = require('../controllers/deliveryController');
-const { getDeliveryWallet, withdraw } = require('../controllers/deliveryWalletController');
+const { getDeliveryWallet } = require('../controllers/deliveryWalletController');
+const { withdraw } = require('../controllers/walletController');
 const deliveryMessageRoutes = require('./deliveryMessageRoutes');
 
 const router = express.Router();

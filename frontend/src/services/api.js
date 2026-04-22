@@ -446,8 +446,12 @@ export const productApi = {
   getSubcategory: (categoryId, subcategoryId) => api.get(`/categories/${categoryId}/subcategories/${subcategoryId}`),
 
   // Admin category methods
-  createCategory: (categoryData) => api.post('/categories/admin/categories', categoryData),
-  createSubcategory: (subcategoryData) => api.post('/categories/admin/subcategories', subcategoryData),
+  createCategory: (categoryData) => api.post('/admin/categories', categoryData),
+  createSubcategory: (categoryId, subcategoryData) => api.post(`/admin/categories/${categoryId}/subcategories`, subcategoryData),
+  updateCategory: (id, categoryData) => api.put(`/admin/categories/${id}`, categoryData),
+  updateSubcategory: (categoryId, subcategoryId, subcategoryData) => api.put(`/admin/categories/${categoryId}/subcategories/${subcategoryId}`, subcategoryData),
+  deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
+  deleteSubcategory: (categoryId, subcategoryId) => api.delete(`/admin/categories/${categoryId}/subcategories/${subcategoryId}`),
 
   // Check for duplicate products
   checkDuplicate: (params) => productsClient.get('/check-duplicate', { params }),
@@ -505,6 +509,19 @@ export const adminApi = {
   updateUserVerification: (userId, verificationData) => adminClient.patch(`/users/${userId}/verification`, verificationData),
   updateUserAccess: (userId, accessData) => adminClient.patch(`/users/${userId}/access`, accessData),
   verifyAdminPassword: (password) => adminClient.post('/verify-password', { password }),
+
+  // Role-specific suspension (Point to generic endpoints internally)
+  suspendMarketer: (userId, data) => adminClient.post(`/users/${userId}/roles/suspend`, { ...data, role: 'marketer' }),
+  reactivateMarketer: (userId) => adminClient.post(`/users/${userId}/roles/reactivate`, { role: 'marketer' }),
+  suspendSeller: (userId, data) => adminClient.post(`/users/${userId}/roles/suspend`, { ...data, role: 'seller' }),
+  reactivateSeller: (userId) => adminClient.post(`/users/${userId}/roles/reactivate`, { role: 'seller' }),
+  suspendDeliveryAgent: (userId, data) => adminClient.post(`/users/${userId}/roles/suspend`, { ...data, role: 'delivery_agent' }),
+  reactivateDeliveryAgent: (userId) => adminClient.post(`/users/${userId}/roles/reactivate`, { role: 'delivery_agent' }),
+
+  // Generic role suspension (For any role like warehouse_manager, finance_manager, etc.)
+  suspendUserRole: (userId, role, adminPassword) => adminClient.post(`/users/${userId}/roles/suspend`, { role, adminPassword }),
+  reactivateUserRole: (userId, role) => adminClient.post(`/users/${userId}/roles/reactivate`, { role }),
+
   bulkUserOperation(userIds, action) {
     return adminClient.post('/users/bulk', { userIds, action });
   },

@@ -79,78 +79,109 @@ const creditWallet = async (req, res) => {
 };
 
 const withdraw = async (req, res) => {
-  const { amount } = req.body;
-  if (!amount || amount <= 0) return res.status(400).json({ error: "Invalid amount" });
-
-  const u = await User.findByPk(req.user.id);
-  const role = u.role || 'customer';
-
-  // Role-based min payout check
   try {
-    const { PlatformConfig } = require('../models');
-    const configRecord = await PlatformConfig.findOne({ where: { key: 'finance_settings' } });
-    if (configRecord) {
-      const dbConfig = typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value;
-      const thresholds = dbConfig.minPayout || {};
-      const minAmount = thresholds[role] || 0;
-      
-      if (amount < minAmount) {
-        return res.status(400).json({ error: `Minimum withdrawal amount for ${role} is KES ${minAmount}` });
+    const { amount, paymentMethod, paymentDetails, paymentMeta } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.role || 'customer';
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: "Invalid withdrawal amount" });
+    }
+
+    // 1. Get or Create Wallet
+    let wallet = await Wallet.findOne({ where: { userId } });
+    if (!wallet) {
+      wallet = await Wallet.create({ userId, balance: 0, pendingBalance: 0, successBalance: 0 });
+    }
+
+    if (wallet.balance < amount) {
+      return res.status(400).json({ error: "Insufficient balance" });
+    }
+
+    // 2. Load Finance Settings
+    let financeSettings = {};
+    try {
+      const configRecord = await PlatformConfig.findOne({ where: { key: 'finance_settings' } });
+      if (configRecord) {
+        financeSettings = typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value;
       }
+    } catch (err) {
+      console.warn('⚠️ Could not fetch finance settings:', err.message);
     }
-  } catch (err) {
-    console.warn('⚠️  Could not check payout threshold:', err.message);
-  }
 
-  const wallet = await Wallet.findOne({ where: { userId: req.user.id } });
-  if (!wallet || wallet.balance < amount) return res.status(400).json({ error: "Insufficient balance" });
-
-  // Get finance settings for fee calculation
-  let financeSettings = {};
-  try {
-    const configRecord = await PlatformConfig.findOne({ where: { key: 'finance_settings' } });
-    if (configRecord) {
-      financeSettings = typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value;
+    // 3. Validate Minimum Payout Threshold
+    const thresholds = financeSettings.minPayout || {};
+    const minAmount = thresholds[userRole] || 500; // default to 500
+    if (amount < minAmount) {
+      return res.status(400).json({ error: `Minimum withdrawal amount for ${userRole.replace('_', ' ')} is KES ${minAmount}` });
     }
-  } catch (err) {
-    console.warn('⚠️  Could not fetch finance settings for fee:', err.message);
+
+    // 4. Calculate Fee
+    const fee = calculateWithdrawalFee(amount, financeSettings);
+    const netAmount = Math.max(0, amount - fee);
+
+    // 5. Determine Wallet Type and Metadata Labels based on Role
+    let walletType = 'customer';
+    const metaLabels = {
+      nameKey: 'userName',
+      role: userRole
+    };
+
+    if (userRole === 'seller') {
+      walletType = 'seller';
+      metaLabels.nameKey = 'sellerName';
+    } else if (userRole === 'marketer') {
+      walletType = 'marketer';
+      metaLabels.nameKey = 'marketerName';
+    } else if (userRole === 'delivery_agent') {
+      walletType = 'delivery_agent';
+      metaLabels.nameKey = 'agentName';
+    } else if (userRole === 'service_provider') {
+      walletType = 'service_provider';
+      metaLabels.nameKey = 'providerName';
+    }
+
+    // 6. Build Metadata
+    const metaObj = {
+      method: paymentMethod || 'mpesa',
+      details: paymentDetails || req.user.phone,
+      [metaLabels.nameKey]: req.user.name,
+      role: metaLabels.role,
+      requestedAmount: amount,
+      withdrawalFee: fee,
+      netAmountToPay: netAmount,
+      ...(paymentMeta || {})
+    };
+
+    // 7. Execute Withdrawal (Transaction)
+    // Subtract full amount from balance (lock the funds)
+    await wallet.decrement({ balance: amount });
+
+    const transaction = await Transaction.create({
+      userId,
+      amount,
+      type: "debit",
+      status: "pending",
+      description: `Withdrawal Request (${paymentMethod === 'bank' ? 'Bank Transfer' : 'M-Pesa'})`,
+      note: `${userRole.charAt(0).toUpperCase() + userRole.slice(1).replace('_', ' ')} requested payout of KES ${amount}. Fee: KES ${fee}. Net to Pay: KES ${netAmount}.`,
+      metadata: JSON.stringify(metaObj),
+      fee: fee,
+      walletType: walletType
+    });
+
+    res.json({
+      success: true,
+      message: "Withdrawal request submitted successfully",
+      balance: (wallet.balance || 0) - amount,
+      fee,
+      netAmount,
+      transactionId: transaction.id
+    });
+
+  } catch (error) {
+    console.error('Error in unified withdraw:', error);
+    res.status(500).json({ error: 'Failed to process withdrawal request', message: error.message });
   }
-
-  const fee = calculateWithdrawalFee(amount, financeSettings);
-  const netAmount = Math.max(0, amount - fee);
-
-  const { paymentMethod, paymentDetails, paymentMeta } = req.body;
-
-  // Build metadata
-  const metaObj = {
-    method: paymentMethod || 'mpesa',
-    details: paymentDetails || u.phone,
-    userName: u.name,
-    requestedAmount: amount,
-    withdrawalFee: fee,
-    netAmountToPay: netAmount,
-    ...(paymentMeta || {})
-  };
-
-  await wallet.decrement({ balance: amount });
-  await Transaction.create({
-    userId: req.user.id,
-    amount,
-    type: "debit",
-    status: "pending",
-    description: `Withdrawal (${paymentMethod === 'bank' ? 'Bank' : 'M-Pesa'})`,
-    metadata: JSON.stringify(metaObj),
-    fee: fee,
-    note: `User requested payout of KES ${amount}. Fee: KES ${fee}. Net to Pay: KES ${netAmount}.`,
-    walletType: 'customer'
-  });
-
-  res.json({ 
-    message: "Withdrawal queued", 
-    balance: (wallet.balance || 0) - amount,
-    fee,
-    netAmount
-  });
 };
 
 const withdrawFunds = async (req, res) => {

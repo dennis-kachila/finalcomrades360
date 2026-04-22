@@ -146,7 +146,7 @@ const DeliveryWallet = () => {
 
         setSubmitting(true);
         try {
-            const res = await api.post('/delivery/wallet/withdraw', { 
+            const res = await api.post('/wallet/withdraw', { 
                 amount,
                 paymentMethod,
                 paymentDetails: paymentMethod === 'mpesa' ? mpesaNumber : `${bankName} / ${accountNumber}`,

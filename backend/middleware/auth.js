@@ -1,6 +1,35 @@
 const jwt = require('jsonwebtoken');
 const { User, Warehouse, PickupStation } = require('../models');
 
+/**
+ * Returns true if the user has been specifically suspended from a role dashboard.
+ * Admins/Superadmins bypass role-level suspension.
+ */
+const isRoleSuspended = (user, role) => {
+  if (!user) return false;
+  
+  const normalize = (r) => String(r || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const userRole = normalize(user.role);
+  const userRoles = Array.isArray(user.roles) ? user.roles.map(normalize) : [userRole];
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin');
+  
+  if (isAdmin) return false; // Admins are never suspended from roles they manage
+
+  const suspendedRoles = Array.isArray(user.suspendedRoles) ? user.suspendedRoles.map(normalize) : [];
+  const targetRole = normalize(role);
+  
+  // Check new flexible array
+  if (suspendedRoles.includes(targetRole)) return true;
+  
+  // Fallback to legacy flags during migration
+  if (targetRole === 'marketer' && user.isMarketerSuspended) return true;
+  if (targetRole === 'seller' && user.isSellerSuspended) return true;
+  if (targetRole === 'service_provider' && user.isServiceProviderSuspended) return true;
+  if (['delivery', 'deliveryagent', 'driver'].includes(targetRole) && user.isDeliverySuspended) return true;
+  
+  return false;
+};
+
 const auth = async (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) {
@@ -154,8 +183,7 @@ const adminOrLogisticsOrSeller = (req, res, next) => {
   }
 
   // Role-specific suspension check
-  const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin');
-  if (!isAdmin && (userRole === 'seller' || userRoles.includes('seller')) && req.user.isSellerSuspended) {
+  if (isRoleSuspended(req.user, 'seller')) {
     return res.status(403).json({ message: 'Your seller portal access has been suspended. You can still use the platform as a customer.' });
   }
 
@@ -193,8 +221,7 @@ const adminOrSeller = (req, res, next) => {
   }
 
   // Role-specific suspension check
-  const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin');
-  if (!isAdmin && (userRole === 'seller' || userRoles.includes('seller')) && req.user.isSellerSuspended) {
+  if (isRoleSuspended(req.user, 'seller')) {
     return res.status(403).json({ message: 'Your seller portal access has been suspended. You can still use the platform as a customer.' });
   }
 
@@ -243,17 +270,14 @@ const checkRole = (roles = []) => {
       }
 
       // Check for role-specific suspension
-      const isAdmin = userRole === 'superadmin' || userRoles.includes('superadmin') || userRoles.includes('super_admin') || userRole === 'admin' || userRoles.includes('admin');
-      if (!isAdmin) {
-        if (normalizedRequired.includes('marketer') && req.user.isMarketerSuspended) {
-          return res.status(403).json({ message: 'Your marketer portal access has been suspended.' });
-        }
-        if (normalizedRequired.includes('seller') && req.user.isSellerSuspended) {
-          return res.status(403).json({ message: 'Your seller portal access has been suspended.' });
-        }
-        if (normalizedRequired.some(r => ['delivery', 'delivery_agent', 'driver'].includes(r)) && req.user.isDeliverySuspended) {
-          return res.status(403).json({ message: 'Your delivery portal access has been suspended.' });
-        }
+      if (normalizedRequired.includes('marketer') && isRoleSuspended(req.user, 'marketer')) {
+        return res.status(403).json({ message: 'Your marketer portal access has been suspended.' });
+      }
+      if (normalizedRequired.includes('seller') && isRoleSuspended(req.user, 'seller')) {
+        return res.status(403).json({ message: 'Your seller portal access has been suspended.' });
+      }
+      if (normalizedRequired.some(r => ['delivery', 'delivery_agent', 'driver'].includes(r)) && isRoleSuspended(req.user, 'delivery_agent')) {
+        return res.status(403).json({ message: 'Your delivery portal access has been suspended.' });
       }
     }
     next();
@@ -303,7 +327,7 @@ const checkSellerProfile = async (req, res, next) => {
   }
 
   // Suspension check
-  if (!isAdmin && req.user.isSellerSuspended) {
+  if (isRoleSuspended(req.user, 'seller')) {
     return res.status(403).json({ message: 'Your seller portal access has been suspended.' });
   }
 
@@ -327,7 +351,7 @@ const marketerOnly = (req, res, next) => {
     return res.status(403).json({ message: 'Marketer access required' });
   }
 
-  if (req.user.isMarketerSuspended) {
+  if (isRoleSuspended(req.user, 'marketer')) {
     return res.status(403).json({ message: 'Your marketer portal access has been suspended. You can still use the platform as a customer.' });
   }
 
@@ -369,9 +393,7 @@ const requirePermission = (permission) => {
     if (allPerms.includes('*') || allPerms.includes(permission)) {
       // Check for delivery agent suspension if the permission is delivery-related
       const isDeliveryRole = userRoles.some(r => ['delivery', 'delivery_agent', 'driver'].includes(r));
-      const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRoles.includes('admin') || userRoles.includes('superadmin');
-      
-      if (isDeliveryRole && !isAdmin && req.user.isDeliverySuspended) {
+      if (isDeliveryRole && isRoleSuspended(req.user, 'delivery_agent')) {
         return res.status(403).json({ message: 'Your delivery portal access has been suspended. You can still use the platform as a customer.' });
       }
 

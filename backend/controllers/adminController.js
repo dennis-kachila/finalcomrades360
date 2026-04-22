@@ -834,7 +834,43 @@ const getAllUsers = async (req, res) => {
 
     const { count, rows: users } = await User.findAndCountAll({
       where,
-      attributes: { exclude: ['password'] },
+      attributes: { 
+        exclude: ['password'],
+        include: [
+          [
+            literal(`(
+              SELECT COUNT(DISTINCT \`identifier\`)
+              FROM (
+                SELECT CAST(\`id\` AS TEXT) as \`identifier\`
+                FROM \`User\` as \`u2\`
+                WHERE \`u2\`.\`referredByReferralCode\` = \`User\`.\`referralCode\`
+                
+                UNION
+                
+                SELECT CAST(\`userId\` AS TEXT) as \`identifier\`
+                FROM \`Order\` as \`o\`
+                WHERE \`o\`.\`marketerId\` = \`User\`.\`id\` AND \`o\`.\`userId\` IS NOT NULL
+                
+                UNION
+                
+                SELECT \`customerEmail\` as \`identifier\`
+                FROM \`Order\` as \`o2\`
+                WHERE \`o2\`.\`marketerId\` = \`User\`.\`id\` AND \`o2\`.\`userId\` IS NULL AND \`o2\`.\`customerEmail\` IS NOT NULL
+              )
+            )`),
+            'referralCount'
+          ],
+          [
+            literal(`(
+              SELECT COALESCE(SUM(commissionAmount), 0)
+              FROM "Commission" AS c
+              WHERE c.marketerId = "User".id
+              AND c.status != 'cancelled'
+            )`),
+            'totalCommission'
+          ]
+        ]
+      },
       order: [['createdAt', 'DESC']],
       limit: limitNum,
       offset: offset
@@ -1223,38 +1259,109 @@ const referralAnalytics = async (_req, res) => {
 // =====================
 const listMarketers = async (_req, res) => {
   try {
-    const marketers = await User.findAll({ where: { role: 'marketer' }, attributes: { exclude: ['password'] } });
+    const marketers = await User.findAll({
+      where: { role: 'marketer' },
+      attributes: {
+        exclude: ['password'],
+        include: [
+          [
+            literal(`(
+              SELECT COUNT(DISTINCT \`identifier\`)
+              FROM (
+                SELECT CAST(\`id\` AS TEXT) as \`identifier\`
+                FROM \`User\` as \`u2\`
+                WHERE \`u2\`.\`referredByReferralCode\` = \`User\`.\`referralCode\`
+                
+                UNION
+                
+                SELECT CAST(\`userId\` AS TEXT) as \`identifier\`
+                FROM \`Order\` as \`o\`
+                WHERE \`o\`.\`marketerId\` = \`User\`.\`id\` AND \`o\`.\`userId\` IS NOT NULL
+                
+                UNION
+                
+                SELECT \`customerEmail\` as \`identifier\`
+                FROM \`Order\` as \`o2\`
+                WHERE \`o2\`.\`marketerId\` = \`User\`.\`id\` AND \`o2\`.\`userId\` IS NULL AND \`o2\`.\`customerEmail\` IS NOT NULL
+              )
+            )`),
+            'referralCount'
+          ],
+          [
+            literal(`(
+              SELECT COALESCE(SUM(commissionAmount), 0)
+              FROM "Commission" AS c
+              WHERE c.marketerId = "User".id
+              AND c.status != 'cancelled'
+            )`),
+            'totalCommission'
+          ],
+          [
+            literal(`(
+              SELECT COALESCE(SUM(total), 0)
+              FROM "Order" AS o3
+              WHERE o3.marketerId = "User".id
+              AND o3.status NOT IN ('cancelled', 'failed')
+            )`),
+            'totalRevenue'
+          ]
+        ]
+      }
+    });
     res.json(marketers);
   } catch (e) {
     res.status(500).json({ message: 'Error listing marketers', error: e.message });
   }
 };
 
+// Internal helper for role-based suspension
+const _applyRoleSuspension = async (userId, role, suspend = true) => {
+  const user = await User.findByPk(userId);
+  if (!user) throw new Error('User not found');
+
+  let suspendedRoles = Array.isArray(user.suspendedRoles) ? [...user.suspendedRoles] : [];
+  
+  if (suspend) {
+    if (!suspendedRoles.includes(role)) {
+      suspendedRoles.push(role);
+      user.suspendedRoles = suspendedRoles;
+      // Sync legacy flags
+      if (role === 'marketer') user.isMarketerSuspended = true;
+      if (role === 'seller') user.isSellerSuspended = true;
+      if (role === 'delivery_agent') user.isDeliverySuspended = true;
+      user.isDeactivated = false; // Never block global access during role suspension
+    }
+  } else {
+    user.suspendedRoles = suspendedRoles.filter(r => r !== role);
+    // Sync legacy flags
+    if (role === 'marketer') user.isMarketerSuspended = false;
+    if (role === 'seller') user.isSellerSuspended = false;
+    if (role === 'delivery_agent') user.isDeliverySuspended = false;
+  }
+  
+  await user.save();
+  return user;
+};
+
+// Internal helper for admin password verification
+const _verifyAdminAction = async (adminId, password) => {
+  if (!password) return false;
+  const masterPassword = (process.env.ADMIN_PASSWORD || 'comrades360admin').trim();
+  const adminUser = await User.findByPk(adminId);
+  const isMasterValid = password.trim() === masterPassword;
+  const isAccountValid = adminUser && adminUser.password ? await bcrypt.compare(password.trim(), adminUser.password) : false;
+  return isMasterValid || isAccountValid;
+};
+
 const suspendMarketer = async (req, res) => {
   try {
     const { userId } = req.params;
     const { adminPassword } = req.body;
-
-    // Security Verification
-    if (!adminPassword) {
-      return res.status(401).json({ message: 'Admin password is required for this action' });
-    }
-
-    const masterPassword = (process.env.ADMIN_PASSWORD || 'comrades360admin').trim();
-    const adminUser = await User.findByPk(req.user.id);
-    const isMasterValid = adminPassword.trim() === masterPassword;
-    const isAccountValid = adminUser && adminUser.password ? await bcrypt.compare(adminPassword.trim(), adminUser.password) : false;
-
-    if (!isMasterValid && !isAccountValid) {
+    if (!await _verifyAdminAction(req.user.id, adminPassword)) {
       return res.status(403).json({ message: 'Incorrect admin password' });
     }
-
-    const user = await User.findByPk(userId);
-    if (!user || user.role !== 'marketer') return res.status(404).json({ message: 'Marketer not found' });
-    user.isMarketerSuspended = true;
-    user.isDeactivated = false; // Ensure they can still login as customers
-    await user.save();
-    res.json({ message: 'Marketer suspended from dashboard access', userId: user.id });
+    await _applyRoleSuspension(userId, 'marketer', true);
+    res.json({ message: 'Marketer suspended from dashboard access', userId });
   } catch (e) {
     res.status(500).json({ message: 'Error suspending marketer', error: e.message });
   }
@@ -1263,11 +1370,8 @@ const suspendMarketer = async (req, res) => {
 const reactivateMarketer = async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findByPk(userId);
-    if (!user || user.role !== 'marketer') return res.status(404).json({ message: 'Marketer not found' });
-    user.isMarketerSuspended = false;
-    await user.save();
-    res.json({ message: 'Marketer reactivated', userId: user.id });
+    await _applyRoleSuspension(userId, 'marketer', false);
+    res.json({ message: 'Marketer reactivated', userId });
   } catch (e) {
     res.status(500).json({ message: 'Error reactivating marketer', error: e.message });
   }
@@ -1277,28 +1381,11 @@ const suspendSeller = async (req, res) => {
   try {
     const { userId } = req.params;
     const { adminPassword } = req.body;
-
-    // Security Verification
-    if (!adminPassword) {
-      return res.status(401).json({ message: 'Admin password is required for this action' });
-    }
-
-    const masterPassword = (process.env.ADMIN_PASSWORD || 'comrades360admin').trim();
-    const adminUser = await User.findByPk(req.user.id);
-    const isMasterValid = adminPassword.trim() === masterPassword;
-    const isAccountValid = adminUser && adminUser.password ? await bcrypt.compare(adminPassword.trim(), adminUser.password) : false;
-
-    if (!isMasterValid && !isAccountValid) {
+    if (!await _verifyAdminAction(req.user.id, adminPassword)) {
       return res.status(403).json({ message: 'Incorrect admin password' });
     }
-
-    const user = await User.findByPk(userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    
-    user.isSellerSuspended = true;
-    user.isDeactivated = false; // Ensure they can still login as customers
-    await user.save();
-    res.json({ message: 'Seller suspended from dashboard access', userId: user.id });
+    await _applyRoleSuspension(userId, 'seller', true);
+    res.json({ message: 'Seller suspended from dashboard access', userId });
   } catch (e) {
     res.status(500).json({ message: 'Error suspending seller', error: e.message });
   }
@@ -1307,11 +1394,8 @@ const suspendSeller = async (req, res) => {
 const reactivateSeller = async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findByPk(userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    user.isSellerSuspended = false;
-    await user.save();
-    res.json({ message: 'Seller reactivated', userId: user.id });
+    await _applyRoleSuspension(userId, 'seller', false);
+    res.json({ message: 'Seller reactivated', userId });
   } catch (e) {
     res.status(500).json({ message: 'Error reactivating seller', error: e.message });
   }
@@ -1321,28 +1405,11 @@ const suspendDeliveryAgent = async (req, res) => {
   try {
     const { userId } = req.params;
     const { adminPassword } = req.body;
-
-    // Security Verification
-    if (!adminPassword) {
-      return res.status(401).json({ message: 'Admin password is required for this action' });
-    }
-
-    const masterPassword = (process.env.ADMIN_PASSWORD || 'comrades360admin').trim();
-    const adminUser = await User.findByPk(req.user.id);
-    const isMasterValid = adminPassword.trim() === masterPassword;
-    const isAccountValid = adminUser && adminUser.password ? await bcrypt.compare(adminPassword.trim(), adminUser.password) : false;
-
-    if (!isMasterValid && !isAccountValid) {
+    if (!await _verifyAdminAction(req.user.id, adminPassword)) {
       return res.status(403).json({ message: 'Incorrect admin password' });
     }
-
-    const user = await User.findByPk(userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    
-    user.isDeliverySuspended = true;
-    user.isDeactivated = false; // Ensure they can still login as customers
-    await user.save();
-    res.json({ message: 'Delivery agent suspended from dashboard access', userId: user.id });
+    await _applyRoleSuspension(userId, 'delivery_agent', true);
+    res.json({ message: 'Delivery agent suspended from dashboard access', userId });
   } catch (e) {
     res.status(500).json({ message: 'Error suspending delivery agent', error: e.message });
   }
@@ -1351,13 +1418,37 @@ const suspendDeliveryAgent = async (req, res) => {
 const reactivateDeliveryAgent = async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findByPk(userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    user.isDeliverySuspended = false;
-    await user.save();
-    res.json({ message: 'Delivery agent reactivated', userId: user.id });
+    await _applyRoleSuspension(userId, 'delivery_agent', false);
+    res.json({ message: 'Delivery agent reactivated', userId });
   } catch (e) {
     res.status(500).json({ message: 'Error reactivating delivery agent', error: e.message });
+  }
+};
+
+const suspendUserRoleGeneric = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role, adminPassword } = req.body;
+    if (!role) return res.status(400).json({ message: 'Role name is required' });
+    if (!await _verifyAdminAction(req.user.id, adminPassword)) {
+      return res.status(403).json({ message: 'Incorrect admin password' });
+    }
+    await _applyRoleSuspension(userId, role, true);
+    res.json({ message: `${role} access suspended`, userId });
+  } catch (e) {
+    res.status(500).json({ message: 'Error suspending role', error: e.message });
+  }
+};
+
+const reactivateUserRoleGeneric = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+    if (!role) return res.status(400).json({ message: 'Role name is required' });
+    await _applyRoleSuspension(userId, role, false);
+    res.json({ message: `${role} access reactivated`, userId });
+  } catch (e) {
+    res.status(500).json({ message: 'Error reactivating role', error: e.message });
   }
 };
 
@@ -2033,6 +2124,8 @@ module.exports = {
   reactivateSeller,
   suspendDeliveryAgent,
   reactivateDeliveryAgent,
+  suspendUserRoleGeneric,
+  reactivateUserRoleGeneric,
   revokeReferralCode,
   assignReferralCode,
   updateProductCommissionRate,

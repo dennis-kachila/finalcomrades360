@@ -63,7 +63,6 @@ const adminMenuItems = [
     children: [
       { name: 'All Users', path: '/dashboard/users', icon: <FaUsers className="mr-2" /> },
       { name: 'Role Applications', path: '/dashboard/users/role-applications', icon: <FaFileAlt className="mr-2" /> },
-      { name: 'Marketers', path: '/dashboard/users/marketers', icon: <FaBullhorn className="mr-2" /> },
       { name: 'ID Verifications', path: '/dashboard/users/verifications', icon: <FaShieldAlt className="mr-2" /> },
       { name: 'Job Openings', path: '/dashboard/users/job-openings', icon: <FaUserTie className="mr-2" /> }
     ]
@@ -120,6 +119,7 @@ const adminMenuItems = [
     icon: <FaBullhorn className="mr-3" />,
     roles: ['admin', 'superadmin', 'super_admin', 'marketer'],
     children: [
+      { name: 'Marketers', path: '/dashboard/users/marketers', icon: <FaBullhorn className="mr-2" /> },
       { name: 'Product Promo Requests', path: '/dashboard/marketing/hero-promotions', icon: <FaAward className="mr-2" /> },
       { name: 'FastFood Promo Requests', path: '/dashboard/marketing/fastfood-promotions', icon: <FaUtensils className="mr-2" /> },
       { name: 'Create Promotion', path: '/dashboard/marketing/hero-promotions/create', icon: <FaPlus className="mr-2" /> },

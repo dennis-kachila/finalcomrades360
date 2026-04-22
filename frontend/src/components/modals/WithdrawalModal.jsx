@@ -95,14 +95,8 @@ const WithdrawalModal = ({ isOpen, onClose, balance, role, onSuccess }) => {
         }
 
         setSubmitting(true);
-        try {
-            // Determine endpoint based on role
-            let endpoint = '';
-            if (role === 'seller') endpoint = '/sellers/wallet/withdraw';
-            else if (role === 'delivery_agent') endpoint = '/delivery/wallet/withdraw';
-            else if (role === 'marketer') endpoint = '/marketing/wallet/withdraw';
-            else if (role === 'service_provider') endpoint = '/provider/wallet/withdraw';
-            else endpoint = '/wallet/withdraw';
+            // Standardized unified endpoint
+            const endpoint = '/wallet/withdraw';
 
             const payload = {
                 amount: numAmount,

@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, literal } = require('sequelize');
 const { MarketingAnalytics, ReferralTracking, Commission, Product, Category, User, Order, OrderItem } = require('../models/index');
 
 // Helper: parse date range
@@ -147,7 +147,37 @@ const getMarketersLeaderboard = async (req, res) => {
 
     // Attach basic marketer info
     const ids = list.map(x => x.marketerId).filter(Boolean);
-    const users = await User.findAll({ where: { id: { [Op.in]: ids } }, attributes: ['id','name','email'], raw: true });
+    const users = await User.findAll({ 
+      where: { id: { [Op.in]: ids } }, 
+      attributes: {
+        include: [
+          [
+            literal(`(
+              SELECT COUNT(DISTINCT \`identifier\`)
+              FROM (
+                SELECT CAST(\`id\` AS TEXT) as \`identifier\`
+                FROM \`User\` as \`u2\`
+                WHERE \`u2\`.\`referredByReferralCode\` = \`User\`.\`referralCode\`
+                
+                UNION
+                
+                SELECT CAST(\`userId\` AS TEXT) as \`identifier\`
+                FROM \`Order\` as \`o\`
+                WHERE \`o\`.\`marketerId\` = \`User\`.\`id\` AND \`o\`.\`userId\` IS NOT NULL
+                
+                UNION
+                
+                SELECT \`customerEmail\` as \`identifier\`
+                FROM \`Order\` as \`o2\`
+                WHERE \`o2\`.\`marketerId\` = \`User\`.\`id\` AND \`o2\`.\`userId\` IS NULL AND \`o2\`.\`customerEmail\` IS NOT NULL
+              )
+            )`),
+            'referralCount'
+          ]
+        ]
+      },
+      raw: true 
+    });
     const byId = new Map(users.map(u => [u.id, u]));
     const withUsers = list.map(x => ({ ...x, user: byId.get(x.marketerId) || null }));
 
@@ -168,7 +198,30 @@ const getMarketerProfile = async (req, res) => {
       attributes: [
         'id', 'name', 'email', 'phone', 'role', 'referralCode', 'isDeactivated',
         'gender', 'dateOfBirth', 'campus', 'county', 'town', 'estate', 'houseNumber',
-        'nationalIdNumber', 'nationalIdStatus', 'nationalIdUrl', 'profileImage'
+        'nationalIdNumber', 'nationalIdStatus', 'nationalIdUrl', 'profileImage',
+        [
+          literal(`(
+            SELECT COUNT(DISTINCT \`identifier\`)
+            FROM (
+              SELECT CAST(\`id\` AS TEXT) as \`identifier\`
+              FROM \`User\` as \`u2\`
+              WHERE \`u2\`.\`referredByReferralCode\` = \`User\`.\`referralCode\`
+              
+              UNION
+              
+              SELECT CAST(\`userId\` AS TEXT) as \`identifier\`
+              FROM \`Order\` as \`o\`
+              WHERE \`o\`.\`marketerId\` = \`User\`.\`id\` AND \`o\`.\`userId\` IS NOT NULL
+              
+              UNION
+              
+              SELECT \`customerEmail\` as \`identifier\`
+              FROM \`Order\` as \`o2\`
+              WHERE \`o2\`.\`marketerId\` = \`User\`.\`id\` AND \`o2\`.\`userId\` IS NULL AND \`o2\`.\`customerEmail\` IS NOT NULL
+            )
+          )`),
+          'referralCount'
+        ]
       ],
       raw: true
     });

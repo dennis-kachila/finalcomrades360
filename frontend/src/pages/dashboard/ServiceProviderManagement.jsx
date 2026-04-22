@@ -27,25 +27,26 @@ export default function ServiceProviderManagement() {
     }, []);
 
     const suspendProvider = async (userId) => {
-        if (!window.confirm('Are you sure you want to suspend this provider?')) return;
+        const password = window.prompt('Please enter admin password to suspend this provider:');
+        if (!password) return;
         resetAlerts();
         try {
-            await adminApi.updateUserStatus(userId, true);
-            setSuccess('Provider suspended');
+            await adminApi.suspendUserRole(userId, 'service_provider', password);
+            setSuccess('Service provider suspended from dashboard access');
             loadProviders();
         } catch (e) {
-            setError('Failed to suspend provider');
+            setError(e.response?.data?.message || 'Failed to suspend provider');
         }
     };
 
     const reactivateProvider = async (userId) => {
         resetAlerts();
         try {
-            await adminApi.updateUserStatus(userId, false);
-            setSuccess('Provider reactivated');
+            await adminApi.reactivateUserRole(userId, 'service_provider');
+            setSuccess('Service provider reactivated');
             loadProviders();
         } catch (e) {
-            setError('Failed to reactivate provider');
+            setError(e.response?.data?.message || 'Failed to reactivate provider');
         }
     };
 
@@ -92,30 +93,30 @@ export default function ServiceProviderManagement() {
                                                     <td className="p-3">{provider.email}</td>
                                                     <td className="p-3">{provider.phone}</td>
                                                     <td className="p-3">
-                                                        <span className={`px-2 py-1 rounded text-xs ${!provider.isDeactivated && !provider.isFrozen
+                                                        <span className={`px-2 py-1 rounded text-xs ${(!provider.suspendedRoles?.includes('service_provider')) && !provider.isDeactivated
                                                                 ? 'bg-green-100 text-green-800'
                                                                 : 'bg-red-100 text-red-800'
                                                             }`}>
-                                                            {!provider.isDeactivated && !provider.isFrozen ? 'Active' : 'Suspended/Frozen'}
+                                                            {provider.suspendedRoles?.includes('service_provider') ? 'Provider Suspended' : provider.isDeactivated ? 'Global Deactivated' : 'Active'}
                                                         </span>
                                                     </td>
                                                     <td className="p-3">
                                                         <div className="flex gap-2">
-                                                            {(!provider.isDeactivated && !provider.isFrozen) ? (
+                                                            {!provider.suspendedRoles?.includes('service_provider') ? (
                                                                 <button
-                                                                    className="btn-warning btn-xs"
-                                                                    onClick={() => suspendProvider(provider.id)}
-                                                                >
-                                                                    Suspend
-                                                                </button>
-                                                            ) : (
-                                                                <button
-                                                                    className="btn-success btn-xs"
-                                                                    onClick={() => reactivateProvider(provider.id)}
-                                                                >
-                                                                    Reactivate
-                                                                </button>
-                                                            )}
+                                                                     className="btn-warning btn-xs"
+                                                                     onClick={() => suspendProvider(provider.id)}
+                                                                 >
+                                                                     Suspend
+                                                                 </button>
+                                                             ) : (
+                                                                 <button
+                                                                     className="btn-success btn-xs"
+                                                                     onClick={() => reactivateProvider(provider.id)}
+                                                                 >
+                                                                     Reactivate
+                                                                 </button>
+                                                             )}
                                                         </div>
                                                     </td>
                                                 </tr>

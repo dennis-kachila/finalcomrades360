@@ -1,7 +1,8 @@
 const express = require('express');
 const { auth, checkRole } = require('../middleware/auth');
 const { getShareUrl, redirectTracker, trackShare, myStats, lookupCustomer, getMarketerPublicDetails, getMyCustomers, getCustomerOrders } = require('../controllers/marketingController');
-const { getMarketerWallet, withdraw } = require('../controllers/marketerWalletController');
+const { getMarketerWallet } = require('../controllers/marketerWalletController');
+const { withdraw } = require('../controllers/walletController');
 // const {
 //   getCampaigns,
 //   createCampaign,

@@ -243,6 +243,7 @@ const AppContent = () => {
   const hideNavbar = ['/login', '/register', '/forgot-password', '/menu', '/station/login'].includes(location.pathname);
   const [isMarketingMode, setIsMarketingMode] = useState(localStorage.getItem('marketing_mode') === 'true');
   const [referrerName, setReferrerName] = useState(localStorage.getItem('referrerName') || '');
+  const [bannerDismissed, setBannerDismissed] = useState(localStorage.getItem('referrerBannerDismissed') === 'true');
 
   // On app load, fire one quick API call; if we get 503+maintenance redirect immediately
   useEffect(() => {
@@ -301,6 +302,10 @@ const AppContent = () => {
 
     if (refCode) {
       localStorage.setItem('referrerCode', refCode);
+      // When a new referral link is used, reset the dismissal flag so the banner shows again
+      localStorage.removeItem('referrerBannerDismissed');
+      setBannerDismissed(false);
+
       // Fetch marketer name
       api.get(`/marketing/ref-details/${refCode}`)
         .then(res => {
@@ -333,9 +338,10 @@ const AppContent = () => {
   }, [location.pathname, location.search]);
 
   const handleClearReferrer = () => {
-    localStorage.removeItem('referrerCode');
-    localStorage.removeItem('referrerName');
-    setReferrerName('');
+    // Only dismiss the banner UI, do NOT remove the referrerCode
+    // The referrerCode must persist for checkout as long as they entered via the link
+    localStorage.setItem('referrerBannerDismissed', 'true');
+    setBannerDismissed(true);
   };
 
   // Initialize performance monitoring after initial render
@@ -412,7 +418,7 @@ const AppContent = () => {
         <Route path="*" element={
           <div className="min-h-screen bg-gray-50">
             {!hideNavbar && (isMarketingMode ? <MarketingNavbar /> : <Navbar />)}
-            {!hideNavbar && !isMarketingMode && referrerName && (
+            {!hideNavbar && !isMarketingMode && referrerName && !bannerDismissed && (
               <div className={paddingClass}>
                 <ReferrerBanner referrerName={referrerName} onClear={handleClearReferrer} />
               </div>

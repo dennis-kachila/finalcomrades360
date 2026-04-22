@@ -2,13 +2,23 @@ import React, { useEffect, useState, useCallback } from 'react';
 import api from '../../services/api';
 
 // ─── Small stateless components ──────────────────────────────────────────────
-const Badge = ({ active }) => (
-  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-    active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-  }`}>
-    {active ? '● Active' : '● Suspended'}
-  </span>
-);
+const Badge = ({ suspended, deactivated }) => {
+  if (deactivated) return (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-200 text-red-900 border border-red-300">
+      ● Global Deactivated
+    </span>
+  );
+  if (suspended) return (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+      ● Suspended
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+      ● Active
+    </span>
+  );
+};
 
 const StatusBadge = ({ status }) => {
   const map = {
@@ -705,7 +715,7 @@ export default function MarketerManagement() {
                             : <span className="text-gray-400 italic text-xs">No code</span>}
                         </td>
                         <td className="p-3 text-center">
-                          <Badge active={!m.isMarketerSuspended} />
+                          <Badge suspended={m.isMarketerSuspended} deactivated={m.isDeactivated} />
                         </td>
                         <td className="p-3 text-right font-medium">{m.referralCount || 0}</td>
                         <td className="p-3 text-right font-semibold text-green-600">

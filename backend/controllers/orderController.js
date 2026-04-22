@@ -917,13 +917,11 @@ const createOrderFromCart = async (req, res) => {
       }
     }
 
-    // Step 9: Create commission records if payment confirmed
-    if (paymentConfirmed) {
-      try {
-        await createCommissionRecords(order.id, effectiveReferralCode, secondaryReferralCode, { transaction: t });
-      } catch (commErr) {
-        console.warn(`Failed to create commission for order ${order.id}:`, commErr);
-      }
+    // Step 9: Create commission records (Pending Balance)
+    try {
+      await createCommissionRecords(order.id, effectiveReferralCode, secondaryReferralCode, { transaction: t });
+    } catch (commErr) {
+      console.warn(`Failed to create commission for order ${order.id}:`, commErr);
     }
 
     // Step 10: Notifications to all involved sellers
@@ -3974,6 +3972,16 @@ const cancelOrder = async (req, res) => {
       const sellerPayout = Number(order.total || 0) - Number(order.deliveryFee || 0);
       if (sellerPayout > 0 && order.sellerId) {
         await revertPending(order.sellerId, sellerPayout, order.id, t);
+      }
+
+      // Revert Marketer Commissions (Pending Wallet)
+      const marketerCommissions = await Commission.findAll({
+        where: { orderId: order.id, status: 'pending' },
+        transaction: t
+      });
+      for (const comm of marketerCommissions) {
+        await revertPending(comm.marketerId, comm.commissionAmount, order.id, t);
+        await comm.update({ status: 'cancelled' }, { transaction: t });
       }
 
       // Revert Delivery Agent Credits if assigned

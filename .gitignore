@@ -72,7 +72,3 @@ files_with_user.txt
 # User uploads and production dynamic content
 backend/uploads/
 
-# Local demo seeding artifacts (keep local, do not push)
-backend/scripts/seed_demo_users.js
-docs/DEMO_LOGIN_USERS.md
-

@@ -216,9 +216,7 @@ function initializeRoutes(app) {
   app.use('/api/products', require('./routes/productRoutes'));
   app.use('/api/role-management', require('./routes/roleManagementRoutes'));
   app.use('/api/hero-promotions', require('./routes/heroPromotionRoutes'));
-  const adminCategoryRoutes = require('./routes/adminCategoryRoutes');
-  app.use('/api/admin', adminCategoryRoutes);
-  app.use('/api/categories/admin', adminCategoryRoutes);
+  app.use('/api/admin/categories', require('./routes/adminCategoryRoutes'));
   app.use('/api/orders', require('./routes/orderRoutes'));
   app.use('/api/notifications', require('./routes/notificationRoutes'));
   app.use('/api/upload', require('./routes/uploadRoutes'));

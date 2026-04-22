@@ -203,7 +203,7 @@ export default function EnhancedCategories() {
         emoji: newSubcategory.emoji
       });
 
-      const response = await api.post('/admin/categories', {
+      const response = await api.post('/categories/admin/categories', {
         name: newSubcategory.name.trim(),
         emoji: newSubcategory.emoji
       });
@@ -257,14 +257,14 @@ export default function EnhancedCategories() {
       try {
         if (editingCategory.parentId) {
           // Edit subcategory
-          await api.put(`/admin/categories/${editingCategory.parentId}/subcategories/${editingCategory.id}`, {
+          await api.put(`/categories/admin/categories/${editingCategory.parentId}/subcategories/${editingCategory.id}`, {
             name: newSubcategory.name.trim(),
             emoji: newSubcategory.emoji
           });
           setSuccess('Subcategory updated successfully');
         } else {
           // Edit category
-          await api.put(`/admin/categories/${editingCategory.id}`, {
+          await api.put(`/categories/admin/categories/${editingCategory.id}`, {
             name: newSubcategory.name.trim(),
             emoji: newSubcategory.emoji
           });
@@ -312,7 +312,7 @@ export default function EnhancedCategories() {
         return updatedCategories;
       });
       
-      const response = await api.delete(`/admin/categories/${categoryId}`);
+      const response = await api.delete(`/categories/admin/categories/${categoryId}`);
       console.log('✅ Category delete response:', response);
       
       setSuccess('Category deleted successfully');
@@ -367,9 +367,9 @@ export default function EnhancedCategories() {
     
     try {
       console.log('🚀 Sending delete request...');
-      console.log('API endpoint:', `/admin/categories/${categoryId}/subcategories/${subcategoryId}`);
+      console.log('API endpoint:', `/categories/admin/categories/${categoryId}/subcategories/${subcategoryId}`);
       
-      const response = await api.delete(`/admin/categories/${categoryId}/subcategories/${subcategoryId}`);
+      const response = await api.delete(`/categories/admin/categories/${categoryId}/subcategories/${subcategoryId}`);
       console.log('✅ Delete response:', response);
       
       setSuccess('Subcategory deleted successfully');
@@ -430,7 +430,7 @@ export default function EnhancedCategories() {
     });
 
     try {
-      const response = await api.post(`/admin/categories/${categoryId}/subcategories`, {
+      const response = await api.post(`/categories/admin/categories/${categoryId}/subcategories`, {
         name: newSubcategory.name.trim(),
         emoji: newSubcategory.emoji,
         categoryId: categoryId

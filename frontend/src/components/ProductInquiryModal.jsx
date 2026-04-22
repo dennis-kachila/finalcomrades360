@@ -34,7 +34,7 @@ const ProductInquiryModal = ({ product, isOpen, onClose, onSuccess }) => {
         inquiryType: 'product_inquiry'
       };
 
-      await api.post('/support/inquiries', inquiryData);
+      await api.post('/product-inquiries', inquiryData);
       
       onSuccess?.(inquiryData);
       setFormData({

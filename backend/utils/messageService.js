@@ -119,10 +119,15 @@ const initWhatsApp = async () => {
                 whatsappStatus = 'disconnected';
                 isInitializing = false;
                 
-                // Simplified reconnect logic to avoid rapid loops
+                // Use a more conservative backoff for reconnection to avoid pool exhaustion
                 if (shouldReconnect) {
-                    logWhatsApp('RETRY: Reconnecting in 10s...');
-                    setTimeout(initWhatsApp, 10000); 
+                    const delay = 30000; // Increase to 30s
+                    logWhatsApp(`RETRY: Reconnecting in ${delay/1000}s...`);
+                    setTimeout(() => {
+                        if (!isWhatsAppReady && !isInitializing) {
+                            initWhatsApp();
+                        }
+                    }, delay); 
                 }
             }
         });

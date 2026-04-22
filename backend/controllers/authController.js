@@ -248,7 +248,7 @@ const login = async (req, res) => {
     console.log('[authController] Step 1: Querying User...');
     const user = await User.findOne({
       where: whereClause,
-      attributes: { exclude: ['resetToken', 'resetTokenExpiry', 'emailVerificationToken', 'emailChangeToken', 'phoneOtp'] }
+      attributes: { exclude: ['emailVerificationToken', 'emailChangeToken', 'phoneOtp'] }
     });
     console.log('[authController] Step 2: User found:', !!user);
 
@@ -381,11 +381,20 @@ const login = async (req, res) => {
 
   } catch (error) {
     console.error('[authController] Login error - Full Stack:', error.stack);
-    console.error('[authController] Login error - Request Body:', req.body);
+    console.error('[authController] Login error - Request Body:', JSON.stringify(req.body));
+    
+    // More detailed logging for Sequelize/DB errors
+    if (error.parent || error.original) {
+      console.error('[authController] DB Error Detail:', error.parent?.message || error.original?.message);
+      console.error('[authController] DB Error Code:', error.parent?.code || error.original?.code);
+      console.error('[authController] DB Error SQL:', error.parent?.sql || error.original?.sql);
+    }
+
     return res.status(500).json({
       success: false,
       message: 'An error occurred during login.',
       error: error.message,
+      detail: (error.parent || error.original)?.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }

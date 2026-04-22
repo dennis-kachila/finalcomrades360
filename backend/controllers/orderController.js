@@ -10,6 +10,7 @@ const {
 } = require('../utils/messageService');
 const { 
   notifyCustomerReadyForPickupStation,
+  notifyCustomerOutForDelivery,
   notifyCustomerSellerConfirmed,
   notifyCustomerOrderCancelled,
   notifyCustomerOrderPlaced,
@@ -3091,6 +3092,92 @@ const bulkMarkReadyAtPickupStation = async (req, res) => {
   }
 };
 
+const bulkWarehouseReceived = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { orderIds, warehouseId, notes } = req.body;
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      if (t) await t.rollback();
+      return res.status(400).json({ error: 'orderIds (array) is required' });
+    }
+
+    const results = [];
+    const status = 'at_warehouse';
+
+    for (const orderId of orderIds) {
+      const order = await Order.findByPk(orderId, { transaction: t });
+      if (!order) {
+        results.push({ orderId, status: 'skipped', reason: 'Order not found' });
+        continue;
+      }
+
+      const routePolicy = await getOrderRoutePolicy(order.id, t);
+      if (routePolicy.isFastFoodOnlyOrder) {
+        results.push({ orderId: order.id, status: 'skipped', reason: `Fast-food orders only support ${FASTFOOD_DIRECT_DELIVERY_TYPE}` });
+        continue;
+      }
+
+      if (order.status === 'at_warehouse') {
+        results.push({ orderId: order.id, status: 'already_at_warehouse' });
+        continue;
+      }
+
+      const validInboundLeg = ['seller_to_warehouse', 'customer_to_warehouse', 'warehouse_to_seller'].includes(order.deliveryType || '');
+      if (order.status !== 'en_route_to_warehouse' || !validInboundLeg) {
+        results.push({ orderId: order.id, status: 'skipped', reason: `Invalid state ${order.status}` });
+        continue;
+      }
+
+      const targetWarehouseId = warehouseId || order.destinationWarehouseId || order.warehouseId;
+      await order.update({
+        status,
+        warehouseId: targetWarehouseId,
+        warehouseArrivalDate: new Date(),
+        deliveryType: null,
+        deliveryAgentId: null
+      }, { transaction: t });
+
+      await DeliveryTask.update(
+        {
+          status: 'completed',
+          completedAt: new Date(),
+          agentNotes: 'Auto-completed via bulk warehouse receipt.'
+        },
+        {
+          where: {
+            orderId: order.id,
+            status: { [Op.in]: ['assigned', 'accepted', 'arrived_at_pickup', 'in_progress'] }
+          },
+          transaction: t
+        }
+      );
+
+      let trackingUpdates = [];
+      try { trackingUpdates = order.trackingUpdates ? JSON.parse(order.trackingUpdates) : []; } catch (_) { }
+      trackingUpdates.push({
+        status,
+        message: notes || 'Bulk: Order received at warehouse',
+        timestamp: new Date().toISOString(),
+        updatedBy: req.user?.id
+      });
+      await order.update({ trackingUpdates: JSON.stringify(trackingUpdates) }, { transaction: t });
+
+      results.push({ orderId: order.id, status: 'updated' });
+    }
+
+    await t.commit();
+    return res.json({
+      success: true,
+      message: 'Bulk warehouse receipt processed',
+      results
+    });
+  } catch (error) {
+    if (t) await t.rollback();
+    console.error('Error in bulkWarehouseReceived:', error);
+    return res.status(500).json({ error: 'Failed to bulk mark orders as received at warehouse' });
+  }
+};
+
 const sellerConfirmOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -4437,6 +4524,7 @@ module.exports = {
   bulkUpdateOrderStatus,
   bulkAssignDeliveryAgent,
   bulkMarkReadyAtPickupStation,
+  bulkWarehouseReceived,
   sellerHandoverOrder,
   getOrderPayments,
   acquireOrderActionLock,

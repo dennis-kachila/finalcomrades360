@@ -3,13 +3,26 @@ if (!global.crypto) {
     global.crypto = require('crypto');
 }
 
-const { 
-    default: makeWASocket, 
-    useMultiFileAuthState, 
-    DisconnectReason,
-    fetchLatestBaileysVersion,
-    makeCacheableSignalKeyStore
-} = require('@whiskeysockets/baileys');
+let makeWASocket;
+let useMultiFileAuthState;
+let DisconnectReason;
+let fetchLatestBaileysVersion;
+let makeCacheableSignalKeyStore;
+let baileysAvailable = false;
+
+try {
+    const baileys = require('@whiskeysockets/baileys');
+    makeWASocket = baileys.default;
+    useMultiFileAuthState = baileys.useMultiFileAuthState;
+    DisconnectReason = baileys.DisconnectReason;
+    fetchLatestBaileysVersion = baileys.fetchLatestBaileysVersion;
+    makeCacheableSignalKeyStore = baileys.makeCacheableSignalKeyStore;
+    baileysAvailable = true;
+} catch (err) {
+    // In tests/Jest, ESM-only package loading can fail under CommonJS.
+    // Keep the service bootable and disable local WhatsApp transport gracefully.
+    console.warn(`[WhatsApp JS] Baileys unavailable: ${err.message}`);
+}
 const P = require('pino');
 const africastalking = require('africastalking');
 const { sendWhatsAppCloud } = require('./metaWhatsAppService');
@@ -39,6 +52,11 @@ const logWhatsApp = (msg) => {
 };
 
 const initWhatsApp = async () => {
+    if (!baileysAvailable) {
+        whatsappStatus = 'disabled';
+        return;
+    }
+
     if (isInitializing) {
         logWhatsApp('⚠️ SKIPPING: initWhatsApp already in progress.');
         return;
@@ -143,7 +161,7 @@ const initWhatsApp = async () => {
 };
 
 // Auto-start
-if (process.env.WHATSAPP_ENABLED !== 'false') {
+if (process.env.NODE_ENV !== 'test' && process.env.WHATSAPP_ENABLED !== 'false') {
     initWhatsApp();
 } else {
     whatsappStatus = 'disabled';
@@ -241,6 +259,10 @@ const sendMessage = async (to, message, method = 'whatsapp') => {
 };
 
 const sendWhatsAppLocal = async (to, message) => {
+    if (!baileysAvailable) {
+        throw new Error('Local WhatsApp transport is unavailable on this runtime.');
+    }
+
     if (!isWhatsAppReady || !sock) {
         throw new Error('WhatsApp service is not ready. Please scan the QR code first.');
     }

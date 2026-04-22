@@ -367,6 +367,8 @@ export default function EnhancedCategories() {
     
     try {
       console.log('🚀 Sending delete request...');
+      console.log('API endpoint:', `/admin/categories/${categoryId}/subcategories/${subcategoryId}`);
+      
       const response = await api.delete(`/admin/categories/${categoryId}/subcategories/${subcategoryId}`);
       console.log('✅ Delete response:', response);
       

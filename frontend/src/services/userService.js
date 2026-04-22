@@ -145,7 +145,19 @@ const userService = {
   // Submit support ticket
   submitSupportTicket: async (ticketData) => {
     try {
-      const response = await api.post('/support/tickets', ticketData);
+      const { subject, category, priority, message, name, email } = ticketData || {};
+      const decoratedSubject = [
+        category ? `[${String(category).toUpperCase()}]` : null,
+        priority ? `[${String(priority).toUpperCase()}]` : null,
+        subject || 'Support Ticket'
+      ].filter(Boolean).join(' ');
+
+      const response = await api.post('/contact', {
+        name,
+        email,
+        subject: decoratedSubject,
+        message
+      });
       return response.data;
     } catch (error) {
       console.error('Error submitting support ticket:', error);

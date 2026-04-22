@@ -28,7 +28,7 @@ export default function CommissionManagement() {
     resetAlerts();
     setLoading(true);
     try {
-      await api.post('/admin/commissions/pay-bulk', { commissionIds });
+      await api.post('/admin/commissions/pay-bulk', { ids: commissionIds });
       setSuccess('Commissions paid successfully');
       loadCommissions();
     } catch (e) {
@@ -43,7 +43,7 @@ export default function CommissionManagement() {
     resetAlerts();
     setLoading(true);
     try {
-      await api.post('/admin/commissions/cancel-bulk', { commissionIds });
+      await api.post('/admin/commissions/cancel-bulk', { ids: commissionIds });
       setSuccess('Commissions cancelled');
       loadCommissions();
     } catch (e) {

@@ -76,12 +76,8 @@ export default function AdminMarketing(){
   }
 
   const loadAudit = async () => {
-    try {
-      const r = await api.get('/admin/audit')
-      setAudit(r.data || [])
-    } catch (e) {
-      setError(e.response?.data?.message || 'Failed to load audit log')
-    }
+    setAudit([])
+    setError('')
   }
 
   useEffect(()=>{

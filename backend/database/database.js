@@ -5,21 +5,39 @@ const dotenv = require('dotenv');
 
 // Load environment variables with robust path detection
 const envPaths = [
-  path.resolve(__dirname, '.env'),
-  path.resolve(__dirname, '.env.production'),
-  path.resolve(__dirname, '..', '.env'),
-  path.resolve(__dirname, '..', '.env.production'),
   path.resolve(__dirname, '..', '..', '.env'),
-  path.resolve(__dirname, '..', '..', '.env.production')
+  path.resolve(__dirname, '..', '.env'),
+  path.resolve(__dirname, '.env')
 ];
 
+// Load primary .env
 envPaths.forEach(envPath => {
   if (fs.existsSync(envPath)) {
+    // Use override: true to ensure local .env wins over OS environment variables
     dotenv.config({ path: envPath, override: true });
   }
 });
 
+// Now determine environment after loading .env
 const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+
+// Force process.env.NODE_ENV to be consistent with our detection
+process.env.NODE_ENV = env;
+
+// ONLY load .env.production if we are explicitly in production mode
+if (env === 'production') {
+  const prodEnvPaths = [
+    path.resolve(__dirname, '..', '..', '.env.production'),
+    path.resolve(__dirname, '..', '.env.production'),
+    path.resolve(__dirname, '.env.production')
+  ];
+  prodEnvPaths.forEach(envPath => {
+    if (fs.existsSync(envPath)) {
+      dotenv.config({ path: envPath, override: true });
+    }
+  });
+}
+
 console.log(`[Database] Final Operating Mode: ${env}`);
 
 // Database configuration

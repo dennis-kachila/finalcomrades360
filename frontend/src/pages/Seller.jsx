@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { FaBars, FaTimes, FaChevronDown } from 'react-icons/fa'
 import { useAuth } from '../contexts/AuthContext'
+import BottomNavbar from '../components/layout/BottomNavbar'
 
 export default function Seller() {
   const navigate = useNavigate()
@@ -9,6 +10,13 @@ export default function Seller() {
   const { user } = useAuth()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [marketingOpen, setMarketingOpen] = useState(false)
+  
+  const sellerBottomNavItems = [
+    { icon: '🏠', label: 'Home', path: '/seller', end: true },
+    { icon: '📦', label: 'Products', path: '/seller/products' },
+    { icon: '➕', label: 'Add', path: '/seller/products/add' },
+    { icon: '🛒', label: 'Orders', path: '/seller/orders' },
+  ];
   
   const logout = () => { localStorage.removeItem('token'); window.location.href = '/login' }
 
@@ -47,7 +55,7 @@ export default function Seller() {
       />
 
       {/* Sidebar - Desktop / Drawer - Mobile */}
-      <div className={`fixed lg:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm z-50 transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed top-14 lg:top-16 inset-x-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm z-50 transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} bottom-0`}>
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-extrabold text-blue-900 tracking-tight">Seller Console</h2>
@@ -129,28 +137,22 @@ export default function Seller() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between p-3 border-b border-gray-100 bg-white sticky top-0 z-30 shadow-sm">
+        <header className="lg:hidden flex items-center justify-between p-3 border-b border-gray-100 bg-white sticky top-14 z-30 shadow-sm">
           <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-3 -ml-3 hover:bg-gray-100 rounded-full text-blue-600 transition-colors"
-            >
-              <FaBars size={24} />
-            </button>
+
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/seller')}>
               <div className="h-2 w-2 rounded-full bg-blue-600 animate-pulse"></div>
               <h2 className="text-sm font-black text-gray-800 tracking-tight uppercase">Seller Panel</h2>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-          </div>
+
         </header>
 
         {/* Dynamic Content */}
-        <main className="flex-1 lg:h-full lg:overflow-y-auto bg-gray-50 relative custom-scrollbar">
-          <div className="w-full p-0 lg:p-4 min-h-full pb-20 lg:pb-0">
+        <main className="flex-1 lg:h-full lg:overflow-y-auto bg-gray-50 relative custom-scrollbar pb-20 lg:pb-0">
+          <div className="w-full p-0 lg:p-4 min-h-full">
             <div className="bg-white lg:rounded-2xl lg:shadow-sm lg:border lg:border-gray-100 min-h-full p-0 lg:p-4">
               <Outlet />
             </div>
@@ -158,6 +160,11 @@ export default function Seller() {
         </main>
       </div>
 
+      {/* Mobile Bottom Navigation */}
+      <BottomNavbar 
+        items={sellerBottomNavItems} 
+        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+      />
       <style dangerouslySetInnerHTML={{
         __html: `
         .no-scrollbar::-webkit-scrollbar { display: none; }

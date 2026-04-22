@@ -1,4 +1,6 @@
 console.error('🚀 SERVER STARTING - VERSION: ' + Date.now());
+console.log('--- RELOAD VERIFIED V5 ---'); // CRITICAL: loads User as-alias fix
+
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
@@ -10,18 +12,37 @@ const fs = require('fs');
 
 // Load environment variables with robust path detection
 const envPaths = [
-  path.resolve(__dirname, '.env'),
-  path.resolve(__dirname, '.env.production'),
   path.resolve(__dirname, '..', '.env'),
-  path.resolve(__dirname, '..', '.env.production')
+  path.resolve(__dirname, '.env')
 ];
 
 envPaths.forEach(envPath => {
   if (fs.existsSync(envPath)) {
     console.error(`[Init] Loading env from: ${envPath}`);
+    // Use override: true to ensure local .env wins over OS environment variables
     dotenv.config({ path: envPath, override: true });
   }
 });
+
+// Determine environment AFTER loading .env
+const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+
+// Force process.env.NODE_ENV to be consistent with our detection
+process.env.NODE_ENV = env;
+
+// ONLY load .env.production if we are explicitly in production mode
+if (env === 'production') {
+  const prodEnvPaths = [
+    path.resolve(__dirname, '..', '.env.production'),
+    path.resolve(__dirname, '.env.production')
+  ];
+  prodEnvPaths.forEach(envPath => {
+    if (fs.existsSync(envPath)) {
+      console.error(`[Init] Loading production env from: ${envPath}`);
+      dotenv.config({ path: envPath, override: true });
+    }
+  });
+}
 
 // Redirect console logs to file for production debugging
 const logFile = path.join(__dirname, 'error.log');
@@ -244,6 +265,8 @@ function initializeRoutes(app) {
   app.use('/api/profile', require('./routes/profileRoutes'));
   app.use('/api/contact', require('./routes/contactRoutes'));
   app.use('/api/product-inquiries', require('./routes/productInquiryRoutes'));
+  console.log('--- MOUNTING SUPPORT ROUTES ---');
+  app.use('/api/support', require('./routes/supportRoutes'));
   
   // SUPPORT BOTH HYPHENATED AND NON-HYPHENATED FASTFOOD PATHS
   const fastFoodRoutes = require('./routes/fastFoodRoutes');

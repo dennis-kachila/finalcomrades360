@@ -29,6 +29,7 @@ const Service = require('./Service')(sequelize, Sequelize.DataTypes);
 const ServiceImage = require('./ServiceImage')(sequelize, Sequelize.DataTypes);
 const ProductDeletionRequest = require('./ProductDeletionRequest')(sequelize, Sequelize.DataTypes);
 const DeletedProduct = require('./DeletedProduct')(sequelize, Sequelize.DataTypes);
+const DeletedFastFood = require('./DeletedFastFood')(sequelize, Sequelize.DataTypes);
 const ProductInquiry = require('./ProductInquiry')(sequelize, Sequelize.DataTypes);
 const ProductInquiryReply = require('./ProductInquiryReply')(sequelize, Sequelize.DataTypes);
 const ProductView = require('./ProductView')(sequelize, Sequelize.DataTypes);
@@ -59,6 +60,7 @@ const HandoverCode = require('./HandoverCode')(sequelize, Sequelize.DataTypes);
 const Otp = require('./Otp')(sequelize, Sequelize.DataTypes);
 const ContactMessage = require('./ContactMessage')(sequelize, Sequelize.DataTypes);
 const ContactReply = require('./ContactReply')(sequelize, Sequelize.DataTypes);
+const SupportMessage = require('./SupportMessage')(sequelize, Sequelize.DataTypes);
 
 const models = {
   User,
@@ -67,6 +69,7 @@ const models = {
   Subcategory,
   ProductDeletionRequest,
   DeletedProduct,
+  DeletedFastFood,
   ProductInquiry,
   RoleApplication,
   Order,
@@ -118,7 +121,8 @@ const models = {
   Otp,
   ContactMessage,
   ContactReply,
-  ProductInquiryReply
+  ProductInquiryReply,
+  SupportMessage
 };
 
 // Set up associations
@@ -136,6 +140,7 @@ module.exports = {
   Subcategory,
   ProductDeletionRequest,
   DeletedProduct,
+  DeletedFastFood,
   ProductInquiry,
   ProductInquiryReply,
   RoleApplication,
@@ -188,6 +193,7 @@ module.exports = {
   Otp,
   ContactMessage,
   ContactReply,
+  SupportMessage,
   sequelize,
   Sequelize,
   Op: Sequelize.Op

@@ -1,4 +1,4 @@
-const { FastFood, User, Category, Subcategory, Cart, sequelize } = require('../models');
+const { FastFood, User, Category, Subcategory, Cart, DeletedFastFood, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const fs = require('fs');
 const path = require('path');
@@ -951,13 +951,57 @@ exports.deleteFastFood = async (req, res) => {
             return res.status(403).json({ success: false, message: 'Not authorized to delete this item' });
         }
 
-        // Log reason for audit/notification purposes
-        if (reason) {
-            // TODO: Send notification to vendor with reason
+        // Move fast food to recycle bin instead of hard delete
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+        console.log('📦 Moving fast food to recycle bin:', fastFood.id);
+
+        try {
+            await DeletedFastFood.create({
+                originalId: fastFood.id,
+                vendor: fastFood.vendor,
+                name: fastFood.name,
+                category: fastFood.category,
+                categoryId: fastFood.categoryId,
+                subcategoryId: fastFood.subcategoryId,
+                shortDescription: fastFood.shortDescription,
+                description: fastFood.description,
+                mainImage: fastFood.mainImage,
+                galleryImages: fastFood.galleryImages,
+                basePrice: fastFood.basePrice,
+                displayPrice: fastFood.displayPrice,
+                discountPrice: fastFood.discountPrice,
+                discountPercentage: fastFood.discountPercentage,
+                vendorLocation: fastFood.vendorLocation,
+                vendorLat: fastFood.vendorLat,
+                vendorLng: fastFood.vendorLng,
+                preparationTimeMinutes: fastFood.preparationTimeMinutes,
+                deliveryTimeEstimateMinutes: fastFood.deliveryTimeEstimateMinutes,
+                sizeVariants: fastFood.sizeVariants,
+                comboOptions: fastFood.comboOptions,
+                ingredients: fastFood.ingredients,
+                tags: fastFood.tags,
+                dietaryTags: fastFood.dietaryTags,
+                deliveryCoverageZones: fastFood.deliveryCoverageZones,
+                marketingEnabled: fastFood.marketingEnabled,
+                status: fastFood.status,
+                reviewStatus: fastFood.reviewStatus,
+                approved: fastFood.approved,
+                deletionReason: reason || 'Deleted by user/admin',
+                deletedAt: new Date(),
+                autoDeleteAt: thirtyDaysFromNow
+            });
+
+            console.log('✅ Fast food moved to recycle bin successfully');
+        } catch (recycleError) {
+            console.error('❌ Error moving fast food to recycle bin:', recycleError);
+            throw recycleError;
         }
 
+        // Now delete the original fast food
         await fastFood.destroy();
-        res.status(200).json({ success: true, message: 'Fast food item deleted' });
+        res.status(200).json({ success: true, message: 'Fast food item moved to recycle bin' });
     } catch (error) {
         console.error('Delete error:', error);
         res.status(500).json({ success: false, message: error.message });
@@ -1020,5 +1064,195 @@ exports.getVendorFastFoods = async (req, res) => {
     } catch (error) {
         console.error('getVendorFastFoods Error:', error);
         res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// --- RECYCLE BIN MANAGEMENT ---
+
+// Get deleted fast food items
+exports.getDeletedFastFoods = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const userRole = String(req.user?.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const isPrivileged = userRole === 'superadmin' || userRole === 'admin';
+
+        console.log(`[getDeletedFastFoods] Fetching for user: ${userId}, Admin: ${isPrivileged}`);
+
+        const where = isPrivileged ? {} : { vendor: userId };
+        const deletedItems = await DeletedFastFood.findAll({
+            where,
+            include: [{
+                model: User,
+                as: 'vendorDetail',
+                attributes: ['id', 'name', 'email', 'businessName'],
+                required: false
+            }],
+            order: [['deletedAt', 'DESC']]
+        });
+
+        res.status(200).json({ success: true, data: deletedItems });
+    } catch (error) {
+        console.error('Error fetching deleted fast foods:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while fetching recycle bin',
+            error: error.message
+        });
+    }
+};
+
+// Restore fast food item
+exports.restoreFastFood = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const { password } = req.body;
+
+        if (!password) {
+            return res.status(400).json({ success: false, message: 'Password is required for restoration' });
+        }
+
+        // Verify password
+        const user = await User.findByPk(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        const bcrypt = require('bcryptjs');
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ success: false, message: 'Invalid password' });
+        }
+
+        // Find the deleted item
+        const deletedItem = await DeletedFastFood.findByPk(id);
+        if (!deletedItem) {
+            return res.status(404).json({ success: false, message: 'Deleted item not found' });
+        }
+
+        const userRole = String(req.user?.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const isPrivileged = userRole === 'superadmin' || userRole === 'admin';
+
+        if (!isPrivileged && deletedItem.vendor !== userId) {
+            return res.status(403).json({ success: false, message: 'You can only restore your own items' });
+        }
+
+        // Check if an item with the same name already exists for this vendor
+        const existingItem = await FastFood.findOne({
+            where: {
+                vendor: deletedItem.vendor,
+                name: deletedItem.name
+            }
+        });
+
+        if (existingItem) {
+            return res.status(409).json({
+                success: false,
+                message: 'An active item with this name already exists. Please rename or delete the existing item first.'
+            });
+        }
+
+        // Restore the item
+        const restoredItem = await FastFood.create({
+            name: deletedItem.name,
+            category: deletedItem.category,
+            categoryId: deletedItem.categoryId,
+            subcategoryId: deletedItem.subcategoryId,
+            shortDescription: deletedItem.shortDescription,
+            description: deletedItem.description,
+            mainImage: deletedItem.mainImage,
+            galleryImages: deletedItem.galleryImages,
+            basePrice: deletedItem.basePrice,
+            displayPrice: deletedItem.displayPrice,
+            discountPrice: deletedItem.discountPrice,
+            discountPercentage: deletedItem.discountPercentage,
+            vendorLocation: deletedItem.vendorLocation,
+            vendorLat: deletedItem.vendorLat,
+            vendorLng: deletedItem.vendorLng,
+            preparationTimeMinutes: deletedItem.preparationTimeMinutes || 15,
+            deliveryTimeEstimateMinutes: deletedItem.deliveryTimeEstimateMinutes || 30,
+            sizeVariants: deletedItem.sizeVariants,
+            comboOptions: deletedItem.comboOptions,
+            ingredients: deletedItem.ingredients,
+            tags: deletedItem.tags,
+            dietaryTags: deletedItem.dietaryTags,
+            deliveryCoverageZones: deletedItem.deliveryCoverageZones,
+            marketingEnabled: deletedItem.marketingEnabled,
+            vendor: deletedItem.vendor,
+            addedBy: userId,
+            approved: false, // Reset approval status
+            reviewStatus: 'pending', // Reset to pending
+            isActive: false, // Keep inactive until reviewed
+            isAvailable: false
+        });
+
+        // Remove from recycle bin
+        await deletedItem.destroy();
+
+        res.status(200).json({
+            success: true,
+            message: 'Fast food item restored successfully. It is now pending review.',
+            data: restoredItem
+        });
+    } catch (error) {
+        console.error('Error restoring fast food:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while restoring item',
+            error: error.message
+        });
+    }
+};
+
+// Permanently delete fast food item
+exports.permanentlyDeleteFastFood = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const { password } = req.body;
+
+        if (!password) {
+            return res.status(400).json({ success: false, message: 'Password is required for permanent deletion' });
+        }
+
+        // Verify password
+        const user = await User.findByPk(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        const bcrypt = require('bcryptjs');
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ success: false, message: 'Invalid password' });
+        }
+
+        // Find the deleted item
+        const deletedItem = await DeletedFastFood.findByPk(id);
+        if (!deletedItem) {
+            return res.status(404).json({ success: false, message: 'Deleted item not found' });
+        }
+
+        const userRole = String(req.user?.role || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const isPrivileged = userRole === 'superadmin' || userRole === 'admin';
+
+        if (!isPrivileged && deletedItem.vendor !== userId) {
+            return res.status(403).json({ success: false, message: 'You can only permanently delete your own items' });
+        }
+
+        // Permanently delete from recycle bin
+        await deletedItem.destroy();
+
+        res.status(200).json({
+            success: true,
+            message: 'Fast food item permanently deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error permanently deleting fast food:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while permanently deleting item',
+            error: error.message
+        });
     }
 };

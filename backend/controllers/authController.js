@@ -246,18 +246,30 @@ const login = async (req, res) => {
 
     // Find user by email or phone
     const lookupKey = isEmail ? loginIdentifier.trim().toLowerCase() : loginIdentifier.trim();
-    console.log(`[authController] Step 1: Querying User by ${isEmail ? 'email' : 'phone'}: ${lookupKey}`);
+    console.log(`[authController-v2] Step 1: Querying User by ${isEmail ? 'email' : 'phone'}: ${lookupKey}`);
     
+    console.log(`[authController] Step 2: Executing findOne with paranoid: false...`);
     const user = await User.findOne({
       where: isEmail ? { email: lookupKey } : { phone: lookupKey },
-      attributes: { exclude: ['emailVerificationToken', 'emailChangeToken', 'phoneOtp'] }
+      attributes: { exclude: ['emailVerificationToken', 'emailChangeToken', 'phoneOtp'] },
+      paranoid: false // Allow finding soft-deleted users
     });
     
     if (!user) {
-      console.log(`[authController] ❌ User Not Found: ${lookupKey}`);
+      console.log(`[authController] ❌ User Not Found even with paranoid:false: ${lookupKey}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid email/phone or password.'
+      });
+    }
+    console.log(`[authController] ✅ User Found: ${user.email} (ID: ${user.id}), deletedAt: ${user.deletedAt}`);
+
+    // Check if account is archived (soft-deleted)
+    if (user.deletedAt) {
+      console.log(`[authController] 🚫 Account ARCHIVED detected for: ${user.email}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is currently blocked/archived. Please contact the administrator at support@comrades360.com or 0757588395 to regain access.'
       });
     }
     console.log(`[authController] ✅ User Found: ${user.email} (ID: ${user.id})`);

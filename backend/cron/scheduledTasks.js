@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { Product, Notification, User, DeletedProduct, Order, OrderItem, HandoverCode, DeliveryTask, Payment, DeliveryCharge, PlatformConfig, sequelize } = require('../models');
+const { Product, Notification, User, DeletedProduct, DeletedFastFood, Order, OrderItem, HandoverCode, DeliveryTask, Payment, DeliveryCharge, PlatformConfig, SupportMessage, sequelize } = require('../models');
 const { revertPending } = require('../utils/walletHelpers');
 const { Op } = require('sequelize');
 
@@ -92,14 +92,27 @@ const initScheduledTasks = () => {
         console.log('🧹 Running daily recycle bin cleanup...');
         try {
             const now = new Date();
-            const deletedCount = await DeletedProduct.destroy({
+            // 1. Products
+            const deletedProductsCount = await DeletedProduct.destroy({
                 where: {
                     autoDeleteAt: {
                         [Op.lte]: now
                     }
                 }
             });
-            console.log(`✅ Permanently deleted ${deletedCount} expired products from recycle bin.`);
+
+            // 2. Fast Food
+            const deletedFastFoodsCount = await DeletedFastFood.destroy({
+                where: {
+                    autoDeleteAt: {
+                        [Op.lte]: now
+                    }
+                }
+            });
+
+            if (deletedProductsCount > 0 || deletedFastFoodsCount > 0) {
+                console.log(`✅ Permanently deleted ${deletedProductsCount} products and ${deletedFastFoodsCount} fast food items from recycle bin.`);
+            }
         } catch (error) {
             console.error('❌ Error in recycle bin cleanup:', error);
         }
@@ -153,6 +166,29 @@ const initScheduledTasks = () => {
             console.log('✅ Daily backup completed successfully');
         } catch (error) {
             console.error('❌ Error in daily backup:', error);
+        }
+    });
+
+    // Run every day at 5:00 AM - Support Message History Cleanup (1 Month Retention)
+    cron.schedule('0 5 * * *', async () => {
+        console.log('💬 Running daily support message cleanup...');
+        try {
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+            const deletedCount = await SupportMessage.destroy({
+                where: {
+                    createdAt: {
+                        [Op.lte]: oneMonthAgo
+                    }
+                }
+            });
+
+            if (deletedCount > 0) {
+                console.log(`✅ Cleaned up ${deletedCount} support messages older than 1 month.`);
+            }
+        } catch (error) {
+            console.error('❌ Error in support message cleanup:', error);
         }
     });
 

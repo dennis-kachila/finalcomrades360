@@ -1,11 +1,12 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import BottomNavbar from '../../components/layout/BottomNavbar';
 import {
   FaTrophy, FaMoneyBillWave, FaWallet, FaShoppingCart,
   FaCog, FaUserPlus, FaCrown, FaMousePointer, FaChartLine,
   FaCheckCircle, FaExclamationTriangle, FaTimes, FaHistory, FaArrowRight, FaQrcode,
   FaUser, FaBox, FaClock, FaMapMarkerAlt, FaUsers, FaPhone, FaEnvelope, FaGlobe, FaLock, FaShareAlt,
-  FaWhatsapp, FaFacebook, FaTwitter, FaCopy, FaDownload, FaBars, FaCheck, FaShieldAlt
+  FaWhatsapp, FaFacebook, FaTwitter, FaCopy, FaDownload, FaBars, FaCheck, FaShieldAlt, FaHome
 } from 'react-icons/fa';
 import { FaTiktok } from 'react-icons/fa6';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,6 +31,13 @@ const MarketerDashboard = () => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const { toast } = useToast();
+
+  const marketerBottomNavItems = [
+    { icon: <FaHome />, label: 'Home', path: '/marketing?tab=overview', onClick: () => setActiveTab('overview'), end: true },
+    { icon: <FaUsers />, label: 'Customers', path: '/marketing?tab=my-customers', onClick: () => setActiveTab('my-customers') },
+    { icon: <FaShoppingCart />, label: 'Shop', path: '/marketing?tab=new-order', onClick: () => setActiveTab('new-order') },
+    { icon: <FaWallet />, label: 'Wallet', path: '/marketing?tab=wallet', onClick: () => setActiveTab('wallet') },
+  ];
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
@@ -1885,7 +1893,7 @@ const MarketerDashboard = () => {
 
 
       {/* Sidebar - Desktop / Drawer - Mobile */}
-      <div className={`fixed lg:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm z-[110] transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed top-14 lg:top-16 inset-x-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm z-50 transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} bottom-0`}>
 
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <div>
@@ -1952,29 +1960,23 @@ const MarketerDashboard = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between p-3 border-b border-gray-100 bg-white sticky top-0 z-30 shadow-sm">
+        <header className="lg:hidden flex items-center justify-between p-3 border-b border-gray-100 bg-white sticky top-14 z-30 shadow-sm">
           <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-3 -ml-3 hover:bg-gray-100 rounded-full text-indigo-600 transition-colors"
-            >
-              <FaBars size={24} />
-            </button>
+
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/marketing')}>
               <div className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse"></div>
               <h2 className="text-sm font-black text-gray-800 tracking-tight uppercase">Marketer Panel</h2>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-          </div>
+
         </header>
 
 
         {/* Dynamic Content */}
         <main className="flex-1 lg:h-full lg:overflow-y-auto bg-gray-50 relative custom-scrollbar">
-          <div className="max-w-7xl mx-auto w-full p-1 sm:p-4 min-h-full pb-[64px] lg:pb-0">
+          <div className="max-w-7xl mx-auto w-full p-1 sm:p-4 min-h-full pb-20 lg:pb-0">
             {/* Page Header — desktop only */}
             <div className="hidden lg:flex flex-row items-center justify-between gap-4 mb-4 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
               <div>
@@ -2089,6 +2091,12 @@ const MarketerDashboard = () => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
       `}} />
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNavbar 
+        items={marketerBottomNavItems} 
+        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+      />
     </div>
   );
 };

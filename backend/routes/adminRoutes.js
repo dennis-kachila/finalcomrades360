@@ -39,6 +39,7 @@ const {
   getProductAnalytics,
   getTopPerformingProducts,
   getProductPerformanceMetrics,
+  getOrderAnalytics,
   bulkUpdateProducts,
   bulkUpdateCategories,
   bulkUpdatePrices,
@@ -55,6 +56,7 @@ const {
   createUser,
   updateUser,
   deleteUser,
+  restoreUser,
   getSearchAnalytics,
   getRevenueAnalytics,
   verifyAdminPassword,
@@ -92,6 +94,7 @@ router.get('/users', adminOnly, getAllUsers);
 router.post('/users', adminOnly, createUser);
 router.patch('/users/:userId', adminOnly, updateUser);
 router.delete('/users/:userId', adminOnly, deleteUser);
+router.post('/users/:userId/restore', adminOnly, restoreUser);
 router.get('/users/deletion-requests', adminOnly, listDeletionRequests);
 router.post('/users/:userId/deletion-approve', adminOnly, approveDeletionRequest);
 router.post('/users/:userId/deletion-deny', adminOnly, denyDeletionRequest);
@@ -165,6 +168,7 @@ router.post('/inventory/bulk-update-stock', adminOrLogistics, bulkUpdateStock);
 // Product analytics
 router.get('/analytics/products', adminOnly, getProductAnalytics);
 router.get('/analytics/top-products', adminOnly, getTopPerformingProducts);
+router.get('/orders/analytics', adminOnly, getOrderAnalytics);
 router.get('/products/:productId/performance', adminOnly, getProductPerformanceMetrics);
 
 // Bulk operations

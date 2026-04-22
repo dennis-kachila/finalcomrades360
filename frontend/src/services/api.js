@@ -464,6 +464,11 @@ export const productApi = {
   // Suspend product
   suspend: (id, suspensionData) => productsClient.put(`/${id}/suspend`, suspensionData),
 
+  // Recycle Bin / Deletion Management
+  getDeleted: (params) => api.get('/products/deleted', { params }),
+  restore: (id, data) => api.post(`/products/${id}/restore`, data),
+  permanentlyDelete: (id, data) => api.delete(`/products/${id}/permanent`, { data }),
+
   // Social Media Account Management
   getSocialMediaAccounts: () => api.get('/social-media-accounts'),
   addSocialMediaAccount: (data) => api.post('/social-media-accounts', data),
@@ -570,13 +575,25 @@ export const adminApi = {
 
   // Legacy APIs (keep for backward compatibility)
   deleteUser: (userId) => adminClient.delete(`/users/${userId}`),
+  restoreUser: (userId) => adminClient.post(`/users/${userId}/restore`),
   approvePendingEmail: (userId) => adminClient.post(`/users/${userId}/approve-email`),
   rejectPendingEmail: (userId) => adminClient.post(`/users/${userId}/reject-email`),
   approvePendingPhone: (userId) => adminClient.post(`/users/${userId}/approve-phone`),
   rejectPendingPhone: (userId) => adminClient.post(`/users/${userId}/reject-phone`),
   getRevenueAnalytics: () => adminClient.get('/analytics/revenue'),
   getPlatformWalletDetails: () => adminClient.get('/finance/platform-wallet'),
-  withdrawPlatformFunds: (data) => adminClient.post('/finance/platform-wallet/withdraw', data)
+  withdrawPlatformFunds: (data) => adminClient.post('/finance/platform-wallet/withdraw', data),
+  
+  // Orders & Products
+  getAllOrders: (params = {}) => api.get('/orders', { params }),
+  getAllProducts: (params = {}) => api.get('/products/admin/all', { params })
 };
 
 export default api;
+export const supportApi = {
+  sendMessage: (data) => api.post('/support/send', data),
+  getHistory: (otherUserId) => api.get(`/support/history?otherUserId=${otherUserId}`),
+  getSummary: () => api.get('/support/summary'),
+  markAsRead: (messageId) => api.patch(`/support/${messageId}/read`),
+  sendBulkMessages: (data) => api.post('/support/bulk', data)
+};

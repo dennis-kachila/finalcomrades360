@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { adminApi } from '../services/api';
+import { adminApi, supportApi } from '../services/api';
 import { validateKenyanPhone, PHONE_VALIDATION_ERROR, formatKenyanPhoneInput } from '../utils/validation';
 import {
   FaUsers,
@@ -30,13 +30,211 @@ import {
   FaFileCsv,
   FaFileExcel,
   FaArrowLeft,
-  FaSave
+  FaSave,
+  FaTrash,
+  FaTrashRestore
 } from 'react-icons/fa';
+
+// Support Messaging Modal Component
+const SupportModal = ({ isOpen, onClose, user }) => {
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      loadHistory();
+      const interval = setInterval(loadHistory, 10000); // Poll every 10s
+      return () => clearInterval(interval);
+    }
+  }, [isOpen, user]);
+
+  const loadHistory = async () => {
+    try {
+      setLoading(true);
+      const response = await supportApi.getHistory(user.id);
+      setMessages(response.data.data);
+    } catch (err) {
+      console.error('Error loading chat history:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+
+    try {
+      setSending(true);
+      await supportApi.sendMessage({
+        receiverId: user.id,
+        message: newMessage,
+        type: 'admin_to_user',
+        subject: 'Support Message'
+      });
+      setNewMessage('');
+      loadHistory(); // Refresh chat
+    } catch (err) {
+      console.error('Error sending message:', err);
+      alert('Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl flex flex-col h-[600px]">
+        <div className="p-4 border-b flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
+          <h3 className="text-lg font-bold flex items-center">
+            <FaComments className="mr-2" /> Chat with {user?.name}
+          </h3>
+          <button onClick={onClose} className="text-white hover:text-gray-200">
+            <FaTimes className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="text-center text-gray-500 py-10">
+              No messages yet. Start a conversation!
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.type === 'admin_to_user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] p-3 rounded-lg ${msg.type === 'admin_to_user'
+                      ? 'bg-blue-600 text-white rounded-br-none'
+                      : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'
+                    }`}
+                >
+                  <p className="text-sm">{msg.message}</p>
+                  <span className={`text-[10px] mt-1 block ${msg.type === 'admin_to_user' ? 'text-blue-100' : 'text-gray-400'}`}>
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <form onSubmit={handleSendMessage} className="p-4 border-t bg-white rounded-b-lg">
+          <div className="flex space-x-2">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type your message..."
+              className="flex-1 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              disabled={sending || !newMessage.trim()}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {sending ? '...' : 'Send'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Bulk Message Modal Component
+const BulkMessageModal = ({ isOpen, onClose, selectedUserIds, onSuccess }) => {
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!message.trim() || selectedUserIds.length === 0) return;
+
+    try {
+      setSending(true);
+      await supportApi.sendBulkMessages({
+        userIds: selectedUserIds,
+        message,
+        subject: 'Administrative Announcement'
+      });
+      setMessage('');
+      onSuccess();
+      onClose();
+    } catch (err) {
+      console.error('Error sending bulk messages:', err);
+      alert('Failed to send bulk messages');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+        <div className="p-4 border-b flex justify-between items-center bg-blue-600 text-white">
+          <h3 className="text-lg font-bold flex items-center">
+            <FaEnvelope className="mr-2" /> Bulk Message ({selectedUserIds.length} Users)
+          </h3>
+          <button onClick={onClose} className="text-white hover:text-gray-200">
+            <FaTimes className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Message Content</label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Enter your message to all selected users..."
+              className="w-full border rounded-xl px-4 py-3 h-40 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+              required
+              disabled={sending}
+            ></textarea>
+          </div>
+
+          <div className="flex space-x-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition"
+              disabled={sending}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={sending || !message.trim()}
+              className="flex-1 px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition shadow-lg shadow-blue-100"
+            >
+              {sending ? 'Sending...' : 'Send Bulk Message'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 // Tab Navigation Component
 const TabNavigation = ({ activeTab, onTabChange }) => {
   const tabs = [
     { id: 'list', label: 'User List', icon: FaUsers },
+    { id: 'archived', label: 'Archived Users', icon: FaUserTimes },
     { id: 'profile', label: 'User Profile', icon: FaUser },
     { id: 'verification', label: 'Verified Users', icon: FaShieldAlt },
     { id: 'security', label: 'Security', icon: FaLock },
@@ -1314,6 +1512,9 @@ const UserListTab = ({ forcedStatus, activeTab }) => {
   const [showViewUserDialog, setShowViewUserDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [userToFreeze, setUserToFreeze] = useState(null);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [selectedUserForMessage, setSelectedUserForMessage] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedUserIds, setSelectedUserIds] = useState([]);
 
@@ -1451,6 +1652,62 @@ const UserListTab = ({ forcedStatus, activeTab }) => {
     } catch (err) {
       console.error('Error updating user status:', err);
       setError(err.response?.data?.message || 'Failed to update user status');
+    }
+  };
+
+  const handleOpenSupportModal = (user) => {
+    setSelectedUserForMessage(user);
+    setShowSupportModal(true);
+  };
+
+  const handleDeleteUser = async (user) => {
+    const isSuperAdmin = user.role === 'super_admin' || user.roles?.includes('super_admin');
+    if (isSuperAdmin) {
+      alert('Super Admins cannot be deleted for safety. Please downgrade their role first if absolutely necessary.');
+      return;
+    }
+
+    if (!window.confirm(`⚠️ WARNING: Are you sure you want to ARCHIVE user "${user.name}"? \n\nThis will block their access and move them to the Archived tab. Past orders and records will be preserved.`)) {
+      return;
+    }
+
+    const password = window.prompt('For security, please enter your SUPER ADMIN password to confirm this deletion:');
+    if (!password) return;
+
+    try {
+      setLoading(true);
+      // Verify password first (using existing endpoint)
+      const verifyResponse = await adminApi.verifyAdminPassword(password);
+      if (!verifyResponse.data?.verified) {
+        setError('Invalid password. Deletion aborted.');
+        setLoading(false);
+        return;
+      }
+
+      await adminApi.deleteUser(user.id);
+      setSuccess('User archived successfully');
+      loadUsers();
+    } catch (err) {
+      console.error('Deletion failed:', err);
+      setError(err.response?.data?.message || 'Failed to delete user');
+      setLoading(false);
+    }
+  };
+
+  const handleRestoreUser = async (user) => {
+    if (!window.confirm(`Are you sure you want to RESTORE user "${user.name}"? \n\nThey will regain access to the system immediately.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await adminApi.restoreUser(user.id);
+      setSuccess('User restored successfully');
+      loadUsers();
+    } catch (err) {
+      console.error('Restoration failed:', err);
+      setError(err.response?.data?.message || 'Failed to restore user');
+      setLoading(false);
     }
   };
 
@@ -1639,6 +1896,14 @@ const UserListTab = ({ forcedStatus, activeTab }) => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setShowBulkModal(true)}
+                  className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-xs flex items-center gap-1"
+                >
+                  <FaComments className="w-3 h-3" />
+                  Message Selected
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSelectedUserIds([])}
                   className="px-3 py-1 rounded border border-yellow-300 text-yellow-800 bg-white text-xs hover:bg-yellow-100"
                 >
@@ -1766,12 +2031,39 @@ const UserListTab = ({ forcedStatus, activeTab }) => {
                             <FaEdit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleBanUser(user)}
-                            className={user.isFrozen ? "text-green-600 hover:text-green-900" : "text-red-600 hover:text-red-900"}
-                            title={user.isFrozen ? "Unfreeze User" : "Freeze User"}
+                            onClick={() => handleOpenSupportModal(user)}
+                            className="text-blue-500 hover:text-blue-700"
+                            title="Message User"
                           >
-                            <FaBan className="w-4 h-4" />
+                            <FaComments className="w-4 h-4" />
                           </button>
+                          
+                          {forcedStatus === 'deleted' ? (
+                            <button
+                              onClick={() => handleRestoreUser(user)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Restore User"
+                            >
+                              <FaTrashRestore className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleBanUser(user)}
+                                className={user.isFrozen ? "text-green-600 hover:text-green-900" : "text-red-600 hover:text-red-900"}
+                                title={user.isFrozen ? "Unfreeze User" : "Freeze User"}
+                              >
+                                <FaBan className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(user)}
+                                className="text-red-600 hover:text-red-900"
+                                title="Archive/Delete User"
+                              >
+                                <FaTrash className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1832,6 +2124,121 @@ const UserListTab = ({ forcedStatus, activeTab }) => {
         userToFreeze={userToFreeze}
         action={userToFreeze?.isFrozen ? 'unfreeze' : 'freeze'}
       />
+
+      <SupportModal
+        isOpen={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
+        user={selectedUserForMessage}
+      />
+
+      <BulkMessageModal
+        isOpen={showBulkModal}
+        onClose={() => setShowBulkModal(false)}
+        selectedUserIds={selectedUserIds}
+        onSuccess={() => {
+          setSuccess(`Message sent to ${selectedUserIds.length} users successfully!`);
+          setSelectedUserIds([]);
+        }}
+      />
+    </div>
+  );
+};
+
+// Communication Tab Component
+const CommunicationTab = () => {
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showChat, setShowChat] = useState(false);
+
+  useEffect(() => {
+    loadConversations();
+    const interval = setInterval(loadConversations, 20000); // Poll conversation list every 20s
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadConversations = async () => {
+    try {
+      setLoading(true);
+      const response = await supportApi.getSummary();
+      // Group by other user
+      const grouped = response.data.data.reduce((acc, msg) => {
+        const otherUser = msg.type === 'admin_to_user' ? msg.receiver : msg.sender;
+        if (!acc[otherUser.id]) {
+          acc[otherUser.id] = {
+            user: otherUser,
+            lastMessage: msg.message,
+            timestamp: msg.createdAt,
+            unreadCount: msg.type === 'user_to_admin' && !msg.isRead ? 1 : 0
+          };
+        } else {
+          if (msg.type === 'user_to_admin' && !msg.isRead) {
+            acc[otherUser.id].unreadCount++;
+          }
+        }
+        return acc;
+      }, {});
+      setConversations(Object.values(grouped));
+    } catch (err) {
+      console.error('Error loading conversations:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openChat = (user) => {
+    setSelectedUser(user);
+    setShowChat(true);
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow">
+      <div className="p-6 border-b">
+        <h3 className="text-lg font-bold text-gray-900">Active Conversations</h3>
+      </div>
+
+      <div className="divide-y">
+        {loading ? (
+          <div className="p-10 text-center">Loading...</div>
+        ) : conversations.length === 0 ? (
+          <div className="p-10 text-center text-gray-500">No active conversations found.</div>
+        ) : (
+          conversations.map((conv) => (
+            <div
+              key={conv.user.id}
+              onClick={() => openChat(conv.user)}
+              className="p-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between transition-colors"
+            >
+              <div className="flex items-center space-x-4">
+                <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                  {conv.user.name.charAt(0)}
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900">{conv.user.name}</h4>
+                  <p className="text-sm text-gray-500 truncate max-w-md">{conv.lastMessage}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-400">{new Date(conv.timestamp).toLocaleDateString()}</p>
+                {conv.unreadCount > 0 && (
+                  <span className="inline-block bg-red-500 text-white text-[10px] px-2 py-1 rounded-full mt-1">
+                    {conv.unreadCount} new
+                  </span>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <SupportModal
+        isOpen={showChat}
+        onClose={() => {
+          setShowChat(false);
+          loadConversations();
+        }}
+        user={selectedUser}
+      />
     </div>
   );
 };
@@ -1849,6 +2256,8 @@ export default function UserManagement() {
     switch (activeTab) {
       case 'list':
         return <UserListTab activeTab={activeTab} />;
+      case 'archived':
+        return <UserListTab forcedStatus="deleted" activeTab={activeTab} />;
       case 'profile':
         return (
           <div className="space-y-6">
@@ -1870,14 +2279,7 @@ export default function UserManagement() {
           </div>
         );
       case 'communication':
-        return (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">User Communication</h3>
-              <p className="text-gray-600">This feature is coming soon. You'll be able to communicate with users here.</p>
-            </div>
-          </div>
-        );
+        return <CommunicationTab />;
       case 'reports':
         return (
           <div className="space-y-6">

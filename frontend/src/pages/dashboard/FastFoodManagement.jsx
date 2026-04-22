@@ -400,6 +400,75 @@ const renderFastFoodTable = (items, {
   </div >
 );
 
+const renderDeletedFastFoodTable = (items, {
+  handleRestoreItem,
+  handlePermanentDeleteItem,
+  fetchFastFoods,
+  toast,
+  navigate
+}) => (
+  <div className="overflow-x-auto bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <table className="w-full text-left border-collapse">
+      <thead>
+        <tr className="bg-gray-50/50 border-b border-gray-100">
+          <th className="px-4 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Fast Food Item</th>
+          <th className="px-4 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Deleted At</th>
+          <th className="px-4 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Auto-Delete At</th>
+          <th className="px-4 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Reason</th>
+          <th className="px-4 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-50">
+        {items.map((item) => (
+          <tr key={item.id} className="hover:bg-gray-50/80 transition-all group">
+            <td className="px-4 py-4">
+              <div className="flex items-center">
+                <div className="h-12 w-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 mr-3 flex-shrink-0 shadow-sm">
+                  <img
+                    src={resolveImageUrl(item.mainImage)}
+                    alt={item.name}
+                    className="h-full w-full object-cover opacity-50 grayscale"
+                    onError={(e) => { e.target.src = '/fallback-food.png' }}
+                  />
+                </div>
+                <div>
+                  <div className="font-bold text-gray-700">{item.name}</div>
+                  <div className="text-[10px] text-gray-400 font-mono">Original ID: #{item.originalId}</div>
+                </div>
+              </div>
+            </td>
+            <td className="px-4 py-4 text-sm text-gray-500">
+              {new Date(item.deletedAt).toLocaleDateString()}
+            </td>
+            <td className="px-4 py-4 text-sm text-red-500 font-medium">
+              {new Date(item.autoDeleteAt).toLocaleDateString()}
+            </td>
+            <td className="px-4 py-4 text-sm text-gray-600 max-w-xs truncate">
+              {item.deletionReason || 'No reason provided'}
+            </td>
+            <td className="px-4 py-4 text-right">
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => handleRestoreItem(item)}
+                  className="px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 border border-green-200"
+                >
+                  <ArrowRight size={14} /> Restore
+                </button>
+                <button
+                  onClick={() => handlePermanentDeleteItem(item)}
+                  className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 border border-red-200"
+                >
+                  <Trash size={14} /> Purge
+                </button>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
 const renderFastFoodGrid = (items, {
   handleViewItem,
   handleEditItem,
@@ -831,14 +900,13 @@ const FastFoodManagement = () => {
       const isPrivileged = user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'super_admin';
 
       let response;
-      if (isPrivileged) {
+      if (activeTab === 'deleted') {
+        response = await fastFoodService.getDeletedFastFoods();
+      } else if (isPrivileged) {
         response = await fastFoodService.getAllFastFoods({ includeInactive: true });
       } else {
         // For sellers, fetch only their own items
         response = await fastFoodService.getVendorFastFoods('me');
-        // Normalize response structure if needed (getVendorFastFoods returns array directly or inside data key depending on backend)
-        // Controller returns array directly for getVendorFastFoods in some cases, but service returns response.data.
-        // Let's check service: return response.data.
       }
 
       // Handle response structure variations
@@ -935,9 +1003,38 @@ const FastFoodManagement = () => {
     }
   };
 
+  const handleRestoreItem = async (item) => {
+    if (!window.confirm(`Are you sure you want to RESTORE "${item.name}"? It will be returned to the active menu immediately.`)) return;
+    try {
+      setLoading(true);
+      await fastFoodService.restoreFastFood(item.id);
+      toast({ title: 'Restored', description: `"${item.name}" has been restored successfully.` });
+      fetchFastFoods();
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Restore Failed', description: err.message || 'Failed to restore item.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePermanentDeleteItem = async (item) => {
+    if (!window.confirm(`⚠️ PERMANENT DELETE: Are you sure you want to PURGE "${item.name}"? This action cannot be undone.`)) return;
+    try {
+      const password = await requirePassword(`Permanently Purge "${item.name}"`, false);
+      setLoading(true);
+      await fastFoodService.permanentlyDeleteFastFood(item.id);
+      toast({ title: 'Purged', description: `"${item.name}" has been permanently removed.` });
+      fetchFastFoods();
+    } catch (err) {
+      if (err?.message) toast({ variant: 'destructive', title: 'Purge Failed', description: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchFastFoods();
-  }, []);
+  }, [activeTab]);
 
   // Fetch reviews when tab is active
   useEffect(() => {
@@ -989,6 +1086,8 @@ const FastFoodManagement = () => {
       // 1. Base Search (Item Name / Desc)
       const matchesSearch = fastFood.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (fastFood.shortDescription && fastFood.shortDescription.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      if (activeTab === 'deleted') return matchesSearch;
 
       // 2. Tab Context
       let matchesTab = true;
@@ -1262,6 +1361,7 @@ const FastFoodManagement = () => {
                 { id: 'create', label: 'Create', icon: <Plus className="mr-1" size={14} /> },
                 { id: 'approve', label: isPrivileged ? 'Review' : 'Pending', icon: <CheckCircle className="mr-1" size={14} /> },
                 { id: 'approved', label: isPrivileged ? 'Approved' : 'My Approved', icon: <CheckCircle2 className="mr-1" size={14} /> },
+                { id: 'deleted', label: 'Recycle Bin', icon: <Trash className="mr-1" size={14} /> },
                 ...(user?.role === 'superadmin' || user?.role === 'super_admin' ? [{ id: 'mine', label: 'Mine', icon: <Utensils className="mr-1" size={14} /> }] : []),
                 { id: 'reviews', label: 'Reviews', icon: <Star className="mr-1" size={14} /> }
               ].map(tab => (
@@ -1808,7 +1908,15 @@ const FastFoodManagement = () => {
                 </div>
               ) : (
                 <div className="pb-10">
-                  {activeTab === 'all' ? (
+                  {activeTab === 'deleted' ? (
+                    renderDeletedFastFoodTable(filteredFastFoods, {
+                      handleRestoreItem,
+                      handlePermanentDeleteItem,
+                      fetchFastFoods,
+                      toast,
+                      navigate
+                    })
+                  ) : activeTab === 'all' ? (
                     <>
                       {/* Mobile: card grid */}
                       <div className="block md:hidden">

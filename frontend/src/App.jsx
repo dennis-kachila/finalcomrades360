@@ -137,6 +137,7 @@ const Customer = lazy(() => import('./pages/Customer'));
 const CustomerOverview = lazy(() => import('./pages/customer/CustomerOverview'));
 const CustomerOrders = lazy(() => import('./pages/customer/CustomerOrders'));
 const MyInquiries = lazy(() => import('./pages/customer/MyInquiries'));
+const SupportChat = lazy(() => import('./pages/customer/SupportChat'));
 const CancelOrder = lazy(() => import('./pages/CancelOrder'));
 const UpdateOrderAddress = lazy(() => import('./pages/UpdateOrderAddress'));
 const OrderTracking = lazy(() => import('./pages/OrderTracking'));
@@ -636,6 +637,7 @@ const AppContent = () => {
                 <Route path="/customer/*" element={<Customer />}>
                   <Route index element={<CustomerOverview />} />
                   <Route path="inquiries" element={<MyInquiries />} />
+                  <Route path="support" element={<SupportChat />} />
                   <Route path="orders" element={<CustomerOrders />} />
                   <Route path="orders/:orderId/track" element={<OrderTracking />} />
                   <Route path="orders/:orderId/cancel" element={<CancelOrder />} />

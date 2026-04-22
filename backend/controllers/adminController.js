@@ -14,6 +14,8 @@ const {
   DeliveryTask,
   ProductDeletionRequest,
   DeletedProduct,
+  ReturnRequest,
+  ProductView,
   sequelize
 } = require('../models');
 const { getIO } = require('../realtime/socket');
@@ -484,7 +486,7 @@ const getProductPerformanceMetrics = async (req, res) => {
         createdAt: { [Op.gte]: thirtyDaysAgo }
       },
       include: [{
-        model: require('../models/OrderItem'),
+        model: OrderItem,
         where: { productId },
         required: true
       }]
@@ -504,6 +506,284 @@ const getProductPerformanceMetrics = async (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ message: 'Error getting product performance metrics', error: e.message });
+  }
+};
+
+// Get comprehensive order analytics for Admin Console — 100% real data
+const getOrderAnalytics = async (req, res) => {
+  try {
+    const { range = '30d' } = req.query;
+
+    let days = 30;
+    if (range === '7d') days = 7;
+    if (range === '90d') days = 90;
+    if (range === '1y') days = 365;
+
+    const now = new Date();
+    const startDate = new Date(now); startDate.setDate(startDate.getDate() - days);
+    const prevStartDate = new Date(startDate); prevStartDate.setDate(prevStartDate.getDate() - days);
+
+    // ── Core metrics (parallel) ──────────────────────────────────────────────
+    const [
+      totalOrders, totalRevenue,
+      prevTotalOrders, prevTotalRevenue,
+      statusDistribution, trends, topProductsRaw, recentOrders,
+      cancelledCount, totalReturnRequests,
+      ordersWithActualDelivery, uniqueBuyerRows
+    ] = await Promise.all([
+      Order.count({ where: { createdAt: { [Op.gte]: startDate } } }),
+      Order.sum('total', { where: { createdAt: { [Op.gte]: startDate } } }) || 0,
+      Order.count({ where: { createdAt: { [Op.between]: [prevStartDate, startDate] } } }),
+      Order.sum('total', { where: { createdAt: { [Op.between]: [prevStartDate, startDate] } } }) || 0,
+      // Status breakdown
+      Order.findAll({
+        attributes: ['status', [fn('COUNT', col('id')), 'count']],
+        where: { createdAt: { [Op.gte]: startDate } },
+        group: ['status'], raw: true
+      }),
+      // Daily trends
+      Order.findAll({
+        attributes: [
+          [fn('DATE', col('createdAt')), 'date'],
+          [fn('COUNT', col('id')), 'orderCount'],
+          [fn('SUM', col('total')), 'dailyRevenue']
+        ],
+        where: { createdAt: { [Op.gte]: startDate } },
+        group: [fn('DATE', col('createdAt'))],
+        order: [[fn('DATE', col('createdAt')), 'ASC']],
+        raw: true
+      }),
+      // Top products
+      OrderItem.findAll({
+        attributes: [
+          'productId',
+          [fn('SUM', col('quantity')), 'totalSold'],
+          [fn('SUM', literal('OrderItem.price * OrderItem.quantity')), 'totalRevenue']
+        ],
+        where: { createdAt: { [Op.gte]: startDate } },
+        group: ['productId'],
+        order: [[literal('totalSold'), 'DESC']],
+        limit: 5,
+        include: [{ model: Product, attributes: ['id', 'name', 'categoryId'] }]
+      }),
+      // Recent orders
+      Order.findAll({
+        limit: 10, order: [['createdAt', 'DESC']],
+        include: [{ model: User, as: 'user', attributes: ['id', 'name'] }]
+      }),
+      // Cancellation count
+      Order.count({ where: { createdAt: { [Op.gte]: startDate }, status: 'cancelled' } }),
+      // Return requests (real)
+      ReturnRequest.count({ where: { createdAt: { [Op.gte]: startDate } } }),
+      // Orders with delivery timestamps for on-time rate
+      Order.findAll({
+        attributes: ['estimatedDelivery', 'actualDelivery'],
+        where: {
+          createdAt: { [Op.gte]: startDate },
+          actualDelivery: { [Op.ne]: null },
+          estimatedDelivery: { [Op.ne]: null }
+        },
+        raw: true
+      }),
+      // Unique buyers — for repeat purchase rate
+      Order.findAll({
+        attributes: ['userId', [fn('COUNT', col('id')), 'orderCount']],
+        where: { createdAt: { [Op.gte]: startDate }, userId: { [Op.ne]: null } },
+        group: ['userId'],
+        raw: true
+      })
+    ]);
+
+    // ── Growth ───────────────────────────────────────────────────────────────
+    const safePrev = (v) => v || 1;
+    const orderGrowth = parseFloat(((totalOrders - safePrev(prevTotalOrders)) / safePrev(prevTotalOrders) * 100).toFixed(1));
+    const revenueGrowth = parseFloat(((totalRevenue - safePrev(prevTotalRevenue)) / safePrev(prevTotalRevenue) * 100).toFixed(1));
+    const averageOrderValue = totalOrders > 0 ? parseFloat((totalRevenue / totalOrders).toFixed(2)) : 0;
+
+    // ── Return Rate (real) ────────────────────────────────────────────────────
+    const returnRate = totalOrders > 0 ? parseFloat(((totalReturnRequests / totalOrders) * 100).toFixed(1)) : 0;
+
+    // ── Cancellation Rate (real) ──────────────────────────────────────────────
+    const cancellationRate = totalOrders > 0 ? parseFloat(((cancelledCount / totalOrders) * 100).toFixed(1)) : 0;
+
+    // ── Repeat Purchase Rate (real) ───────────────────────────────────────────
+    const totalUniqueBuyers = uniqueBuyerRows.length;
+    const repeatBuyers = uniqueBuyerRows.filter(r => parseInt(r.orderCount) >= 2).length;
+    const repeatPurchaseRate = totalUniqueBuyers > 0
+      ? parseFloat(((repeatBuyers / totalUniqueBuyers) * 100).toFixed(1))
+      : 0;
+
+    // ── On-time Delivery Rate (real) ──────────────────────────────────────────
+    const onTimeCount = ordersWithActualDelivery.filter(o => new Date(o.actualDelivery) <= new Date(o.estimatedDelivery)).length;
+    const onTimeDeliveryRate = ordersWithActualDelivery.length > 0
+      ? parseFloat(((onTimeCount / ordersWithActualDelivery.length) * 100).toFixed(1))
+      : null; // null = insufficient data
+
+    // ── Fulfillment Timings (real, from lifecycle timestamps) ─────────────────
+    const ordersWithTimings = await Order.findAll({
+      attributes: ['createdAt', 'sellerConfirmedAt', 'pickedUpAt', 'actualDelivery'],
+      where: {
+        createdAt: { [Op.gte]: startDate },
+        sellerConfirmedAt: { [Op.ne]: null },
+        actualDelivery: { [Op.ne]: null }
+      },
+      raw: true
+    });
+
+    let avgProcessingHrs = null, avgTransitHrs = null, avgDeliveryHrs = null;
+    if (ordersWithTimings.length > 0) {
+      const toHours = (ms) => ms / (1000 * 60 * 60);
+      const processingSamples = ordersWithTimings
+        .filter(o => o.sellerConfirmedAt)
+        .map(o => toHours(new Date(o.sellerConfirmedAt) - new Date(o.createdAt)))
+        .filter(h => h > 0 && h < 720); // cap at 30 days to filter outliers
+      const transitSamples = ordersWithTimings
+        .filter(o => o.pickedUpAt && o.sellerConfirmedAt)
+        .map(o => toHours(new Date(o.pickedUpAt) - new Date(o.sellerConfirmedAt)))
+        .filter(h => h > 0 && h < 720);
+      const deliverySamples = ordersWithTimings
+        .filter(o => o.actualDelivery && o.pickedUpAt)
+        .map(o => toHours(new Date(o.actualDelivery) - new Date(o.pickedUpAt)))
+        .filter(h => h > 0 && h < 720);
+
+      const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+      avgProcessingHrs = processingSamples.length ? parseFloat(avg(processingSamples).toFixed(1)) : null;
+      avgTransitHrs = transitSamples.length ? parseFloat(avg(transitSamples).toFixed(1)) : null;
+      avgDeliveryHrs = deliverySamples.length ? parseFloat(avg(deliverySamples).toFixed(1)) : null;
+    }
+
+    const fulfillmentStats = {
+      picking: avgProcessingHrs,
+      packing: avgTransitHrs,
+      shipping: avgDeliveryHrs,
+      total: (avgProcessingHrs || 0) + (avgTransitHrs || 0) + (avgDeliveryHrs || 0) || null
+    };
+
+    // ── Top Regions (real, parsed from deliveryAddress) ───────────────────────
+    const ordersWithAddress = await Order.findAll({
+      attributes: ['deliveryAddress', 'marketingDeliveryAddress'],
+      where: { createdAt: { [Op.gte]: startDate } },
+      raw: true
+    });
+
+    // Common Kenyan cities/towns to extract
+    const KENYAN_CITIES = [
+      'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Malindi',
+      'Kitale', 'Garissa', 'Kakamega', 'Nyeri', 'Machakos', 'Meru', 'Embu',
+      'Kericho', 'Kisii', 'Migori', 'Homa Bay', 'Siaya', 'Vihiga', 'Bungoma',
+      'Trans Nzoia', 'Uasin Gishu', 'Nandi', 'Laikipia', 'Samburu', 'Isiolo',
+      'Marsabit', 'Mandera', 'Wajir', 'Tana River', 'Lamu', 'Kilifi', 'Kwale',
+      'Taita Taveta', 'Kajiado', 'Makueni', 'Kitui', 'Tharaka Nithi', 'Kirinyaga',
+      'Murang\'a', 'Kiambu', 'Nyandarua', 'Nyamira', 'Bomet', 'Narok', 'Baringo'
+    ];
+
+    const regionCounts = {};
+    for (const order of ordersWithAddress) {
+      const addr = (order.deliveryAddress || order.marketingDeliveryAddress || '').toLowerCase();
+      let matched = false;
+      for (const city of KENYAN_CITIES) {
+        if (addr.includes(city.toLowerCase())) {
+          regionCounts[city] = (regionCounts[city] || 0) + 1;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        regionCounts['Other'] = (regionCounts['Other'] || 0) + 1;
+      }
+    }
+
+    const topRegions = Object.entries(regionCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([region, orderCount]) => ({ region, orderCount }));
+
+    // ── Conversion Rate (real: orders / unique product view sessions) ─────────
+    const [uniqueViewSessions, ordersFromViewers] = await Promise.all([
+      ProductView.count({
+        distinct: true, col: 'sessionId',
+        where: { createdAt: { [Op.gte]: startDate }, sessionId: { [Op.ne]: null } }
+      }),
+      Order.count({
+        where: {
+          createdAt: { [Op.gte]: startDate },
+          userId: { [Op.ne]: null }
+        }
+      })
+    ]);
+    const conversionRate = uniqueViewSessions > 0
+      ? parseFloat(((ordersFromViewers / uniqueViewSessions) * 100).toFixed(2))
+      : null;
+
+    // ── Cohort Data — real monthly new vs returning customers ─────────────────
+    const cohortMonths = 4;
+    const cohortData = [];
+    for (let i = cohortMonths - 1; i >= 0; i--) {
+      const mStart = new Date(now); mStart.setMonth(mStart.getMonth() - i); mStart.setDate(1); mStart.setHours(0,0,0,0);
+      const mEnd = new Date(mStart); mEnd.setMonth(mEnd.getMonth() + 1);
+      const monthLabel = mStart.toLocaleString('default', { month: 'short' });
+
+      // All buyers in this month
+      const monthOrders = await Order.findAll({
+        attributes: ['userId'],
+        where: { createdAt: { [Op.between]: [mStart, mEnd] }, userId: { [Op.ne]: null } },
+        raw: true
+      });
+      const monthBuyerIds = [...new Set(monthOrders.map(o => o.userId))];
+
+      // Count how many had an order BEFORE this month
+      const returningCount = await Order.count({
+        where: {
+          userId: { [Op.in]: monthBuyerIds.length ? monthBuyerIds : [0] },
+          createdAt: { [Op.lt]: mStart }
+        },
+        distinct: true, col: 'userId'
+      });
+
+      const newCount = monthBuyerIds.length - returningCount;
+      cohortData.push({ month: monthLabel, new: Math.max(0, newCount), returning: returningCount });
+    }
+
+    // ── Top products ─────────────────────────────────────────────────────────
+    const topProducts = topProductsRaw.map(item => ({
+      id: item.productId,
+      name: item.Product?.name || 'Unknown Product',
+      categoryId: item.Product?.categoryId,
+      totalSold: parseInt(item.dataValues.totalSold) || 0,
+      totalRevenue: parseFloat(item.dataValues.totalRevenue) || 0
+    }));
+
+    res.json({
+      // Core
+      totalOrders, orderGrowth, totalRevenue, revenueGrowth, averageOrderValue,
+      // Status
+      statusDistribution,
+      // Products & Orders
+      topProducts, recentOrders,
+      // Trends
+      revenueTrend: trends.map(t => parseFloat(t.dailyRevenue) || 0),
+      orderTrend: trends.map(t => parseInt(t.orderCount) || 0),
+      labels: trends.map(t => t.date),
+      // Real advanced metrics
+      returnRate,
+      cancellationRate,
+      repeatPurchaseRate,
+      onTimeDeliveryRate,
+      conversionRate,
+      fulfillmentStats,
+      topRegions,
+      cohortData,
+      // Metadata
+      dataQuality: {
+        onTimeDeliverySampleSize: ordersWithActualDelivery.length,
+        fulfillmentSampleSize: ordersWithTimings.length,
+        conversionSessionCount: uniqueViewSessions
+      }
+    });
+
+  } catch (error) {
+    console.error('Order Analytics Error:', error);
+    res.status(500).json({ message: 'Error fetching order analytics', error: error.message });
   }
 };
 
@@ -830,6 +1110,8 @@ const getAllUsers = async (req, res) => {
           ]
         }
       ];
+    } else if (status === 'deleted') {
+      where.deletedAt = { [Op.ne]: null };
     }
 
     const isSqlite = sequelize.options.dialect === 'sqlite';
@@ -843,7 +1125,8 @@ const getAllUsers = async (req, res) => {
       attributes: { exclude: ['password'] },
       order: [['createdAt', 'DESC']],
       limit: limitNum,
-      offset: offset
+      offset: offset,
+      paranoid: status !== 'deleted' // Must set to false to see deleted records
     });
 
     // Safely fetch additional statistics for each user in parallel
@@ -1086,16 +1369,48 @@ const updateUser = async (req, res) => {
   }
 };
 
-// Delete User
+// Delete User (Soft Delete due to paranoid model)
 const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
     const user = await User.findByPk(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Safety check: Prevent deleting self or other superadmins if not a superadmin
+    const isSuperAdmin = req.user?.role === 'super_admin' || req.user?.roles?.includes('super_admin');
+    const targetIsSuperAdmin = user.role === 'super_admin' || user.roles?.includes('super_admin');
+    
+    if (targetIsSuperAdmin && !isSuperAdmin) {
+      return res.status(403).json({ message: 'Only a super admin can delete another super admin' });
+    }
+
+    if (user.id === req.user?.id) {
+      return res.status(400).json({ message: 'You cannot delete your own account while logged in' });
+    }
+
     await user.destroy();
-    res.json({ message: 'User deleted' });
+    res.json({ message: 'User archived successfully' });
   } catch (e) {
+    console.error('[adminController] Error deleting user:', e);
     res.status(500).json({ message: 'Error deleting user', error: e.message });
+  }
+};
+
+// Restore User (Recover from Soft Delete)
+const restoreUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    // We must use paranoid: false to find the deleted user
+    const user = await User.findByPk(userId, { paranoid: false });
+    
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.deletedAt) return res.status(400).json({ message: 'User is not archived' });
+
+    await user.restore();
+    res.json({ message: 'User restored successfully', user });
+  } catch (e) {
+    console.error('[adminController] Error restoring user:', e);
+    res.status(500).json({ message: 'Error restoring user', error: e.message });
   }
 };
 
@@ -2151,6 +2466,7 @@ module.exports = {
   getProductAnalytics,
   getTopPerformingProducts,
   getProductPerformanceMetrics,
+  getOrderAnalytics,
   // Bulk operations
   bulkUpdateProducts,
   bulkUpdateCategories,
@@ -2171,6 +2487,7 @@ module.exports = {
   createUser,
   updateUser,
   deleteUser,
+  restoreUser,
   getSearchAnalytics,
   verifyAdminPassword,
   getRevenueAnalytics,

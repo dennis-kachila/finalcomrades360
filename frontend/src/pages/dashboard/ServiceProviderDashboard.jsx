@@ -12,9 +12,11 @@ import {
   FaWallet,
   FaRegCalendarAlt,
   FaBars,
-  FaTimes
+  FaTimes,
+  FaHome
 } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
+import BottomNavbar from '../../components/layout/BottomNavbar';
 
 const ServiceProviderDashboard = () => {
   const { user } = useAuth();
@@ -22,6 +24,13 @@ const ServiceProviderDashboard = () => {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const serviceProviderBottomNavItems = [
+    { icon: <FaHome />, label: 'Home', path: '/dashboard/service-provider', end: true },
+    { icon: <FaClipboardList />, label: 'Services', path: '/dashboard/services/my' },
+    { icon: <FaCalendarAlt />, label: 'Bookings', path: '/dashboard/service-provider/booking-list' },
+    { icon: <FaWallet />, label: 'Wallet', path: '/dashboard/service-provider/wallet' },
+  ];
 
   const menuItems = [
     { id: 'create-service', icon: <FaUserCog />, label: 'Create Service', path: '/dashboard/services/create' },
@@ -42,7 +51,7 @@ const ServiceProviderDashboard = () => {
       />
 
       {/* Sidebar - Desktop / Drawer - Mobile */}
-      <div className={`fixed lg:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm z-50 transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed top-14 lg:top-16 inset-x-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm z-50 transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} bottom-0`}>
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-extrabold text-blue-900 tracking-tight">Service Panel</h2>
@@ -91,11 +100,21 @@ const ServiceProviderDashboard = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between p-3 border-b border-gray-100 bg-white sticky top-14 z-30 shadow-sm">
+          <div className="flex items-center gap-3">
+
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-blue-600 animate-pulse"></div>
+              <h2 className="text-sm font-black text-gray-800 tracking-tight uppercase">Service Panel</h2>
+            </div>
+          </div>
+        </header>
 
         {/* Dynamic Content */}
-        <main className="flex-1 lg:h-full lg:overflow-y-auto bg-gray-50 relative custom-scrollbar">
-          <div className="w-full p-2 lg:p-4 min-h-full pb-20 lg:pb-0">
+        <main className="flex-1 lg:h-full lg:overflow-y-auto bg-gray-50 relative custom-scrollbar pb-20 lg:pb-0">
+          <div className="w-full p-2 lg:p-4 min-h-full">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 min-h-full">
               <div className="p-2 sm:p-6 lg:p-8">
                 {/* Page Header with Navigation Buttons */}
@@ -137,6 +156,11 @@ const ServiceProviderDashboard = () => {
         </main>
       </div>
 
+      {/* Mobile Bottom Navigation */}
+      <BottomNavbar 
+        items={serviceProviderBottomNavItems} 
+        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+      />
       <style dangerouslySetInnerHTML={{
         __html: `
         .no-scrollbar::-webkit-scrollbar { display: none; }

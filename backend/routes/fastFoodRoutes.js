@@ -6,7 +6,10 @@ const {
     createFastFood,
     updateFastFood,
     deleteFastFood,
-    getVendorFastFoods
+    getVendorFastFoods,
+    getDeletedFastFoods,
+    restoreFastFood,
+    permanentlyDeleteFastFood
 } = require('../controllers/fastFoodController');
 
 // Import authentication middleware if needed
@@ -27,6 +30,11 @@ router.route('/')
 
 router.get('/vendor/me', protect, getVendorFastFoods);
 router.get('/vendor/:vendorId', protect, getVendorFastFoods);
+
+// --- RECYCLE BIN ROUTES ---
+router.get('/deleted', protect, getDeletedFastFoods);
+router.post('/restore/:id', protect, restoreFastFood);
+router.delete('/permanent/:id', protect, permanentlyDeleteFastFood);
 
 router.route('/:id')
     .get(optionalAuth, getFastFoodById)

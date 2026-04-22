@@ -36,10 +36,28 @@ class FastFoodService {
     return response.data;
   }
 
-  // Delete fast food item
+  // Delete fast food item (moves to recycle bin)
   async deleteFastFood(id, reason = '') {
     const config = reason ? { data: { reason } } : {};
     const response = await api.delete(`/fast-food/${id}`, config);
+    return response.data;
+  }
+  
+  // Get deleted fast food items
+  async getDeletedFastFoods() {
+    const response = await api.get('/fast-food/deleted');
+    return response.data;
+  }
+
+  // Restore deleted fast food item
+  async restoreFastFood(id) {
+    const response = await api.post(`/fast-food/restore/${id}`);
+    return response.data;
+  }
+
+  // Permanently delete fast food item
+  async permanentlyDeleteFastFood(id) {
+    const response = await api.delete(`/fast-food/permanent/${id}`);
     return response.data;
   }
 

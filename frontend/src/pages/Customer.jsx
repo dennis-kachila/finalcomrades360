@@ -2,11 +2,19 @@ import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { FaBars, FaTimes } from 'react-icons/fa';
+import BottomNavbar from '../components/layout/BottomNavbar';
 
 export default function Customer() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const customerBottomNavItems = [
+    { icon: '🏠', label: 'Home', path: '/customer', end: true },
+    { icon: '📦', label: 'Orders', path: '/customer/orders' },
+    { icon: '💰', label: 'Wallet', path: '/customer/wallet' },
+    { icon: '🔄', label: 'Returns', path: '/customer/returns' },
+  ];
 
   const logout = () => {
     localStorage.removeItem('token');
@@ -39,6 +47,17 @@ export default function Customer() {
     }
   };
 
+  const [expandedItems, setExpandedItems] = useState(new Set(['Support Center']));
+
+  const toggleExpanded = (label) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  };
+
   const menuItems = [
     { to: "/customer", label: "Overview", icon: "🏠", end: true },
     { to: "/customer/orders", label: "My Orders", icon: "📦" },
@@ -46,7 +65,15 @@ export default function Customer() {
     { to: "/customer/wishlist", label: "Wishlist", icon: "❤️" },
     { to: "/customer/wallet", label: "Wallet", icon: "💰" },
     { to: "/customer/applications", label: "Applications", icon: "📄" },
-    { to: "/customer/inquiries", label: "Support Inquiries", icon: "🎧" },
+    { 
+      label: "Support Center", 
+      icon: "🎧", 
+      isParent: true,
+      children: [
+        { to: "/customer/inquiries", label: "Support Inquiries", icon: "🎫" },
+        { to: "/customer/support", label: "Live Chat & Messages", icon: "💬" },
+      ]
+    },
     { to: "/customer/settings", label: "Settings", icon: "⚙️" },
     { to: "/customer/work-with-us", label: "Work with Us", icon: "💼", color: "green", onClick: handleWorkWithUsClick },
   ];
@@ -60,7 +87,7 @@ export default function Customer() {
       />
 
       {/* Sidebar - Desktop / Drawer - Mobile */}
-      <div className={`fixed lg:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm z-50 transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed top-14 lg:top-16 inset-x-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm z-50 transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} bottom-0`}>
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-extrabold text-blue-900 tracking-tight">My Account</h2>
@@ -78,22 +105,56 @@ export default function Customer() {
         <nav className="flex-1 overflow-y-auto no-scrollbar lg:custom-scrollbar mt-2">
           <ul className="flex flex-col space-y-1 px-3 pb-4">
             {menuItems.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  onClick={item.onClick || (() => setIsSidebarOpen(false))}
-                  className={({ isActive }) => `flex items-center gap-2 px-4 py-2 lg:py-2.5 lg:px-4 rounded-xl transition-all duration-200 text-[9px] lg:text-[15px] font-bold uppercase tracking-tight ${isActive
-                    ? item.color === 'green' ? 'bg-green-600 text-white shadow-lg shadow-green-100' : 'bg-blue-600 text-white shadow-lg shadow-blue-100'
-                    : 'text-gray-500 hover:bg-gray-100 hover:text-blue-600'
-                    }`}
-                >
-                  <span className="text-sm lg:text-base opacity-90">{item.icon}</span>
-                  <span className="whitespace-nowrap">{item.label}</span>
-                  {item.label === "Work with Us" && !isVerified && (
-                    <span className="ml-auto text-[8px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full">Verify</span>
-                  )}
-                </NavLink>
+              <li key={item.label}>
+                {item.isParent ? (
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => toggleExpanded(item.label)}
+                      className={`flex items-center gap-2 px-4 py-2 lg:py-2.5 lg:px-4 rounded-xl transition-all duration-200 text-[9px] lg:text-[15px] font-bold uppercase tracking-tight w-full text-left text-gray-500 hover:bg-gray-100 hover:text-blue-600`}
+                    >
+                      <span className="text-sm lg:text-base opacity-90">{item.icon}</span>
+                      <span className="whitespace-nowrap">{item.label}</span>
+                      <span className={`ml-auto transition-transform ${expandedItems.has(item.label) ? 'rotate-180' : ''}`}>
+                        ▼
+                      </span>
+                    </button>
+                    {expandedItems.has(item.label) && (
+                      <ul className="ml-6 space-y-1 border-l-2 border-gray-100 pl-2">
+                        {item.children.map((child) => (
+                          <li key={child.to}>
+                            <NavLink
+                              to={child.to}
+                              onClick={() => setIsSidebarOpen(false)}
+                              className={({ isActive }) => `flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-[8px] lg:text-[13px] font-bold uppercase tracking-tight ${isActive
+                                ? 'bg-blue-50 text-blue-600'
+                                : 'text-gray-400 hover:bg-gray-50 hover:text-blue-500'
+                                }`}
+                            >
+                              <span className="text-xs lg:text-sm">{child.icon}</span>
+                              <span className="whitespace-nowrap">{child.label}</span>
+                            </NavLink>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <NavLink
+                    to={item.to}
+                    end={item.end}
+                    onClick={item.onClick || (() => setIsSidebarOpen(false))}
+                    className={({ isActive }) => `flex items-center gap-2 px-4 py-2 lg:py-2.5 lg:px-4 rounded-xl transition-all duration-200 text-[9px] lg:text-[15px] font-bold uppercase tracking-tight ${isActive
+                      ? item.color === 'green' ? 'bg-green-600 text-white shadow-lg shadow-green-100' : 'bg-blue-600 text-white shadow-lg shadow-blue-100'
+                      : 'text-gray-500 hover:bg-gray-100 hover:text-blue-600'
+                      }`}
+                  >
+                    <span className="text-sm lg:text-base opacity-90">{item.icon}</span>
+                    <span className="whitespace-nowrap">{item.label}</span>
+                    {item.label === "Work with Us" && !isVerified && (
+                      <span className="ml-auto text-[8px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full">Verify</span>
+                    )}
+                  </NavLink>
+                )}
               </li>
             ))}
           </ul>
@@ -107,11 +168,21 @@ export default function Customer() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between p-3 border-b border-gray-100 bg-white sticky top-14 z-30 shadow-sm">
+          <div className="flex items-center gap-3">
+
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-blue-600 animate-pulse"></div>
+              <h2 className="text-sm font-black text-gray-800 tracking-tight uppercase">My Account</h2>
+            </div>
+          </div>
+        </header>
 
         {/* Dynamic Content */}
-        <main className="flex-1 lg:h-full lg:overflow-y-auto bg-gray-50 relative custom-scrollbar">
-          <div className="max-w-6xl mx-auto w-full p-2 lg:p-8 min-h-full pb-20 lg:pb-0">
+        <main className="flex-1 lg:h-full lg:overflow-y-auto bg-gray-50 relative custom-scrollbar pb-20 lg:pb-0">
+          <div className="max-w-6xl mx-auto w-full p-2 lg:p-8 min-h-full">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 min-h-full p-1 sm:p-4 lg:p-6">
               <Outlet />
             </div>
@@ -119,6 +190,11 @@ export default function Customer() {
         </main>
       </div>
 
+      {/* Mobile Bottom Navigation */}
+      <BottomNavbar 
+        items={customerBottomNavItems} 
+        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+      />
       <style dangerouslySetInnerHTML={{
         __html: `
         .no-scrollbar::-webkit-scrollbar { display: none; }

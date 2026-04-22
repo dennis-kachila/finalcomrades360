@@ -9,6 +9,7 @@ import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { getSocket, joinUserRoom } from '../../services/socket';
 import { useToast } from '../../components/ui/use-toast';
+import BottomNavbar from '../../components/layout/BottomNavbar';
 
 const DeliveryAgentDashboard = () => {
   const { user } = useAuth();
@@ -20,6 +21,13 @@ const DeliveryAgentDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { toast } = useToast();
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+
+  const deliveryBottomNavItems = [
+    { icon: <FaBoxOpen />, label: 'Available', path: '/delivery/available', end: true },
+    { icon: <FaMotorcycle />, label: 'Tasks', path: '/delivery/orders' },
+    { icon: <FaHistory />, label: 'History', path: '/delivery/logistics' },
+    { icon: <FaUser />, label: 'Account', path: '/delivery/account' },
+  ];
 
   useEffect(() => {
     fetchStatus();
@@ -204,7 +212,7 @@ const DeliveryAgentDashboard = () => {
       />
 
       {/* Sidebar - Desktop / Drawer - Mobile */}
-      <div className={`fixed lg:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm z-50 transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed top-14 lg:top-16 inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm z-50 transform transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-800 tracking-tight">Delivery Console</h2>
@@ -275,16 +283,11 @@ const DeliveryAgentDashboard = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between p-3 border-b border-gray-100 bg-white sticky top-0 z-30 shadow-sm">
+        <header className="lg:hidden flex items-center justify-between p-3 border-b border-gray-100 bg-white sticky top-14 z-30 shadow-sm">
           <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-3 -ml-3 hover:bg-gray-100 rounded-full text-blue-600 transition-colors"
-            >
-              <FaBars size={24} />
-            </button>
+
             <div className="flex items-center gap-2">
               <div className={`h-2 w-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
               <h2 className="text-sm font-black text-gray-800 tracking-tight uppercase">Delivery Panel</h2>
@@ -297,21 +300,18 @@ const DeliveryAgentDashboard = () => {
             >
               {isOnline ? 'Go Offline' : 'Go Online'}
             </button>
-            <Link to="/delivery/account" className="text-gray-400 hover:text-blue-600 p-1.5 hover:bg-gray-50 rounded-full">
-              <FaUser className="h-4 w-4" />
-            </Link>
           </div>
         </header>
 
         {/* Dynamic Content */}
-        <main className="flex-1 lg:h-full lg:overflow-y-auto bg-gray-50 relative custom-scrollbar">
+        <main className="flex-1 lg:h-full lg:overflow-y-auto bg-gray-50 relative custom-scrollbar pb-20 lg:pb-0">
           {!isOnline && !loading && (
             <div className="bg-amber-50 border-b border-amber-100 p-2 text-center text-[10px] md:text-xs text-amber-700 flex items-center justify-center gap-2 sticky top-0 z-10 shadow-sm backdrop-blur-sm bg-white/80">
               <span className="flex h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse"></span>
               You are <strong>Offline</strong>. No new requests will be received.
             </div>
           )}
-          <div className="max-w-7xl mx-auto min-h-full pb-20 lg:pb-0">
+          <div className="max-w-7xl mx-auto min-h-full">
             <LocationTracker isOnline={isOnline} />
             <div className="p-3 md:p-6 lg:p-8">
               {/* Page Header with Navigation Buttons */}
@@ -345,6 +345,12 @@ const DeliveryAgentDashboard = () => {
           </div>
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNavbar 
+        items={deliveryBottomNavItems} 
+        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+      />
     </div>
   );
 };

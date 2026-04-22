@@ -149,28 +149,7 @@ export default function SellerBusinessLocation() {
                     </p>
                 </div>
 
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded text-blue-800">
-                    <p className="text-sm mb-2">
-                        <strong>📍 Important:</strong> This location will be shown to delivery agents when they need to
-                        pick up orders from your store. Accurate coordinates ensure agents find you without delay.
-                    </p>
-                    <p className="text-xs font-medium">
-                        Use the GPS button or enter Latitude/Longitude manually.
-                    </p>
-                </div>
 
-                {(showWarning || !profileComplete) && (
-                    <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded text-amber-800 flex gap-3 items-start animate-pulse">
-                        <FaExclamationTriangle className="text-amber-500 mt-1 flex-shrink-0" size={20} />
-                        <div>
-                            <p className="text-sm font-bold">Action Required: Complete Your Profile</p>
-                            <p className="text-xs mt-1">
-                                You must provide all business location details below before you can access seller dashboard features, 
-                                add products, or manage orders. This information is critical for our delivery network.
-                            </p>
-                        </div>
-                    </div>
-                )}
 
                 <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
                     <form onSubmit={handleSubmit} className="space-y-4">

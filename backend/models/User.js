@@ -305,6 +305,7 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     timestamps: true,
+    paranoid: true, // Enable Soft Deletes
     modelName: 'User',
     tableName: 'User',  // Explicitly set to match the actual table name in the database
   });

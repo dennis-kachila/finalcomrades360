@@ -9,9 +9,18 @@ import {
   FaEdit,
   FaBox,
   FaArrowLeft,
-  FaSpinner
+  FaSpinner,
+  FaThLarge,
+  FaTable,
+  FaSearch,
+  FaTrash,
+  FaEye,
+  FaBan,
+  FaTrashRestore
 } from 'react-icons/fa';
 import DeleteConfirmationModal from '../../components/modals/DeleteConfirmationModal';
+import AdminPasswordDialog from '../../components/AdminPasswordDialog';
+import ConfirmationDialog from '../../components/ConfirmationDialog';
 import { productApi } from '../../services/api';
 import serviceApi from '../../services/serviceApi';
 import { fastFoodService } from '../../services/fastFoodService';
@@ -46,6 +55,28 @@ const Products = () => {
   const [displayedProducts, setDisplayedProducts] = useState([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, product: null });
+  const [viewMode, setViewMode] = useState(localStorage.getItem('product_view_mode') || 'grid');
+
+  // Recycle Bin State
+  const [deletedProducts, setDeletedProducts] = useState([]);
+  const [isDeletedLoading, setIsDeletedLoading] = useState(false);
+
+  // Password Dialog State
+  const [passwordDialog, setPasswordDialog] = useState({
+    isOpen: false,
+    actionDescription: '',
+    requiresReason: false,
+    reasonLabel: 'Reason',
+    onConfirm: null
+  });
+
+  // Confirmation Dialog State
+  const [confirmationDialog, setConfirmationDialog] = useState({
+    isOpen: false,
+    success: true,
+    title: '',
+    message: ''
+  });
 
   // Hub Navigation Scrolling State
   const hubScrollRef = useRef(null);
@@ -88,7 +119,7 @@ const Products = () => {
       setActiveView('list');
     } else if (segments.length >= 3 && segments[1] === 'products') {
       const view = segments[2];
-      const validViews = ['create', 'edit', 'view', 'my-products', 'product-listing', 'inventory', 'pricing', 'analytics', 'bulk-actions', 'categories'];
+      const validViews = ['create', 'edit', 'view', 'my-products', 'product-listing', 'inventory', 'pricing', 'analytics', 'bulk-actions', 'categories', 'recycle-bin'];
       if (validViews.includes(view)) {
         setActiveView(view);
       }
@@ -196,6 +227,85 @@ const Products = () => {
     }
   }, [navigate]);
 
+  // Helper to require password before action
+  const requirePassword = (actionDescription, requiresReason = false, reasonLabel = 'Reason') => {
+    return new Promise((resolve, reject) => {
+      setPasswordDialog({
+        isOpen: true,
+        actionDescription,
+        requiresReason,
+        reasonLabel,
+        onConfirm: resolve
+      });
+    });
+  };
+
+  const fetchDeletedProducts = async () => {
+    try {
+      setIsDeletedLoading(true);
+      const response = await productApi.getDeleted();
+      setDeletedProducts(response.data || []);
+    } catch (error) {
+      console.error('Error fetching deleted products:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch deleted products',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletedLoading(false);
+    }
+  };
+
+  const handleRestoreProduct = async (product) => {
+    if (!window.confirm(`Are you sure you want to RESTORE "${product.name}"? It will be returned to the pending review list.`)) return;
+    try {
+      const password = await requirePassword(`Restore "${product.name}"`, false);
+      setIsDeletedLoading(true);
+      await productApi.restore(product.id, { password });
+      toast({
+        title: 'Success',
+        description: `"${product.name}" has been restored successfully.`,
+      });
+      fetchDeletedProducts();
+      refetch(); // Refresh main list
+    } catch (error) {
+      if (error?.message) {
+        toast({
+          title: 'Restore Failed',
+          description: error.message || 'Failed to restore product',
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setIsDeletedLoading(false);
+    }
+  };
+
+  const handlePermanentDeleteProduct = async (product) => {
+    if (!window.confirm(`⚠️ PERMANENT DELETE: Are you sure you want to PURGE "${product.name}"? This action cannot be undone.`)) return;
+    try {
+      const password = await requirePassword(`Permanently Purge "${product.name}"`, false);
+      setIsDeletedLoading(true);
+      await productApi.permanentlyDelete(product.id, { password });
+      toast({
+        title: 'Success',
+        description: `"${product.name}" has been permanently removed.`,
+      });
+      fetchDeletedProducts();
+    } catch (error) {
+      if (error?.message) {
+        toast({
+          title: 'Purge Failed',
+          description: error.message || 'Failed to purge product',
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setIsDeletedLoading(false);
+    }
+  };
+
   // Handle listing a product
   const handleListProduct = useCallback(async (product) => {
     try {
@@ -223,6 +333,10 @@ const Products = () => {
 
   // Reset pagination when activeView changes to something other than list
   useEffect(() => {
+    if (activeView === 'recycle-bin') {
+      fetchDeletedProducts();
+    }
+
     if (activeView !== 'list' && activeView !== 'my-products') {
       setCurrentPage(1);
       setDisplayedProducts([]);
@@ -333,6 +447,17 @@ const Products = () => {
       hoverColor: 'hover:border-gray-500',
       to: 'settings',
       action: 'Set'
+    },
+    {
+      id: 'recycle-bin',
+      title: 'Recycle Bin',
+      description: 'Restore or permanently remove deleted products',
+      icon: <FaTrashRestore className="text-white" />,
+      bgColor: 'bg-red-500',
+      borderColor: 'border-red-200',
+      hoverColor: 'hover:border-red-500',
+      to: 'recycle-bin',
+      action: 'View'
     }
   ], []);
 
@@ -699,6 +824,262 @@ const Products = () => {
     );
   }, [filteredProducts, isPending, error, hasMore, isLoadingMore, renderProductCard, loadMoreProducts, refetch]);
 
+  // Table view renderer
+  const renderProductTable = useCallback(() => {
+    if (error) return renderProductGrid();
+
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden border">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Product</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Brand / Category</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Price</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Stock</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map((product) => (
+                  <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-12 w-12 flex-shrink-0 rounded-lg overflow-hidden border bg-gray-50">
+                          <img
+                            src={product.images?.[0] || '/uploads/default-product.jpg'}
+                            alt={product.name}
+                            className="h-full w-full object-cover"
+                            onError={(e) => { e.target.src = '/uploads/default-product.jpg'; }}
+                          />
+                        </div>
+                        <div className="ml-4 max-w-[200px]">
+                          <div className="text-sm font-bold text-gray-900 truncate">{product.name}</div>
+                          <div className="text-[10px] text-gray-500">ID: {product.id}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="font-medium text-gray-700">{product.brand || 'No Brand'}</div>
+                      <div className="text-[11px] text-gray-400 capitalize">{product.Category?.name || 'Uncategorized'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-bold text-gray-900">
+                        {product.displayPrice ? `KSh ${parseFloat(product.displayPrice).toLocaleString()}` : '—'}
+                      </div>
+                      {product.basePrice && (
+                        <div className="text-[10px] text-gray-400 line-through">KSh {parseFloat(product.basePrice).toLocaleString()}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${product.stock <= 0 ? 'bg-red-100 text-red-700' :
+                        product.stock <= 10 ? 'bg-orange-100 text-orange-700' :
+                          'bg-green-100 text-green-700'
+                        }`}>
+                        {product.stock} in stock
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col gap-1">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold text-center w-fit ${product.approved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                          {product.approved ? 'Approved' : 'Pending'}
+                        </span>
+                        {product.hidden && (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 text-center w-fit flex items-center gap-1">
+                            <FaEye className="w-2.5 h-2.5" /> Hidden
+                          </span>
+                        )}
+                        {product.suspended && (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-600 text-center w-fit flex items-center gap-1">
+                            <FaBan className="w-2.5 h-2.5" /> Suspended
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleViewChange('view', product)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="View Product"
+                        >
+                          <FaEye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleViewChange('edit', product)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Edit Product"
+                        >
+                          <FaEdit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteModal({ isOpen: true, product });
+                          }}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete Product"
+                        >
+                          <FaTrash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : isPending ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={`skeleton-row-${i}`} className="animate-pulse">
+                    <td colSpan="6" className="px-6 py-4 bg-gray-50/50 border-b border-gray-100 h-16" />
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="px-6 py-10 text-center text-gray-500 italic">No products found matching your criteria</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {hasMore && (
+          <div className="p-4 bg-gray-50 border-t flex justify-center">
+            <button
+              onClick={loadMoreProducts}
+              disabled={isLoadingMore || isPending}
+              className="px-6 py-2 bg-white border border-gray-300 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              {isLoadingMore ? 'Loading...' : 'Load More Products'}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }, [filteredProducts, isPending, error, hasMore, isLoadingMore, handleViewChange, loadMoreProducts]);
+
+  const renderDeletedProductTable = useCallback(() => {
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden border">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Product</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Seller</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Deleted At</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Auto-Delete</th>
+                <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {deletedProducts.length > 0 ? (
+                deletedProducts.map((product) => (
+                  <tr key={product.id} className="hover:bg-red-50/30 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border bg-gray-50 grayscale opacity-70">
+                          <img
+                            src={product.images?.[0] || '/uploads/default-product.jpg'}
+                            alt={product.name}
+                            className="h-full w-full object-cover"
+                            onError={(e) => { e.target.src = '/uploads/default-product.jpg'; }}
+                          />
+                        </div>
+                        <div className="ml-4 max-w-[200px]">
+                          <div className="text-sm font-bold text-gray-900 truncate">{product.name}</div>
+                          <div className="text-[10px] text-gray-400">ID: {product.id}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="font-medium text-gray-700">{product.seller?.businessName || product.seller?.name || 'Unknown'}</div>
+                      <div className="text-[10px] text-gray-400">{product.seller?.email}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(product.deletedAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-[10px] font-bold">
+                        {product.autoDeleteAt ? new Date(product.autoDeleteAt).toLocaleDateString() : '30 days'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleRestoreProduct(product)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Restore Product"
+                        >
+                          <FaTrashRestore className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handlePermanentDeleteProduct(product)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Purge Permanently"
+                        >
+                          <FaTrash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="px-6 py-10 text-center text-gray-500 italic">Recycle bin is empty</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }, [deletedProducts, handleRestoreProduct, handlePermanentDeleteProduct]);
+
+  const renderDeletedProducts = useCallback(() => {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleBack}
+              className="p-2 rounded-full hover:bg-gray-200 transition-colors"
+            >
+              <FaArrowLeft className="text-lg text-gray-600" />
+            </button>
+            <div>
+              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <FaTrashRestore className="text-red-500" /> Recycle Bin
+              </h3>
+              <p className="text-xs text-gray-500 font-medium">
+                Items here will be permanently deleted after 30 days
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={fetchDeletedProducts}
+            disabled={isDeletedLoading}
+            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold border border-blue-100"
+          >
+            <FaSpinner className={isDeletedLoading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        {isDeletedLoading && deletedProducts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-100">
+            <FaSpinner className="animate-spin text-blue-500 text-3xl mb-4" />
+            <p className="text-gray-500 font-medium">Scanning recycle bin...</p>
+          </div>
+        ) : (
+          renderDeletedProductTable()
+        )}
+      </div>
+    );
+  }, [deletedProducts, isDeletedLoading, handleBack, renderDeletedProductTable]);
+
   // Render the main content
   const renderContent = useCallback(() => {
     // Handle session recovery or missing data
@@ -805,6 +1186,10 @@ const Products = () => {
       return <ProductAnalytics onBack={handleBack} />;
     }
 
+    if (activeView === 'recycle-bin') {
+      return renderDeletedProducts();
+    }
+
     if (activeView === 'bulk-actions') {
       return <BulkOperations onBack={handleBack} />;
     }
@@ -830,20 +1215,49 @@ const Products = () => {
     if (activeView === 'my-products' || activeView === 'list') {
       return (
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-100">
             <div>
-              <h2 className="text-xl font-semibold text-gray-800">
-                {activeView === 'my-products' ? 'Super Admin Products' : 'All Products'}
+              <h2 className="text-xl font-bold text-gray-800">
+                {activeView === 'my-products' ? 'Super Admin Products' : 'Product Inventory'}
               </h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 font-medium">
                 {activeView === 'my-products'
-                  ? 'Products added by super admin'
-                  : 'Browse all available products'}
+                  ? 'Manage products added specifically by super admin'
+                  : `Browsing ${filteredProducts.length} ${activeView === 'my-products' ? 'super admin' : ''} products`}
               </p>
+            </div>
+
+            <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200">
+              <button
+                onClick={() => {
+                  setViewMode('grid');
+                  localStorage.setItem('product_view_mode', 'grid');
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'grid'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                  }`}
+              >
+                <FaThLarge className="w-4 h-4" />
+                Grid
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('table');
+                  localStorage.setItem('product_view_mode', 'table');
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'table'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                  }`}
+              >
+                <FaTable className="w-4 h-4" />
+                Table
+              </button>
             </div>
           </div>
 
-          {renderProductGrid()}
+          {viewMode === 'grid' ? renderProductGrid() : renderProductTable()}
         </div>
       );
     }
@@ -860,7 +1274,8 @@ const Products = () => {
     );
   }, [
     activeView, selectedProduct, handleBack, handleCloseForm, handleViewChange,
-    handleListProduct, renderProductGrid, productStats, productCards
+    handleListProduct, renderProductGrid, renderProductTable, productStats, productCards,
+    viewMode, filteredProducts
   ]);
 
   return (
@@ -945,7 +1360,7 @@ const Products = () => {
                 {productCards.map((card) => (
                   <button
                     key={card.id}
-                    onClick={() => handleCardClick(card)}
+                    onClick={() => handleViewChange(card.to)}
                     className={`flex-shrink-0 w-[140px] md:w-[170px] flex items-center p-2 md:p-3 rounded-lg border transition-all duration-200 ${(activeView === card.to || (card.to === 'create' && activeView === 'create'))
                       ? 'bg-blue-50 border-blue-500 shadow-md scale-[1.02]'
                       : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow-md hover:scale-[1.01]'
@@ -987,6 +1402,27 @@ const Products = () => {
         onClose={() => setDeleteModal({ isOpen: false, product: null })}
         product={deleteModal.product}
         onConfirm={handleConfirmedDelete}
+      />
+
+      {/* Password & Confirmation Dialogs */}
+      <AdminPasswordDialog
+        isOpen={passwordDialog.isOpen}
+        onClose={() => setPasswordDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={(password, reason) => {
+          passwordDialog.onConfirm(password, reason);
+          setPasswordDialog(prev => ({ ...prev, isOpen: false }));
+        }}
+        actionDescription={passwordDialog.actionDescription}
+        requiresReason={passwordDialog.requiresReason}
+        reasonLabel={passwordDialog.reasonLabel}
+      />
+
+      <ConfirmationDialog
+        isOpen={confirmationDialog.isOpen}
+        onClose={() => setConfirmationDialog(prev => ({ ...prev, isOpen: false }))}
+        success={confirmationDialog.success}
+        title={confirmationDialog.title}
+        message={confirmationDialog.message}
       />
     </div>
   );

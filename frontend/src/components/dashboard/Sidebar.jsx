@@ -31,7 +31,8 @@ import {
   FaBoxes,
   FaUtensils,
   FaUndo,
-  FaPlus
+  FaPlus,
+  FaComments
 } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -225,10 +226,14 @@ const customerMenuItems = [
     roles: ['customer']
   },
   {
-    name: 'Support Inquiries',
-    path: '/customer/inquiries',
+    name: 'Support Center',
+    path: '/customer/support-center',
     icon: <FaHeadset className="mr-3" />,
-    roles: ['customer']
+    roles: ['customer'],
+    children: [
+      { name: 'Support Inquiries', path: '/customer/inquiries', icon: <FaTicketAlt size={14} className="mr-2" /> },
+      { name: 'Live Chat & Messages', path: '/customer/support', icon: <FaComments size={14} className="mr-2" /> }
+    ]
   },
   {
     name: 'Notifications & Alerts',

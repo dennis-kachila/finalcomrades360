@@ -4,7 +4,7 @@ export const twoFactorAuthService = {
   // Generate 2FA secret and get QR code
   generate2FASecret: async () => {
     try {
-      const response = await api.post('/2fa/setup');
+      const response = await api.post('/api/2fa/setup');
       return response.data;
     } catch (error) {
       console.error('Error generating 2FA secret:', error);
@@ -15,7 +15,7 @@ export const twoFactorAuthService = {
   // Verify 2FA setup with token
   verify2FASetup: async (token) => {
     try {
-      const response = await api.post('/2fa/verify', { token });
+      const response = await api.post('/api/2fa/verify', { token });
       return response.data;
     } catch (error) {
       console.error('Error verifying 2FA setup:', error);
@@ -26,7 +26,7 @@ export const twoFactorAuthService = {
   // Disable 2FA
   disable2FA: async () => {
     try {
-      const response = await api.post('/2fa/disable');
+      const response = await api.post('/api/2fa/disable');
       return response.data;
     } catch (error) {
       console.error('Error disabling 2FA:', error);
@@ -37,7 +37,7 @@ export const twoFactorAuthService = {
   // Generate new recovery codes
   generateNewRecoveryCodes: async () => {
     try {
-      const response = await api.post('/2fa/recovery-codes');
+      const response = await api.post('/api/2fa/recovery-codes');
       return response.data;
     } catch (error) {
       console.error('Error generating recovery codes:', error);
@@ -48,7 +48,7 @@ export const twoFactorAuthService = {
   // Verify 2FA token (for login)
   verify2FAToken: async (token) => {
     try {
-      const response = await api.post('/2fa/verify-token', { token });
+      const response = await api.post('/api/2fa/verify-token', { token });
       return response.data;
     } catch (error) {
       console.error('Error verifying 2FA token:', error);

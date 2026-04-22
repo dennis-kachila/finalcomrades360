@@ -446,8 +446,8 @@ export const productApi = {
   getSubcategory: (categoryId, subcategoryId) => api.get(`/categories/${categoryId}/subcategories/${subcategoryId}`),
 
   // Admin category methods
-  createCategory: (categoryData) => api.post('/admin/categories', categoryData),
-  createSubcategory: (categoryId, subcategoryData) => api.post(`/admin/categories/${categoryId}/subcategories`, subcategoryData),
+  createCategory: (categoryData) => api.post('/categories/admin/categories', categoryData),
+  createSubcategory: (subcategoryData) => api.post('/categories/admin/subcategories', subcategoryData),
 
   // Check for duplicate products
   checkDuplicate: (params) => productsClient.get('/check-duplicate', { params }),

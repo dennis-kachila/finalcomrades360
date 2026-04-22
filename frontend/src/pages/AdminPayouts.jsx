@@ -2,23 +2,12 @@ import { useState } from 'react';
 import api from '../services/serviceApi';
 
 const AdminPayouts = () => {
-    const [transactionIdsRaw, setTransactionIdsRaw] = useState('');
+    const [sellerId, setSellerId] = useState('');
+    const [payoutAmount, setPayoutAmount] = useState(0);
 
     const handlePayout = async () => {
         try {
-            const transactionIds = transactionIdsRaw
-                .split(',')
-                .map((id) => id.trim())
-                .filter(Boolean)
-                .map((id) => Number(id))
-                .filter((id) => Number.isFinite(id));
-
-            if (transactionIds.length === 0) {
-                alert('Enter at least one valid transaction ID.');
-                return;
-            }
-
-            await api.post('/finance/process-payout', { transactionIds });
+            await api.post('/admin/process-payout', { sellerId, amount: payoutAmount });
             alert('Payout processed successfully');
         } catch (error) {
             console.error('Error processing payout:', error);
@@ -30,11 +19,19 @@ const AdminPayouts = () => {
         <div>
             <h1>Admin Payouts</h1>
             <div>
-                <label>Transaction IDs (comma-separated):</label>
+                <label>Seller ID:</label>
                 <input
                     type="text"
-                    value={transactionIdsRaw}
-                    onChange={(e) => setTransactionIdsRaw(e.target.value)}
+                    value={sellerId}
+                    onChange={(e) => setSellerId(e.target.value)}
+                />
+            </div>
+            <div>
+                <label>Payout Amount:</label>
+                <input
+                    type="number"
+                    value={payoutAmount}
+                    onChange={(e) => setPayoutAmount(e.target.value)}
                 />
             </div>
             <button onClick={handlePayout}>Process Payout</button>

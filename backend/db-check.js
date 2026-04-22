@@ -8,6 +8,9 @@ async function checkDatabaseSchema() {
     console.log('✅ Connection to database established.');
 
     const queryInterface = sequelize.getQueryInterface();
+    const dialect = sequelize.getDialect();
+    console.log(`✅ Database Dialect: ${dialect}`);
+
     const tables = await queryInterface.showAllTables();
     console.log('Tables found:', tables);
 
@@ -15,6 +18,9 @@ async function checkDatabaseSchema() {
       console.error('❌ Table "User" not found!');
       return;
     }
+
+    const userCount = await sequelize.query('SELECT COUNT(*) as count FROM User', { type: sequelize.QueryTypes.SELECT });
+    console.log(`✅ User table has ${userCount[0].count || userCount[0].COUNT || 0} rows.`);
 
     console.log('\n--- Checking Table: User ---');
     const columns = await queryInterface.describeTable('User');

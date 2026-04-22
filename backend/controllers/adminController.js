@@ -838,19 +838,46 @@ const getAllUsers = async (req, res) => {
 
     console.error(`[getAllUsers] Debug: Starting query with limit=${limitNum}, dialect=${sequelize.options.dialect}`);
 
-    const { count, rows: users } = await User.findAndCountAll({
+    const { count, rows: userRows } = await User.findAndCountAll({
       where,
-      attributes: { 
-        exclude: ['password'],
-        include: [
-          [literal('0'), 'referralCount'],
-          [literal('0'), 'totalCommission']
-        ]
-      },
+      attributes: { exclude: ['password'] },
       order: [['createdAt', 'DESC']],
       limit: limitNum,
       offset: offset
     });
+
+    // Safely fetch additional statistics for each user in parallel
+    const users = await Promise.all(userRows.map(async (userRow) => {
+      const user = userRow.get({ plain: true });
+      
+      // Initialize stats
+      user.referralCount = 0;
+      user.totalCommission = 0;
+
+      // Only calculate for marketers or users with referral codes
+      if (user.referralCode) {
+        try {
+          // 1. Calculate unique referrals (Users + Orders)
+          const [directRefs, orderUserRefs, orderGuestRefs] = await Promise.all([
+            User.count({ where: { referredByReferralCode: user.referralCode } }),
+            Order.count({ distinct: true, col: 'userId', where: { marketerId: user.id, userId: { [Op.ne]: null } } }),
+            Order.count({ distinct: true, col: 'customerEmail', where: { marketerId: user.id, userId: null, customerEmail: { [Op.ne]: null } } })
+          ]);
+          
+          user.referralCount = directRefs + orderUserRefs + orderGuestRefs;
+
+          // 2. Calculate Commissions
+          const commSum = await Commission.sum('commissionAmount', { 
+            where: { marketerId: user.id, status: { [Op.ne]: 'cancelled' } } 
+          });
+          user.totalCommission = parseFloat(commSum || 0);
+        } catch (statError) {
+          console.error(`[getAllUsers] Error fetching stats for user ${user.id}:`, statError.message);
+        }
+      }
+      
+      return user;
+    }));
 
     const totalPages = Math.ceil(count / limitNum);
 
@@ -1242,17 +1269,44 @@ const listMarketers = async (_req, res) => {
     const textCast = isSqlite ? 'TEXT' : 'CHAR';
     const quote = isSqlite ? '"' : '`';
 
-    const marketers = await User.findAll({
+    const marketersRows = await User.findAll({
       where: { role: 'marketer' },
-      attributes: {
-        exclude: ['password'],
-        include: [
-          [literal('0'), 'referralCount'],
-          [literal('0'), 'totalCommission'],
-          [literal('0'), 'totalRevenue']
-        ]
-      }
+      attributes: { exclude: ['password'] }
     });
+
+    const marketers = await Promise.all(marketersRows.map(async (userRow) => {
+      const user = userRow.get({ plain: true });
+      
+      user.referralCount = 0;
+      user.totalCommission = 0;
+      user.totalRevenue = 0;
+
+      if (user.referralCode) {
+        try {
+          // 1. Calculate unique referrals
+          const [directRefs, orderUserRefs, orderGuestRefs] = await Promise.all([
+            User.count({ where: { referredByReferralCode: user.referralCode } }),
+            Order.count({ distinct: true, col: 'userId', where: { marketerId: user.id, userId: { [Op.ne]: null } } }),
+            Order.count({ distinct: true, col: 'customerEmail', where: { marketerId: user.id, userId: null, customerEmail: { [Op.ne]: null } } })
+          ]);
+          user.referralCount = directRefs + orderUserRefs + orderGuestRefs;
+
+          // 2. Commissions & Revenue
+          const [commSum, revSum] = await Promise.all([
+            Commission.sum('commissionAmount', { where: { marketerId: user.id, status: { [Op.ne]: 'cancelled' } } }),
+            Order.sum('total', { where: { marketerId: user.id, status: { [Op.notIn]: ['cancelled', 'failed'] } } })
+          ]);
+          
+          user.totalCommission = parseFloat(commSum || 0);
+          user.totalRevenue = parseFloat(revSum || 0);
+        } catch (statError) {
+          console.error(`[listMarketers] Error fetching stats for user ${user.id}:`, statError.message);
+        }
+      }
+      
+      return user;
+    }));
+
     res.json(marketers);
   } catch (e) {
     res.status(500).json({ message: 'Error listing marketers', error: e.message });

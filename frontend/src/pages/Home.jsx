@@ -582,7 +582,7 @@ function Home({ isMarketingMode: propMarketingMode = false }) {
   }, []);
 
   // Instant Loading Implementation
-  const batchUrl = isMarketingMode ? '/ultra-fast/batch?marketing=true&ignoreCache=true' : '/ultra-fast/batch?ignoreCache=true';
+  const batchUrl = isMarketingMode ? `/ultra-fast/batch?marketing=true` : `/ultra-fast/batch`;
   const { data: homeBatchData, loading: hookLoading, error: hookError, refresh: refreshHomeData } = usePersistentFetch(
     // FORCE CACHE BUST FROM V15 -> V16
     `home_data_v19_critical_refresh_${isMarketingMode ? 'marketing' : 'personal'}`,

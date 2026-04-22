@@ -30,7 +30,7 @@ async function syncUserTable() {
         try {
           // Construct raw SQL for more control over ENUMs and types
           let sql = `ALTER TABLE User ADD COLUMN ${col.name} ${col.type}`;
-          if (col.defaultValue !== 'NULL') {
+          if (col.defaultValue !== 'NULL' && col.type !== 'JSON') {
             sql += ` DEFAULT ${col.defaultValue}`;
           }
           

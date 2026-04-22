@@ -245,25 +245,27 @@ const login = async (req, res) => {
     }
 
     // Find user by email or phone
-    console.log('[authController] Step 1: Querying User...');
+    const lookupKey = isEmail ? loginIdentifier.trim().toLowerCase() : loginIdentifier.trim();
+    console.log(`[authController] Step 1: Querying User by ${isEmail ? 'email' : 'phone'}: ${lookupKey}`);
+    
     const user = await User.findOne({
-      where: whereClause,
+      where: isEmail ? { email: lookupKey } : { phone: lookupKey },
       attributes: { exclude: ['emailVerificationToken', 'emailChangeToken', 'phoneOtp'] }
     });
-    console.log('[authController] Step 2: User found:', !!user);
-
+    
     if (!user) {
-      console.log('[authController] User not found return 401');
+      console.log(`[authController] ❌ User Not Found: ${lookupKey}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid email/phone or password.'
       });
     }
+    console.log(`[authController] ✅ User Found: ${user.email} (ID: ${user.id})`);
 
     // Check if email is verified (skip if placeholder)
     const isPlaceholderEmail = user.email && user.email.startsWith('noemail_');
     if (!user.emailVerified && !isPlaceholderEmail) {
-      console.log('[authController] Email not verified, returning 403 with needsVerification flag');
+      console.log(`[authController] ⚠️ Email not verified for: ${user.email}`);
       return res.status(403).json({
         success: false,
         needsVerification: true,
@@ -273,9 +275,8 @@ const login = async (req, res) => {
     }
 
     // Check if account is deactivated
-    console.log('[authController] Step 3: Checking deactivated/frozen status...');
     if (user.isDeactivated) {
-      console.log('[authController] Account deactivated return 403');
+      console.log(`[authController] 🚫 Account deactivated: ${user.email}`);
       return res.status(403).json({
         success: false,
         message: 'Your account is deactivated contact support team on 0757588395.'
@@ -285,10 +286,9 @@ const login = async (req, res) => {
     // Verify password
     console.log('[authController] Step 4: Comparing password...');
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log('[authController] Step 5: Password match:', isMatch);
-
+    
     if (!isMatch) {
-      console.log('[authController] Password mismatch return 401');
+      console.log(`[authController] ❌ Password Mismatch for: ${user.email}`);
 
       // Record failed login attempt (Backgrounded)
       const ipAddress = req.ip || req.connection.remoteAddress;

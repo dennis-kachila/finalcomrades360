@@ -95,6 +95,7 @@ const WithdrawalModal = ({ isOpen, onClose, balance, role, onSuccess }) => {
         }
 
         setSubmitting(true);
+        try {
             // Standardized unified endpoint
             const endpoint = '/wallet/withdraw';
 

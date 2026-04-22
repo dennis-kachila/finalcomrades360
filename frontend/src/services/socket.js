@@ -1,22 +1,23 @@
 import { io } from 'socket.io-client';
 
-// WebSocket server URL - using the same host as the API but with WebSocket protocol
-const getWsUrl = () => {
-  if (process.env.NODE_ENV === 'development') return 'ws://localhost:5001';
-  
-  // Use VITE_SOCKET_URL from environment if available (standard for production builds)
-  const envUrl = import.meta.env?.VITE_SOCKET_URL;
-  if (envUrl) {
-    // Convert https to wss or http to ws
-    return envUrl.replace(/^http/, 'ws');
+// Socket.IO server URL - MUST be http:// or https://, NOT ws:// or wss://.
+// socket.io-client handles the WebSocket upgrade handshake internally.
+// Passing wss:// directly skips the required HTTP handshake and causes 400 errors.
+const getSocketUrl = () => {
+  if (import.meta.env.DEV) return 'http://localhost:5001';
+
+  // Derive from VITE_API_URL (e.g. "https://comrades360.shop/api" -> "https://comrades360.shop")
+  const apiUrl = import.meta.env?.VITE_API_URL;
+  if (apiUrl) {
+    // Strip /api suffix to get the server root
+    return apiUrl.replace(/\/api\/?$/, '');
   }
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host;
-  return `${protocol}//${host}`;
+  // Final fallback: use current page origin (works when frontend & backend share the same domain)
+  return window.location.origin;
 };
 
-const WS_URL = getWsUrl();
+const WS_URL = getSocketUrl();
 
 let socket;
 let reconnectAttempts = 0;
@@ -33,7 +34,7 @@ const connectSocket = () => {
 
   // Create new socket connection
   socket = io(WS_URL, {
-    transports: ['websocket', 'polling'], // Prioritize WebSocket but keep polling as fallback
+    transports: ['polling', 'websocket'], // Default to polling first, upgrade to websocket if possible (fixes proxy/cPanel issues)
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,

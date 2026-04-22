@@ -476,7 +476,11 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: true
   },
-  transports: ['websocket', 'polling'], // Prioritize WebSocket but allow fallback to prevent 400 errors
+  // Accept both polling and websocket — polling is the stable fallback for cPanel/Passenger
+  // which may not support WebSocket upgrades through the proxy layer
+  transports: ['polling', 'websocket'],
+  allowUpgrades: true,   // Allow upgrade from polling -> websocket when the proxy supports it
+  allowEIO3: true,       // Backwards-compatible with Socket.IO v2 / EIO3 clients
   pingTimeout: 60000,
   pingInterval: 25000
 });

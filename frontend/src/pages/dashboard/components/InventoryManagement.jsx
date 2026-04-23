@@ -804,7 +804,7 @@ const InventoryManagement = ({ onBack }) => {
   const { overview, alerts } = inventoryData;
 
   return (
-    <div className="w-full h-full p-0 sm:p-6 overflow-y-auto">
+    <div className="w-full h-full p-0 sm:p-6 overflow-y-auto pb-32">
       <div className={`hidden md:block p-3 md:p-4 rounded-xl mb-4 md:mb-8 transition-colors duration-500 border-l-4 ${filters.itemType === 'fastfood' ? 'bg-orange-50 border-orange-500' : 'bg-blue-50 border-blue-500'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center">

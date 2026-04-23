@@ -493,10 +493,10 @@ const AppContent = () => {
                   <Route path="products/:view" element={<DashboardProducts />} />
                   <Route path="products/:view/:id" element={<DashboardProducts />} />
                   <Route path="products/comrades" element={<ComradesProducts />} />
-                  <Route path="products/comrades/new" element={<ComradesProductForm strictMode={true} taxonomyType="comrades" />} />
+                  <Route path="products/comrades/new" element={<ComradesProductForm />} />
                   <Route path="products/comrades/pending" element={<ComradesProducts status="pending" />} />
                   <Route path="products/comrades/rejected" element={<ComradesProducts status="rejected" />} />
-                  <Route path="products/comrades/:id/edit" element={<ComradesProductForm mode="edit" strictMode={true} taxonomyType="comrades" />} />
+                  <Route path="products/comrades/:id/edit" element={<ComradesProductForm mode="edit" />} />
                   <Route path="products/comrades/list/:id" element={<ComradesProductList />} />
 
                   <Route path="comrades-products" element={<Navigate to="products/comrades" replace />} />

@@ -56,7 +56,7 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 lg:ml-64">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 lg:ml-64 lg:h-[calc(100vh-64px)] overflow-hidden">
         {/* Mobile Header */}
         <header className="lg:hidden flex items-center justify-between p-3 border-b border-gray-100 bg-white sticky top-14 z-30 shadow-sm">
           <div className="flex items-center gap-3">
@@ -69,8 +69,8 @@ const Dashboard = () => {
         </header>
 
         {/* Dynamic Content */}
-        <main className="flex-1 flex flex-col bg-gray-50 relative custom-scrollbar pb-24 lg:pb-0 lg:overflow-y-auto lg:min-h-0">
-          <div className="w-full p-0 lg:p-4 min-h-full">
+        <main className="flex-1 flex flex-col bg-gray-50 relative custom-scrollbar pb-24 lg:pb-12 overflow-y-auto min-h-0">
+          <div className="w-full p-0 lg:p-4 min-h-0">
             <Outlet />
           </div>
         </main>

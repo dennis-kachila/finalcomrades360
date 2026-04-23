@@ -97,11 +97,17 @@ const PasswordPromptModal = ({ isOpen, onConfirm, onCancel, title, loading }) =>
 function MarketerProfileModal({ marketer, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     api.get(`/admin/marketing/marketers/${marketer.id}`)
       .then(r => setData(r.data))
-      .catch(() => { })
+      .catch(err => {
+        console.error('Error fetching marketer profile:', err);
+        setError('Failed to load profile data. Please try again.');
+      })
       .finally(() => setLoading(false));
   }, [marketer.id]);
 
@@ -130,6 +136,24 @@ function MarketerProfileModal({ marketer, onClose }) {
           <div className="p-20 text-center text-gray-400 flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
             Loading profile information...
+          </div>
+        ) : error ? (
+          <div className="p-20 text-center text-red-500 flex flex-col items-center gap-3">
+            <span className="text-4xl">⚠️</span>
+            <p className="font-medium text-lg">{error}</p>
+            <button 
+              onClick={() => {
+                setLoading(true);
+                setError(null);
+                api.get(`/admin/marketing/marketers/${marketer.id}`)
+                  .then(r => setData(r.data))
+                  .catch(err => setError('Failed to load profile data.'))
+                  .finally(() => setLoading(false));
+              }}
+              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-all font-bold"
+            >
+              Retry
+            </button>
           </div>
         ) : (
           <div className="p-6 space-y-8">

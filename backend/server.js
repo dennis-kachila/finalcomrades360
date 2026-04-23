@@ -129,7 +129,7 @@ app.use(compression());
 // Rate Limiting — protect against brute-force and abuse
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 300, // 300 requests per 15min per IP for general routes
+  max: 2000, // Increased from 300 to 2000 to allow rich SPA usage and avoid 429 errors on page load
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' },

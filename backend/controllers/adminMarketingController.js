@@ -1,5 +1,5 @@
 const { Op, literal } = require('sequelize');
-const { MarketingAnalytics, ReferralTracking, Commission, Product, Category, User, Order, OrderItem } = require('../models/index');
+const { MarketingAnalytics, ReferralTracking, Commission, Product, Category, User, Order, OrderItem, FastFood: FastFoodModel } = require('../models/index');
 
 // Helper: parse date range
 const getDateRange = (query) => {
@@ -145,43 +145,35 @@ const getMarketersLeaderboard = async (req, res) => {
     const sorter = sorters[sortBy] || sorters.commission;
     list.sort(sorter);
 
-    // Attach basic marketer info
-    const ids = list.map(x => x.marketerId).filter(Boolean);
+    const resultList = list.slice(0, Number(limit) || 20);
+    const ids = resultList.map(x => x.marketerId).filter(Boolean);
+
+    // Attach basic marketer info and referral count
     const users = await User.findAll({ 
       where: { id: { [Op.in]: ids } }, 
-      attributes: {
-        include: [
-          [
-            literal(`(
-              SELECT COUNT(DISTINCT \`identifier\`)
-              FROM (
-                SELECT CAST(\`id\` AS TEXT) as \`identifier\`
-                FROM \`User\` as \`u2\`
-                WHERE \`u2\`.\`referredByReferralCode\` = \`User\`.\`referralCode\`
-                
-                UNION
-                
-                SELECT CAST(\`userId\` AS TEXT) as \`identifier\`
-                FROM \`Order\` as \`o\`
-                WHERE \`o\`.\`marketerId\` = \`User\`.\`id\` AND \`o\`.\`userId\` IS NOT NULL
-                
-                UNION
-                
-                SELECT \`customerEmail\` as \`identifier\`
-                FROM \`Order\` as \`o2\`
-                WHERE \`o2\`.\`marketerId\` = \`User\`.\`id\` AND \`o2\`.\`userId\` IS NULL AND \`o2\`.\`customerEmail\` IS NOT NULL
-              )
-            )`),
-            'referralCount'
-          ]
-        ]
-      },
+      attributes: ['id', 'name', 'email', 'referralCode'],
       raw: true 
     });
-    const byId = new Map(users.map(u => [u.id, u]));
-    const withUsers = list.map(x => ({ ...x, user: byId.get(x.marketerId) || null }));
 
-    return res.json({ items: withUsers.slice(0, Number(limit) || 20) });
+    // Fetch referral counts separately for each user to avoid subquery alias issues in different dialects
+    const withUsers = await Promise.all(resultList.map(async (item) => {
+      const user = users.find(u => u.id === item.marketerId);
+      let referralCount = 0;
+      if (user) {
+        // Count registrations
+        const regCount = await User.count({ where: { referredByReferralCode: user.referralCode || '—' } });
+        // Count orders (unique customers)
+        const orderCustomers = await Order.count({
+          where: { marketerId: user.id },
+          distinct: true,
+          col: 'customerEmail' // Fallback for guest orders
+        });
+        referralCount = regCount + orderCustomers;
+      }
+      return { ...item, user: user ? { ...user, referralCount } : null };
+    }));
+
+    return res.json({ items: withUsers });
   } catch (err) {
     console.error('Admin getMarketersLeaderboard error:', err);
     return res.status(500).json({ message: 'Failed to load marketers leaderboard' });
@@ -192,36 +184,14 @@ const getMarketerProfile = async (req, res) => {
   try {
     const marketerId = Number(req.params.id);
     const dateWhere = getDateRange(req.query);
+    console.log(`[DEBUG] Fetching profile for marketerId: ${marketerId}, FastFoodModel exists: ${!!FastFoodModel}`);
 
     // Fetch full user details for profile
     const user = await User.findByPk(marketerId, {
       attributes: [
         'id', 'name', 'email', 'phone', 'role', 'referralCode', 'isDeactivated',
         'gender', 'dateOfBirth', 'campus', 'county', 'town', 'estate', 'houseNumber',
-        'nationalIdNumber', 'nationalIdStatus', 'nationalIdUrl', 'profileImage',
-        [
-          literal(`(
-            SELECT COUNT(DISTINCT \`identifier\`)
-            FROM (
-              SELECT CAST(\`id\` AS TEXT) as \`identifier\`
-              FROM \`User\` as \`u2\`
-              WHERE \`u2\`.\`referredByReferralCode\` = \`User\`.\`referralCode\`
-              
-              UNION
-              
-              SELECT CAST(\`userId\` AS TEXT) as \`identifier\`
-              FROM \`Order\` as \`o\`
-              WHERE \`o\`.\`marketerId\` = \`User\`.\`id\` AND \`o\`.\`userId\` IS NOT NULL
-              
-              UNION
-              
-              SELECT \`customerEmail\` as \`identifier\`
-              FROM \`Order\` as \`o2\`
-              WHERE \`o2\`.\`marketerId\` = \`User\`.\`id\` AND \`o2\`.\`userId\` IS NULL AND \`o2\`.\`customerEmail\` IS NOT NULL
-            )
-          )`),
-          'referralCount'
-        ]
+        'nationalIdNumber', 'nationalIdStatus', 'nationalIdUrl', 'profileImage'
       ],
       raw: true
     });
@@ -229,6 +199,15 @@ const getMarketerProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'Marketer not found' });
     }
+
+    // Referral count (registrations + unique customer orders)
+    const regCount = await User.count({ where: { referredByReferralCode: user.referralCode || '—' } });
+    const orderCustomers = await Order.count({
+      where: { marketerId: user.id },
+      distinct: true,
+      col: 'customerEmail'
+    });
+    user.referralCount = regCount + orderCustomers;
 
     // KPIs from commissions
     const commissions = await Commission.findAll({ where: { marketerId, ...dateWhere }, raw: true });
@@ -275,7 +254,6 @@ const getMarketerProfile = async (req, res) => {
         if (a.actionType === 'click') performanceMap[gId].clicks += 1;
         if (a.actionType === 'share') performanceMap[gId].shares += 1;
       } else {
-        // Even if no conversion, track activity
         performanceMap[gId] = {
           productId: a.productId,
           fastFoodId: a.fastFoodId,
@@ -294,9 +272,14 @@ const getMarketerProfile = async (req, res) => {
     const fastFoodIds = Object.values(performanceMap).map(r => r.fastFoodId).filter(Boolean);
 
     const [products, fastfoods] = await Promise.all([
-      Product.findAll({ where: { id: { [Op.in]: productIds } }, attributes: ['id', 'name', 'categoryId'], raw: true }),
-      FastFood.findAll({ where: { id: { [Op.in]: fastFoodIds } }, attributes: ['id', 'name'], raw: true })
+      productIds.length > 0 
+        ? Product.findAll({ where: { id: { [Op.in]: productIds } }, attributes: ['id', 'name', 'categoryId'], raw: true })
+        : Promise.resolve([]),
+      fastFoodIds.length > 0
+        ? FastFoodModel.findAll({ where: { id: { [Op.in]: fastFoodIds } }, attributes: ['id', 'name'], raw: true })
+        : Promise.resolve([])
     ]);
+
 
     const cats = await Category.findAll({ attributes: ['id', 'name'], raw: true });
     const catById = new Map(cats.map(c => [c.id, c.name]));
@@ -340,7 +323,10 @@ const getMarketerProfile = async (req, res) => {
     });
   } catch (err) {
     console.error('Admin getMarketerProfile error:', err);
-    return res.status(500).json({ message: 'Failed to load marketer profile' });
+    return res.status(500).json({ 
+      message: 'Failed to load marketer profile',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined 
+    });
   }
 };
 

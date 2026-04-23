@@ -1067,6 +1067,9 @@ const ComradesProductForm = ({
       setProductName(value);
     }
 
+    // Clear submit error when user starts correcting the form
+    if (errorMsg) setErrorMsg('');
+
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -2030,7 +2033,12 @@ const ComradesProductForm = ({
         console.error('Status code:', error.response.status);
 
         if (error.response.status === 403) {
-          errorMessage = 'You do not have permission to perform this action. Please check your account permissions.';
+          // Use actual server message if available (e.g. SELLER_PROFILE_INCOMPLETE)
+          errorMessage = error.response.data?.message ||
+            'You do not have permission to perform this action. Please check your account permissions.';
+          if (error.response.data?.code === 'SELLER_PROFILE_INCOMPLETE') {
+            errorMessage = 'Your seller profile is incomplete. Please go to your Business Location settings and fill in all required details before creating a product.';
+          }
         } else if (error.response.status === 401) {
           errorMessage = 'Your session has expired. Please log in again.';
           setTimeout(() => navigate('/login'), 2000);
@@ -2066,6 +2074,9 @@ const ComradesProductForm = ({
       // Show the error with additional details
       const fullErrorMessage = errorDetails ? `${errorMessage}. ${errorDetails}` : errorMessage;
 
+      // Set inline error so it shows at the bottom of the form (visible without scrolling)
+      setErrorMsg(fullErrorMessage);
+
       setModalConfig({
         type: 'error',
         title: 'Save Failed',
@@ -2079,6 +2090,11 @@ const ComradesProductForm = ({
         variant: 'destructive',
         duration: 8000, // Show longer for validation errors
       });
+
+      // Scroll the error into view after a short delay
+      setTimeout(() => {
+        document.getElementById('comrades-form-error-banner')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 200);
     } finally {
       setLoading(false);
     }
@@ -2089,9 +2105,9 @@ const ComradesProductForm = ({
   const isSuperAdminCreate = !id && initialProduct?.addedBy?.role === 'superadmin';
 
   return (
-    <div className="w-full max-w-5xl ml-0 mr-auto overflow-x-hidden">
+    <div className="w-auto max-w-5xl ml-0 mr-auto overflow-x-hidden mx-2 sm:mx-0">
       <div className="sm:rounded-lg rounded-none shadow-md sm:shadow-lg bg-white overflow-hidden">
-        <div className="p-2 sm:p-5 md:p-8">
+        <div className="px-3 py-4 sm:p-5 md:p-8">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-4">
               <Button
@@ -3544,7 +3560,30 @@ const ComradesProductForm = ({
 
                 {/* Action buttons - Only show in Edit/Create/List mode */}
                 {(!effectiveIsViewMode || isEditing) && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t bg-white mt-8 p-4 sm:p-0">
+                  <div className="flex flex-col gap-0">
+                  {/* Inline error banner — visible at form bottom without scrolling */}
+                  {errorMsg && (
+                    <div
+                      id="comrades-form-error-banner"
+                      className="flex items-start gap-3 bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-r-lg shadow-sm mb-0"
+                      role="alert"
+                    >
+                      <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-sm">Failed to save product</p>
+                        <p className="text-sm mt-0.5">{errorMsg}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setErrorMsg('')}
+                        className="text-red-400 hover:text-red-600 transition-colors"
+                        aria-label="Dismiss error"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t bg-white mt-4 p-4 sm:p-0">
                     <AutoSaveIndicator 
                       lastSaved={autoLastSaved} 
                       isSaving={false} 
@@ -3592,6 +3631,7 @@ const ComradesProductForm = ({
                         )}
                       </button>
                     </div>
+                  </div>
                   </div>
                 )}
               </form>

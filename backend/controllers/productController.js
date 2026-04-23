@@ -72,7 +72,9 @@ const createProduct = async (req, res) => {
     basePrice,
     stock,
     categoryId,
-    subcategoryId
+    subcategoryId,
+    discountPercentage,
+    discountPrice
   } = req.body;
   const isDraft = ['1', 'true', true].includes((req.body.draft ?? '').toString().toLowerCase());
   
@@ -134,6 +136,22 @@ const createProduct = async (req, res) => {
   const missing = [];
   const effectiveShortDescription = (shortDescription || description || '').trim();
 
+  // deliveryMethod can come from body or logistics in merged tags
+  let deliveryMethod = '';
+  if (req.body.deliveryMethod) {
+    try {
+      deliveryMethod = String(req.body.deliveryMethod).trim();
+    } catch (e) {
+      console.error('Error processing deliveryMethod:', e);
+    }
+  } else if (mergedTags?.logistics?.deliveryMethod) {
+    try {
+      deliveryMethod = String(mergedTags.logistics.deliveryMethod).trim();
+    } catch (e) {
+      console.error('Error processing deliveryMethod from logistics:', e);
+    }
+  }
+
   if (!isDraft) {
     if (!normalizedName || !normalizedName.trim()) missing.push('name');
     
@@ -156,22 +174,6 @@ const createProduct = async (req, res) => {
     if (!unitOfMeasure || !unitOfMeasure.trim()) missing.push('unitOfMeasure');
     // Newly required fields
     if (!fullDescription || !fullDescription.trim()) missing.push('fullDescription');
-    
-    // deliveryMethod can come from body or logistics in merged tags
-    let deliveryMethod = '';
-    if (req.body.deliveryMethod) {
-      try {
-        deliveryMethod = String(req.body.deliveryMethod).trim();
-      } catch (e) {
-        console.error('Error processing deliveryMethod:', e);
-      }
-    } else if (mergedTags?.logistics?.deliveryMethod) {
-      try {
-        deliveryMethod = String(mergedTags.logistics.deliveryMethod).trim();
-      } catch (e) {
-        console.error('Error processing deliveryMethod from logistics:', e);
-      }
-    }
 
     if (!deliveryMethod) {
       missing.push('deliveryMethod');

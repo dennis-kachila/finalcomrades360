@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { FaStore, FaMapMarkerAlt, FaPhone, FaSave, FaExclamationTriangle } from 'react-icons/fa';
 import api from '../../services/api';
 import { isSellerProfileComplete } from '../../utils/sellerUtils';
@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function SellerBusinessLocation() {
     const location = useLocation();
+    const navigate = useNavigate();
     const { updateUser } = useAuth();
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -124,6 +125,7 @@ export default function SellerBusinessLocation() {
             setProfileComplete(true);
             setShowWarning(false);
             alert('✅ Business location saved successfully! Your seller profile is now active.');
+            navigate('/seller');
         } catch (error) {
             console.error('Error saving location:', error);
             alert('Failed to save business location: ' + (error.response?.data?.message || error.message));

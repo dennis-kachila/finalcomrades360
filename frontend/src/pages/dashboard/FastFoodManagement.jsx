@@ -1348,7 +1348,7 @@ const FastFoodManagement = () => {
   };
 
   return (
-    <div className="min-h-screen bg-transparent">
+    <div className="min-h-screen bg-transparent pb-32">
       <div className="w-full">
 
         {/* Tab Navigation Bar - Docked at the top */}

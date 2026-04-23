@@ -1416,6 +1416,7 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
           description: 'Please select a category or subcategory',
           variant: 'destructive',
         });
+        setErrorMsg('Please select a category or subcategory.');
         setLoading(false);
         isSavingRef.current = false;
         return;
@@ -1429,6 +1430,7 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
             description: 'Please upload a cover image',
             variant: 'destructive',
           });
+          setErrorMsg('Please upload a cover image.');
           setLoading(false);
           isSavingRef.current = false;
           return;
@@ -1441,6 +1443,7 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
             description: 'Please add at least 2 gallery images.',
             variant: 'destructive',
           });
+          setErrorMsg('Please add at least 2 gallery images.');
           setLoading(false);
           isSavingRef.current = false;
           return;
@@ -1452,6 +1455,7 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
             description: 'You can add up to 5 gallery images.',
             variant: 'destructive',
           });
+          setErrorMsg('You can add up to 5 gallery images.');
           setLoading(false);
           isSavingRef.current = false;
           return;
@@ -1475,6 +1479,7 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
             description: 'You already have a product with this name in the selected category. Please choose a different name or category.',
             variant: 'destructive',
           });
+          setErrorMsg('You already have a product with this name in the selected category. Please choose a different name or category.');
           setLoading(false);
           isSavingRef.current = false;
           return;
@@ -1774,6 +1779,7 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
         description: errorMessage,
         onConfirm: () => setShowModal(false) // Close the modal
       });
+      setErrorMsg(errorMessage);
       setShowModal(true);
 
       toast({
@@ -1822,7 +1828,7 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
   }, [formData.categoryId, allCategories]);
 
   return (
-    <div className="p-0 sm:p-4 md:p-6 w-full overflow-x-hidden">
+    <div className="px-3 py-4 sm:p-4 md:p-6 w-auto overflow-x-hidden mx-2 sm:mx-0">
       {mode === 'edit' && (
         <div className="mb-6">
           <Button
@@ -2580,7 +2586,7 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
                   {/* Cover Image */}
                   <div>
                     <Label htmlFor="coverImage">
-                      Cover Image
+                      Cover Image {mode !== 'edit' && '*'}
                     </Label>
                     <Input
                       id="coverImage"
@@ -2823,6 +2829,23 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
                       </Button>
                     )}
                   </div>
+                  {errorMsg && (
+                    <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-2 shadow-sm rounded-r-md">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-red-800">Failed to create product</h3>
+                          <div className="mt-2 text-sm text-red-700">
+                            <p>{errorMsg}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <Button type="submit" disabled={loading}>
                     {loading ? (
                       <>

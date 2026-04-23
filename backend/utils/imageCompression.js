@@ -73,7 +73,7 @@ async function compressImage(inputPath, outputPath, options = {}) {
       originalSize,
       compressedSize,
       compressionRatio: `${compressionRatio}%`,
-      finalQuality: currentQuality,
+      finalQuality: finalQuality,
       newDimensions: { width: newWidth, height: newHeight },
       savedBytes: originalSize - compressedSize
     };

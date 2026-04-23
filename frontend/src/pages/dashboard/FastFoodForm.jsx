@@ -119,7 +119,7 @@ const FastFoodForm = ({
       mainImage: null,
       existingMainImage: null,
       deliveryTimeEstimateMinutes: '',
-      pickupAvailable: true,
+      pickupAvailable: false,
       pickupLocation: '',
       deliveryAreaLimits: '',
       tags: '',
@@ -206,17 +206,17 @@ const FastFoodForm = ({
     existingMainImage: null,
     // Delivery Rules
     deliveryTimeEstimateMinutes: '',
-    pickupAvailable: true,
+    pickupAvailable: false,
     pickupLocation: '',
     deliveryAreaLimits: '',
     // Additional Fields
     tags: '',
     ingredients: '',
     // NEW FIELDS
-    estimatedServings: '1 person',
+    estimatedServings: '',
     dietaryTags: [],
     isFeatured: false,
-    minOrderQty: 1,
+    minOrderQty: '',
     maxOrderQty: '',
     allergens: [],
     nutritionalInfo: {
@@ -680,13 +680,13 @@ const FastFoodForm = ({
             discountPercentage: item.discountPercentage || '',
             isActive: item.isActive,
             preparationTimeMinutes: item.preparationTimeMinutes || '',
-            availableFrom: item.availableFrom || '08:00',
-            availableTo: item.availableTo || '22:00',
+            availableFrom: item.availableFrom || '',
+            availableTo: item.availableTo || '',
             mainImage: null, // We don't pre-fill file inputs, but track if it's a new upload
             existingMainImage: item.mainImage || null, // Store existing image URL
             // Delivery Rules
             deliveryTimeEstimateMinutes: item.deliveryTimeEstimateMinutes || '',
-            pickupAvailable: item.pickupAvailable !== undefined ? item.pickupAvailable : true,
+            pickupAvailable: item.pickupAvailable !== undefined ? item.pickupAvailable : false,
             pickupLocation: item.pickupLocation || '',
             deliveryAreaLimits: ensureArray(item.deliveryAreaLimits).join(', '),
             // Additional Fields
@@ -748,12 +748,12 @@ const FastFoodForm = ({
             estimatedServings: item.estimatedServings || '1 person',
             dietaryTags: Array.isArray(item.dietaryTags) ? item.dietaryTags : [],
             isFeatured: item.isFeatured || false,
-            minOrderQty: item.minOrderQty || 1,
+            minOrderQty: item.minOrderQty !== undefined && item.minOrderQty !== null ? item.minOrderQty : '',
             maxOrderQty: item.maxOrderQty || '',
             allergens: ensureArray(item.allergens),
             // Delivery Configuration
             deliveryFeeType: item.deliveryFeeType || 'fixed',
-            deliveryFee: item.deliveryFee || 0,
+            deliveryFee: item.deliveryFee !== undefined && item.deliveryFee !== null ? item.deliveryFee : '',
             deliveryCoverageZones: ensureArray(item.deliveryCoverageZones).join(', '),
             // Marketing Configuration
             marketingCommissionType: item.marketingCommissionType || 'flat',
@@ -822,7 +822,12 @@ const FastFoodForm = ({
       setFormData(prev => ({ 
         ...prev, 
         category: '', 
-        subcategoryId: '' 
+        subcategoryId: '',
+        deliveryTimeEstimateMinutes: '',
+        pickupAvailable: false,
+        estimatedServings: '',
+        availableFrom: '',
+        availableTo: ''
       }));
       hasResetNewForm.current = true;
     }
@@ -1446,7 +1451,7 @@ const FastFoodForm = ({
         // Other fields
         submitData.append('estimatedServings', formData.estimatedServings || '1 person');
         submitData.append('isFeatured', String(formData.isFeatured));
-        submitData.append('minOrderQty', String(formData.minOrderQty || '1'));
+        submitData.append('minOrderQty', String(formData.minOrderQty || ''));
         if (formData.maxOrderQty) submitData.append('maxOrderQty', String(formData.maxOrderQty));
         submitData.append('dietaryTags', JSON.stringify(formData.dietaryTags || []));
 
@@ -1653,7 +1658,7 @@ const FastFoodForm = ({
   if (subcategoriesLoading) {
     console.log('FastFoodForm: Showing subcategories loading state');
     return (
-      <div className="bg-white rounded-lg shadow p-0 sm:p-6">
+      <div className="bg-white rounded-lg shadow px-3 py-4 sm:p-6">
         <div className="flex items-center mb-6">
           <Button
             variant="ghost"
@@ -1687,7 +1692,7 @@ const FastFoodForm = ({
   console.log('FastFoodForm: Rendering main form');
 
   return (
-    <div className="bg-white rounded-lg shadow p-0 sm:p-6 mx-0">
+    <div className="bg-white rounded-lg shadow px-3 py-4 sm:p-6 mx-2 sm:mx-0">
       <div className="flex items-center mb-6">
         <Button
           variant="ghost"
@@ -1859,7 +1864,7 @@ const FastFoodForm = ({
                 onChange={handleInputChange}
                 required
                 min="1"
-                placeholder="15"
+                placeholder=""
                 disabled={isViewMode}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -1971,7 +1976,7 @@ const FastFoodForm = ({
                 onChange={handleInputChange}
                 required
                 min="1"
-                placeholder="1"
+                placeholder=""
                 disabled={isViewMode}
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -2323,7 +2328,7 @@ const FastFoodForm = ({
                 onChange={handleInputChange}
                 required
                 min="1"
-                placeholder="15"
+                placeholder=""
                 disabled={isViewMode}
                 className="w-full px-4 py-3 border-2 border-blue-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 font-semibold shadow-sm transition-all"
               />
@@ -2361,7 +2366,7 @@ const FastFoodForm = ({
                       type="number"
                       value={formData.deliveryFee}
                       onChange={handleInputChange}
-                      placeholder="0"
+                      placeholder=""
                       min="0"
                       max={formData.deliveryFeeType === 'percentage' ? 100 : undefined}
                       disabled={isViewMode}
@@ -3050,8 +3055,8 @@ const FastFoodForm = ({
           )
         }
 
-        {/* Actions */}
-        <div className="pt-6 border-t flex items-center justify-between">
+        {/* Actions - Integrated Action Bar */}
+        <div className="flex items-center justify-between pt-8 border-t mt-10">
           <Button
             type="button"
             variant="ghost"
@@ -3092,7 +3097,7 @@ const FastFoodForm = ({
               <Button
                 type="button"
                 disabled={loading}
-                className="bg-orange-600 hover:bg-orange-700"
+                className="bg-orange-600 hover:bg-orange-700 shadow-md transition-all active:scale-95"
                 onClick={(e) => {
                   e.preventDefault(); // Safety precaution
                   console.log('🔘 Submit button clicked (Manual Handler)');

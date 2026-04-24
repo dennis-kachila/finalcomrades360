@@ -105,7 +105,7 @@ export default function SellerOrders() {
         else if (activeTab === 'finalized') statuses = [...new Set(FINALIZED_STATUSES)].join(',');
         else if (activeTab === 'returns') statuses = [...new Set(RETURN_STATUSES)].join(',');
 
-        const url = `/sellers/orders?status=${statuses}&page=${currentPage}&pageSize=${pageSize}`;
+        const url = `/seller/orders?status=${statuses}&page=${currentPage}&pageSize=${pageSize}`;
         const res = await Promise.race([api.get(url), timeout(30000)]);
 
         if (alive) {

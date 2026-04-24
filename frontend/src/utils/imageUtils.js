@@ -202,7 +202,7 @@ export const resolveImageUrl = (imageUrl, baseUrl = null, version = null) => {
       // Default to product uploads unless filename or baseUrl suggests otherwise
       let uploadDir = 'uploads/products';
 
-      if (pathPart.includes('mainImage-')) {
+      if (pathPart.includes('mainImage-') || pathPart.includes('mainImage_')) {
         uploadDir = 'uploads/other';
       } else if (pathPart.includes('food') || (baseUrl && baseUrl.includes('food'))) {
         uploadDir = 'uploads/fastfood';
@@ -247,10 +247,21 @@ export const getResizedImageUrl = (imageUrl, options = {}) => {
     return resolvedUrl;
   }
 
-  // Extract the path relative to the backend (i.e., starting with /uploads)
   // resolvedUrl typically starts with /uploads/... due to resolveImageUrl
+  // If it's a full URL, we need to extract only the path part for the resize API
+  let imagePath = resolvedUrl;
+  
+  if (imagePath.includes('://')) {
+    try {
+      const urlObj = new URL(imagePath);
+      imagePath = urlObj.pathname;
+    } catch (e) {
+      console.warn('[getResizedImageUrl] Failed to parse URL:', imagePath);
+    }
+  }
+
   // CRITICAL FIX: Split by '?' to remove any existing cache busting parameters from the file path
-  const imagePath = resolvedUrl.split('?')[0];
+  imagePath = imagePath.split('?')[0];
 
   const width = options.width ? `&width=${options.width}` : '';
   const height = options.height ? `&height=${options.height}` : '';

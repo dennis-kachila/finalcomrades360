@@ -56,7 +56,7 @@ const SellerProductView = () => {
       try {
         console.log(`Fetching product with ID: ${id}`);
         // First get the product
-        const productResponse = await api.get(`/sellers/products/${id}`, {
+        const productResponse = await api.get(`/seller/products/${id}`, {
           validateStatus: function (status) {
             return status >= 200 && status < 300; // default
           }

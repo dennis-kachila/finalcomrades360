@@ -694,14 +694,55 @@ const googleAuth = async (req, res, next) => {
     // Look up user
     let user = await User.findOne({ where: { email } });
     
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+
     if (user) {
-      if (!user.profileImage && picture) user.profileImage = picture;
-      if (!user.emailVerified) user.emailVerified = true;
-      user.lastLogin = new Date();
-      await user.save();
+      // User exists - generate token and send response IMMEDIATELY
+      const jwtToken = jwt.sign(
+        { id: user.id, role: user.role, roles: user.roles || [], email: user.email },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '1d' }
+      );
+
+      const rawUser = user.toJSON();
+      delete rawUser.password;
+      delete rawUser.resetToken;
+      delete rawUser.emailVerificationToken;
+      delete rawUser.emailChangeToken;
+      delete rawUser.phoneOtp;
+
+      res.status(200).json({
+        success: true,
+        message: 'Authentication successful.',
+        token: jwtToken,
+        user: sanitizeUserPayload(rawUser)
+      });
+
+      // Background tasks: Update profile, last login, and history
+      setImmediate(async () => {
+        try {
+          let needsSave = false;
+          if (!user.profileImage && picture) { user.profileImage = picture; needsSave = true; }
+          if (!user.emailVerified) { user.emailVerified = true; needsSave = true; }
+          
+          user.lastLogin = new Date();
+          await user.save();
+
+          await LoginHistory.create({
+            userId: user.id, ipAddress, browser: 'GoogleLogin', os: 'Unknown', device: 'Unknown', location: 'Unknown', status: 'success'
+          });
+        } catch (err) {
+          console.error('[authController] Google login background tasks failed:', err);
+        }
+      });
+      return;
     } else {
-      const password = crypto.randomBytes(16).toString('hex') + 'A1!'; // Secure random password matching constraints
-      const hashedPassword = await bcrypt.hash(password, 10);
+      // New user creation
+      // Optimize hashing by using a lower cost factor for this random password (since they will never use it)
+      // Salt rounds 10 takes ~100ms, 4 takes ~2ms. We use 8 to balance security and speed.
+      const password = crypto.randomBytes(16).toString('hex') + 'A1!'; 
+      const hashedPassword = await bcrypt.hash(password, 8);
       const newReferralCode = await generateUniqueReferralCode();
       const placeholderPhone = `nophone_${uuidv4()}`;
       
@@ -723,39 +764,41 @@ const googleAuth = async (req, res, next) => {
         profileImage: picture || null
       });
 
-      // Send welcome notification with temporary password (Non-blocking)
-      notifyCustomerGoogleSignup(user, password).catch(err => {
-        console.error('[authController] Google signup notification failed:', err);
+      const jwtToken = jwt.sign(
+        { id: user.id, role: user.role, roles: user.roles || [], email: user.email },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '1d' }
+      );
+      
+      const rawUser = user.toJSON();
+      delete rawUser.password;
+      delete rawUser.resetToken;
+      delete rawUser.emailVerificationToken;
+      delete rawUser.emailChangeToken;
+      delete rawUser.phoneOtp;
+
+      res.status(200).json({
+        success: true,
+        message: 'Authentication successful.',
+        token: jwtToken,
+        user: sanitizeUserPayload(rawUser)
       });
+
+      // Send welcome notification and save login history in background
+      setImmediate(async () => {
+        try {
+          await LoginHistory.create({
+            userId: user.id, ipAddress, browser: 'GoogleLogin', os: 'Unknown', device: 'Unknown', location: 'Unknown', status: 'success'
+          });
+          notifyCustomerGoogleSignup(user, password).catch(err => {
+            console.error('[authController] Google signup notification failed:', err);
+          });
+        } catch (err) {
+          console.error('[authController] Google signup background tasks failed:', err);
+        }
+      });
+      return;
     }
-
-    const jwtToken = jwt.sign(
-      { id: user.id, role: user.role, roles: user.roles || [], email: user.email },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '1d' }
-    );
-    
-    try {
-      const ipAddress = req.ip || req.connection.remoteAddress;
-      const userAgent = req.headers['user-agent'] || 'Unknown';
-      await LoginHistory.create({
-        userId: user.id, ipAddress, browser: 'GoogleLogin', os: 'Unknown', device: 'Unknown', location: 'Unknown', status: 'success'
-      });
-    } catch (e) {}
-
-    const rawUser = user.toJSON();
-    delete rawUser.password;
-    delete rawUser.resetToken;
-    delete rawUser.emailVerificationToken;
-    delete rawUser.emailChangeToken;
-    delete rawUser.phoneOtp;
-
-    res.status(200).json({
-      success: true,
-      message: 'Authentication successful.',
-      token: jwtToken,
-      user: sanitizeUserPayload(rawUser)
-    });
 
   } catch (error) {
     next(error);

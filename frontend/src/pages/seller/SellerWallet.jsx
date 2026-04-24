@@ -23,7 +23,7 @@ const SellerWallet = () => {
   const fetchWalletData = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/sellers/wallet');
+      const res = await api.get('/seller/wallet');
       setWalletData(res.data);
     } catch (error) {
       console.error('Failed to fetch wallet data:', error);

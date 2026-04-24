@@ -84,14 +84,7 @@ export default function SellerProducts() {
     }
   };
 
-  const resolveImageUrl = (url) => {
-    const FALLBACK = 'data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22 viewBox=%220 0 400 300%22%3E%3Crect width=%22400%22 height=%22300%22 fill=%22%23e5e7eb%22/%3E%3Ctext x=%22200%22 y=%22160%22 font-size=%2216%22 text-anchor=%22middle%22 fill=%22%236b7280%22%3ENo Image Available%3C/text%3E%3C/svg%3E'
-    if (!url) return FALLBACK
-    if (/^data:image\//i.test(url)) return url
-    if (/^https?:\/\//i.test(url)) return url
-    const fileBase = api.defaults.baseURL?.replace(/\/?api\/?$/, '') || '';
-    return `${fileBase}/${String(url).replace(/^\/+/, '')}`
-  }
+  // Removed local resolveImageUrl as it is now imported from utils/imageUtils
 
   useEffect(() => {
     let alive = true;
@@ -103,9 +96,9 @@ export default function SellerProducts() {
         const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch Timeout')), ms));
 
         let url = '';
-        if (activeTab === 'approved_products') url = `/sellers/products?approved=true&page=${currentPage}&pageSize=${pageSize}`;
-        else if (activeTab === 'pending_products') url = `/sellers/products?approved=false&page=${currentPage}&pageSize=${pageSize}`;
+        if (activeTab === 'approved_products') url = `/seller/products?approved=true&page=${currentPage}&pageSize=${pageSize}`;
         else if (activeTab === 'approved_fastfood') url = `/fastfood/vendor/me?approved=true&page=${currentPage}&pageSize=${pageSize}`;
+        else if (activeTab === 'pending_products') url = `/seller/products?approved=false&page=${currentPage}&pageSize=${pageSize}`;
         else if (activeTab === 'pending_fastfood') url = `/fastfood/vendor/me?approved=false&page=${currentPage}&pageSize=${pageSize}`;
 
         const res = await Promise.race([api.get(url), timeout(30000)]);

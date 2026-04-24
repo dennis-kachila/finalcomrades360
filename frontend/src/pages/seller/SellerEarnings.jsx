@@ -9,7 +9,7 @@ export default function SellerEarnings(){
     let alive=true
     const load=async()=>{
       try{
-        const os = await api.get('/sellers/orders')
+        const os = await api.get('/seller/orders')
         if (!alive) return
         setOrders(os.data||[])
       }catch(e){} finally{ if(alive) setLoading(false) }

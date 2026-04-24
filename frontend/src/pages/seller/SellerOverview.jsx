@@ -79,8 +79,8 @@ export default function SellerOverview() {
       try {
         // ── Try the single optimized endpoint first ──────────────────────────
         try {
-          const res = await timed('GET /sellers/overview (single call)', () =>
-            withTimeout(api.get('/sellers/overview'), 10000, '/sellers/overview')
+          const res = await timed('GET /seller/overview (single call)', () =>
+            withTimeout(api.get('/seller/overview'), 10000, '/seller/overview')
           );
           if (!alive) return;
           const { products: p, fastFoods: f, orders: o, kpis } = res.data;
@@ -106,17 +106,17 @@ export default function SellerOverview() {
         console.log('📡 [Overview] Running 4 parallel API calls with 10s timeouts each...');
 
         const [pRes, oRes, fRes, kRes] = await Promise.allSettled([
-          timed('GET /sellers/products?pageSize=6', () =>
-            withTimeout(api.get('/sellers/products?page=1&pageSize=6'), 10000, 'products')
+          timed('GET /seller/products?pageSize=6', () =>
+            withTimeout(api.get('/seller/products?page=1&pageSize=6'), 10000, 'products')
           ),
-          timed('GET /sellers/orders?pageSize=6', () =>
-            withTimeout(api.get('/sellers/orders?page=1&pageSize=6'), 10000, 'orders')
+          timed('GET /seller/orders?pageSize=6', () =>
+            withTimeout(api.get('/seller/orders?page=1&pageSize=6'), 10000, 'orders')
           ),
           timed('GET /fastfood/vendor/me?pageSize=6', () =>
             withTimeout(api.get('/fastfood/vendor/me?page=1&pageSize=6'), 10000, 'fastfood')
           ),
-          timed('GET /sellers/kpis', () =>
-            withTimeout(api.get('/sellers/kpis'), 10000, 'kpis')
+          timed('GET /seller/kpis', () =>
+            withTimeout(api.get('/seller/kpis'), 10000, 'kpis')
           ),
         ]);
 

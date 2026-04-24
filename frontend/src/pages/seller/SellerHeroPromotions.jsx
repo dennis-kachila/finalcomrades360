@@ -80,7 +80,7 @@ export default function SellerHeroPromotions() {
       setLoading(true)
       try {
         await Promise.all([
-          api.get('/sellers/products').then(r => {
+          api.get('/seller/products').then(r => {
             const list = Array.isArray(r.data) ? r.data : (r.data?.data || [])
             setProducts(list)
           }),

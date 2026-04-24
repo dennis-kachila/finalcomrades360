@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Product, Category, Order, OrderItem, User, FastFood, DeliveryTask, Warehouse, PickupStation, Batch } = require('../models/index');
+const { Product, Category, Order, OrderItem, User, FastFood, DeliveryTask, Warehouse, PickupStation, Batch, sequelize } = require('../models/index');
 
 const getMyProducts = async (req, res, next) => {
   console.log(`[getMyProducts] User: ${req?.user?.id} Query: ${JSON.stringify(req.query)}`);
@@ -317,39 +317,34 @@ const updateMyProduct = async (req, res, next) => {
 // Helper to find all order IDs where a user has at least one item
 const getSellersItemOrderIds = async (userId) => {
   try {
-    // Fast path for unified orders: OrderItem.sellerId is now populated.
-    const directItems = await OrderItem.findAll({
-      attributes: ['orderId'],
-      where: { sellerId: userId },
-      raw: true
-    });
-
-    const directOrderIds = Array.from(new Set(directItems.map(it => it.orderId)));
-
-    // Legacy fallback for historical items that may not have sellerId populated.
-    const [pIds, fIds] = await Promise.all([
-      Product.findAll({ where: { sellerId: userId }, attributes: ['id'], raw: true }).then(rows => rows.map(r => r.id)),
-      FastFood.findAll({ where: { vendor: userId }, attributes: ['id'], raw: true }).then(rows => rows.map(r => r.id))
-    ]);
-
-    if (pIds.length === 0 && fIds.length === 0) return directOrderIds;
-
-    const legacyItems = await OrderItem.findAll({
-      attributes: ['orderId'],
+    // Single-query approach using subqueries for legacy products/fastfoods
+    // This is significantly faster than the previous multi-step ID fetching
+    const items = await OrderItem.findAll({
+      attributes: [[sequelize.fn('DISTINCT', sequelize.col('orderId')), 'orderId']],
       where: {
         [Op.or]: [
-          { productId: { [Op.in]: pIds } },
-          { fastFoodId: { [Op.in]: fIds } }
+          { sellerId: userId },
+          { productId: { [Op.in]: sequelize.literal(`(SELECT id FROM Products WHERE sellerId = ${userId})`) } },
+          { fastFoodId: { [Op.in]: sequelize.literal(`(SELECT id FROM FastFoods WHERE vendor = ${userId})`) } }
         ]
       },
       raw: true
     });
 
-    const legacyOrderIds = legacyItems.map(it => it.orderId);
-    return Array.from(new Set([...directOrderIds, ...legacyOrderIds]));
+    return items.map(it => it.orderId);
   } catch (err) {
     console.error('[getSellersItemOrderIds] Error:', err);
-    return [];
+    // Fallback to the slow but safe way if subqueries fail (e.g. SQLite compatibility issues)
+    try {
+        const directItems = await OrderItem.findAll({
+          attributes: ['orderId'],
+          where: { sellerId: userId },
+          raw: true
+        });
+        return Array.from(new Set(directItems.map(it => it.orderId)));
+    } catch (fallbackErr) {
+        return [];
+    }
   }
 };
 
@@ -539,6 +534,8 @@ const getOverview = async (req, res, next) => {
     // 1. Find limited order IDs for overview
     const myItemOrderIds = await getSellersItemOrderIds(userId);
 
+    const todayRange = { [Op.between]: [todayStart, todayEnd] };
+
     const [
       products,
       fastFoods,
@@ -549,7 +546,7 @@ const getOverview = async (req, res, next) => {
       awaitingMeals,
       rejectedMeals,
       pendingOrdersCount,
-      todayPaidOrders
+      todayPaidItems
     ] = await Promise.all([
       Product.findAll({
         where: { sellerId: userId },
@@ -578,15 +575,19 @@ const getOverview = async (req, res, next) => {
           {
             model: OrderItem,
             as: 'OrderItems',
+            where: { sellerId: userId },
+            required: false,
             include: [
               {
                 model: Product,
                 required: false,
+                attributes: ['id', 'name', 'coverImage', 'basePrice', 'sellerId'],
                 include: [{ model: User, as: 'seller', attributes: ['id', 'name', 'businessName'] }]
               },
               {
                 model: FastFood,
                 required: false,
+                attributes: ['id', 'name', 'mainImage', 'basePrice', 'vendor'],
                 include: [{ model: User, as: 'vendorDetail', attributes: ['id', 'name', 'businessName'] }]
               }
             ]
@@ -610,28 +611,29 @@ const getOverview = async (req, res, next) => {
       Product.count({ where: { sellerId: userId, reviewStatus: 'rejected' } }),
       FastFood.count({ where: { vendor: userId, approved: false, reviewStatus: { [Op.or]: ['pending', 'awaiting_approval'] } } }),
       FastFood.count({ where: { vendor: userId, reviewStatus: 'rejected' } }),
-      Order.count({ where: { sellerId: userId, status: { [Op.in]: pendingStatuses } } }),
-      Order.findAll({
-        where: {
-          [Op.or]: [
-            { sellerId: userId },
-            { id: { [Op.in]: myItemOrderIds } }
-          ],
-          status: { [Op.in]: paidStatuses },
-          createdAt: { [Op.between]: [todayStart, todayEnd] }
-        },
-        include: [
-          {
-            model: OrderItem,
-            as: 'OrderItems',
-            include: [
-              { model: Product, attributes: ['id', 'sellerId', 'basePrice'], required: false },
-              { model: FastFood, attributes: ['id', 'vendor', 'basePrice'], required: false }
-            ]
+      Order.count({ 
+        where: { 
+          [Op.or]: [{ sellerId: userId }, { id: { [Op.in]: myItemOrderIds } }],
+          status: { [Op.in]: pendingStatuses } 
+        } 
+      }),
+      OrderItem.findAll({
+        attributes: ['basePrice', 'quantity'],
+        where: { sellerId: userId },
+        include: [{
+          model: Order,
+          required: true,
+          attributes: [],
+          where: {
+            status: { [Op.in]: paidStatuses },
+            createdAt: todayRange
           }
-        ]
+        }],
+        raw: true
       })
     ]);
+
+    const todayEarnings = todayPaidItems.reduce((sum, item) => sum + (Number(item.basePrice || 0) * (item.quantity || 0)), 0);
 
     const ordersWithTotal = recentOrders.map(o => {
       const json = o.toJSON();
@@ -669,17 +671,7 @@ const getOverview = async (req, res, next) => {
       return json;
     });
 
-    // Calculate today's earnings accurately by summing sellerTotal for today's orders
-    let todayEarnings = 0;
-    todayPaidOrders.forEach(o => {
-      (o.OrderItems || []).forEach(it => {
-        const isMyProduct = it.Product && String(it.Product.sellerId) === String(userId);
-        const isMyMeal = it.FastFood && String(it.FastFood.vendor) === String(userId);
-        if (isMyProduct || isMyMeal) {
-          todayEarnings += (Number(it.Product?.basePrice || it.FastFood?.basePrice || 0) * (it.quantity || 0));
-        }
-      });
-    });
+    // Calculate today's earnings already done via todayPaidItems above.
 
     const productsNormalized = products.map(p => {
       const images = [];

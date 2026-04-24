@@ -4,7 +4,7 @@ import api from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { validateKenyanPhone, PHONE_VALIDATION_ERROR, formatKenyanPhoneInput } from '../../utils/validation'
 import SystemFeedbackModal from '../ui/SystemFeedbackModal'
-import { GoogleLogin } from '@react-oauth/google'
+import { GoogleLogin, useGoogleOneTapLogin } from '@react-oauth/google'
 import { Eye, EyeOff } from 'lucide-react'
 
 export default function RegisterForm({ onSuccess, initialReferralCode, isModal = false }) {
@@ -167,6 +167,13 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
             setLoading(false);
         }
     };
+
+    // Google One Tap for instant registration/login
+    useGoogleOneTapLogin({
+        onSuccess: handleGoogleSuccess,
+        onError: () => console.error('Google One Tap failed'),
+        disabled: step !== 'register' || loading
+    });
 
     // ── OTP input handlers ────────────────────────────────────────────────────
     const handleOtpChange = (index, value) => {

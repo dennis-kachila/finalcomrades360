@@ -626,5 +626,5 @@ if (global.__serverStarted) {
 }
 
 // Export for cPanel/Passenger
-// We export the SERVER which has Socket.io attached, ensuring connectivity.
-module.exports = server;
+// We export the APP instance, which Passenger uses to mount the server.
+module.exports = app;

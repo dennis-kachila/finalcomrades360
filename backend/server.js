@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const errorHandler = require('./middleware/errorHandler');
 
 // Load environment variables with robust path detection
 const envPaths = [
@@ -430,30 +431,7 @@ if (sequelize.options.dialect === 'sqlite') {
 
 
 // Error handling middleware
-// Error handling middleware
-
-app.use((err, req, res, next) => {
-  if (res.headersSent) {
-    return next(err);
-  }
-  
-  const errorDetail = `\n--- ${new Date().toISOString()} ---\n` +
-    `Request: ${req.method} ${req.url}\n` +
-    `Error: ${err.message}\n` +
-    `Stack: ${err.stack}\n` +
-    `Body: ${JSON.stringify(req.body || {})}\n`;
-
-  fs.appendFileSync(path.join(__dirname, 'error.log'), errorDetail);
-  console.error('Error middleware:', err.stack);
-
-  res.status(err.status || 500).json({
-    message: err.message || 'Internal Server Error',
-    ...(process.env.NODE_ENV === 'development' && {
-      stack: err.stack,
-      detail: 'Check backend/error.log for more info'
-    })
-  });
-});
+app.use(errorHandler);
 
 
 // 404 handler - Registered later in finalizeMiddleware

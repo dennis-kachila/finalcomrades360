@@ -230,24 +230,41 @@ app.use(async (req, res, next) => {
 // -----------------------------------------------------------------
 // 2. API ROUTES
 // -----------------------------------------------------------------
-initializeRoutes(app);
+const apiRouter = express.Router();
+apiRouter.use('/auth', require('./routes/authRoutes'));
+apiRouter.use('/users', require('./routes/userRoutes'));
+apiRouter.use('/categories', require('./routes/categoryRoutes'));
+apiRouter.use('/cart', require('./routes/cartRoutes'));
+apiRouter.use('/wishlist', require('./routes/wishlistRoutes'));
+apiRouter.use('/ultra-fast', require('./routes/ultraFastRoutes'));
+apiRouter.use('/orders', require('./routes/orderRoutes'));
+apiRouter.use('/products', require('./routes/productRoutes'));
+apiRouter.use('/stats', require('./routes/statsRoutes'));
+apiRouter.use('/marketing', require('./routes/marketingRoutes'));
+apiRouter.use('/inventory', require('./routes/inventoryRoutes'));
+apiRouter.use('/services', require('./routes/serviceRoutes'));
+apiRouter.use('/finance', require('./routes/financeRoutes'));
+apiRouter.use('/payments', require('./routes/paymentRoutes'));
+apiRouter.use('/mpesa', require('./routes/mpesaRoutes'));
+apiRouter.use('/notifications', require('./routes/notificationRoutes'));
+apiRouter.use('/fastfood', require('./routes/fastFoodRoutes'));
+apiRouter.use('/referrals', require('./routes/referralRoutes'));
+apiRouter.use('/tickets', require('./routes/ticketRoutes'));
+apiRouter.use('/config', require('./routes/configRoutes'));
+apiRouter.use('/warehouse', require('./routes/warehouseRoutes'));
+apiRouter.use('/pickup-stations', require('./routes/pickupStationRoutes'));
+apiRouter.use('/station-managers', require('./routes/stationManagerRoutes'));
+apiRouter.use('/support', require('./routes/supportRoutes'));
+apiRouter.use('/hero-promotions', require('./routes/heroPromotionRoutes'));
+apiRouter.use('/delivery', require('./routes/deliveryRoutes'));
+apiRouter.use('/payouts', require('./routes/payoutRoutes'));
+apiRouter.use('/commissions', require('./routes/commissionRoutes'));
+apiRouter.use('/driver', require('./routes/driverRoutes'));
+apiRouter.use('/admin', require('./routes/adminRoutes'));
 
-// -----------------------------------------------------------------
-// 3. STATIC FILES
-// -----------------------------------------------------------------
-// Route Initialization Function (Lazy Loaded)
-function initializeRoutes(app) {
-  // CRITICAL: Prioritize modules that reported 404s
-  app.use('/api/social-media', require('./routes/socialMediaAccountRoutes'));
-  app.use('/api/social-media-accounts', require('./routes/socialMediaAccountRoutes'));
-
-  console.error('ℹ️ Registering core API routes...');
-  app.use('/api/auth', require('./routes/authRoutes'));
-  app.use('/api/users', require('./routes/userRoutes'));
-  app.use('/api/categories', require('./routes/categoryRoutes'));
-  app.use('/api/cart', require('./routes/cartRoutes'));
-  app.use('/api/wishlist', require('./routes/wishlistRoutes'));
-  app.use('/api/ultra-fast', require('./routes/ultraFastRoutes'));
+// Mount the API router on both prefixes for maximum compatibility
+app.use('/api', apiRouter);
+app.use('/', apiRouter);
   app.use('/api/password-reset', require('./routes/passwordResetRoutes'));
   
   console.error('ℹ️ Registering extended API modules...');

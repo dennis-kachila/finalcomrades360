@@ -369,7 +369,11 @@ const login = async (req, res, next) => {
     
     const cleanUser = sanitizeUserPayload(rawUser);
 
-    console.log('[authController] Login Success return 200');
+    // SAFETY: Ensure role and roles are always defined to prevent frontend crashes
+    if (!cleanUser.role) cleanUser.role = 'customer';
+    if (!Array.isArray(cleanUser.roles)) cleanUser.roles = [];
+
+    console.log(`[authController] Login Success return 200 for role: ${cleanUser.role}`);
     return res.status(200).json({
       success: true,
       message: 'Login successful.',

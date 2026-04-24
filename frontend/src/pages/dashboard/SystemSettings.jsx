@@ -228,7 +228,16 @@ export default function SystemSettings() {
       setSuccess(`${section.replace(/_/g, ' ').toUpperCase()} updated successfully`);
     } catch (e) {
       console.error(`Failed to update ${section} settings:`, e);
-      setError(e.response?.data?.message || e.message || 'Failed to update settings');
+      const data = e.response?.data
+      let msg = data?.message || e.message || 'Failed to update settings'
+      
+      if (data?.details?.fields) {
+          msg = `Validation failed for fields: ${data.details.fields.join(', ')}`
+      } else if (data?.errors && Array.isArray(data.errors)) {
+          msg = data.errors.map(err => err.message || err).join('. ')
+      }
+
+      setError(msg);
     } finally {
       setLoading(false);
     }

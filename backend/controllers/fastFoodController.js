@@ -292,7 +292,7 @@ exports.getFastFoodById = async (req, res) => {
 };
 
 // Create new fast food item
-exports.createFastFood = async (req, res) => {
+exports.createFastFood = async (req, res, next) => {
     try {
         const createData = { ...req.body };
         if (createData.name) {
@@ -526,25 +526,12 @@ exports.createFastFood = async (req, res) => {
 
         res.status(201).json({ success: true, data: newItem });
     } catch (error) {
-        console.error('Create FastFood Error:', {
-            message: error.message,
-            stack: error.stack,
-            body: req.body,
-            files: req.files ? Object.keys(req.files) : 'none'
-        });
-        if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
-            return res.status(400).json({
-                success: false,
-                message: error.errors.map(e => e.message).join(', '),
-                errors: error.errors
-            });
-        }
-        res.status(400).json({ success: false, message: error.message });
+        next(error);
     }
 };
 
 // Update fast food item
-exports.updateFastFood = async (req, res) => {
+exports.updateFastFood = async (req, res, next) => {
     try {
         const fastFood = await FastFood.findByPk(req.params.id);
         if (!fastFood) {
@@ -921,15 +908,7 @@ exports.updateFastFood = async (req, res) => {
 
         res.status(200).json({ success: true, data: fastFood });
     } catch (error) {
-        console.error('Update FastFood Error:', error);
-        if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
-            return res.status(400).json({
-                success: false,
-                message: error.errors.map(e => e.message).join(', '),
-                errors: error.errors
-            });
-        }
-        res.status(400).json({ success: false, message: error.message });
+        next(error);
     }
 };
 

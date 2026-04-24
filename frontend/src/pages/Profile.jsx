@@ -148,7 +148,8 @@ const Profile = () => {
       console.error('Error fetching profile:', error);
       // Only show error if it's not a 404 (which might be expected for some endpoints)
       if (error.response?.status !== 404) {
-        toast.error(error.response?.data?.message || 'Failed to load profile data');
+        const data = error.response?.data
+        toast.error(data?.message || 'Failed to load profile data');
       }
     } finally {
       setLoading(false);
@@ -225,7 +226,16 @@ const Profile = () => {
       setIsEditing(false);
       toast.success('Profile updated successfully');
     } catch (error) {
-      toast.error('Failed to update profile');
+      const data = error.response?.data
+      let msg = data?.message || 'Failed to update profile'
+      
+      if (data?.details?.fields) {
+          msg = `Validation error for: ${data.details.fields.join(', ')}`
+      } else if (data?.errors && Array.isArray(data.errors)) {
+          msg = data.errors.map(e => e.message || e).join('. ')
+      }
+      
+      toast.error(msg);
       console.error('Error updating profile:', error);
     } finally {
       setLoading(false);

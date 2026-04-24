@@ -39,7 +39,7 @@ const sanitizeUserPayload = (userData) => {
   return u;
 };
 
-const register = async (req, res) => {
+const register = async (req, res, next) => {
   console.log('[authController] Registration attempt:', req.body);
   const { name, email, phone, password, referralCode, referredByReferralCode, isMarketerRegistration } = req.body;
 
@@ -191,22 +191,11 @@ const register = async (req, res) => {
       user: cleanUser
     });
   } catch (error) {
-    console.error('[authController] Registration error:', error);
-    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
-      const messages = error.errors.map(e => e.message);
-      console.error('[authController] Validation details:', messages);
-      return res.status(400).json({ message: 'Validation error: ' + messages.join('. ') });
-    }
-    res.status(500).json({
-      message: 'Server error during registration.',
-      error: error.message,
-      name: error.name,
-      stack: error.stack
-    });
+    next(error);
   }
 };
 
-const login = async (req, res) => {
+const login = async (req, res, next) => {
   // Support both 'identifier' (new) and 'email' (backward compatibility)
   const { identifier, email, password } = req.body;
   const loginIdentifier = identifier || email;
@@ -392,29 +381,13 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[authController] Login error - Full Stack:', error.stack);
-    console.error('[authController] Login error - Request Body:', JSON.stringify(req.body));
-    
-    // More detailed logging for Sequelize/DB errors
-    if (error.parent || error.original) {
-      console.error('[authController] DB Error Detail:', error.parent?.message || error.original?.message);
-      console.error('[authController] DB Error Code:', error.parent?.code || error.original?.code);
-      console.error('[authController] DB Error SQL:', error.parent?.sql || error.original?.sql);
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred during login.',
-      error: error.message,
-      detail: (error.parent || error.original)?.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    next(error);
   }
 };
 
 const normalizePhoneLike = (value) => String(value || '').replace(/\D/g, '');
 
-const stationLogin = async (req, res) => {
+const stationLogin = async (req, res, next) => {
   const { identifier, email, password } = req.body;
   const loginIdentifier = String(identifier || email || '').trim();
   const secret = String(password || '').trim();
@@ -537,8 +510,7 @@ const stationLogin = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[authController] stationLogin error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to login station account.' });
+    next(error);
   }
 };
 
@@ -563,7 +535,7 @@ const me = (req, res) => {
 };
 
 // Verify password for sensitive operations
-const verifyPassword = async (req, res) => {
+const verifyPassword = async (req, res, next) => {
   try {
     let { password } = req.body;
 
@@ -604,8 +576,7 @@ const verifyPassword = async (req, res) => {
     console.log('[authController] Password verification failed for user:', user.email);
     res.status(401).json({ success: false, verified: false, message: 'Incorrect password' });
   } catch (error) {
-    console.error('[authController] Error verifying password:', error);
-    res.status(500).json({ success: false, verified: false, message: 'Server error verifying password' });
+    next(error);
   }
 };
 
@@ -634,7 +605,7 @@ const parseUA = (userAgent) => {
 };
 
 // Send Registration OTP before account creation
-const sendRegistrationOtp = async (req, res) => {
+const sendRegistrationOtp = async (req, res, next) => {
   const { email, phone } = req.body;
 
   if (!email && !phone) {
@@ -683,12 +654,11 @@ const sendRegistrationOtp = async (req, res) => {
       return res.json({ success: true, message: 'Verification code has been sent to your phone via SMS.', method: 'sms' });
     }
   } catch (error) {
-    console.error('[authController] sendRegistrationOtp error:', error);
-    return res.status(500).json({ success: false, message: 'Server error while sending OTP.' });
+    next(error);
   }
 };
 // Google OAuth handler
-const googleAuth = async (req, res) => {
+const googleAuth = async (req, res, next) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ success: false, message: 'No Google token provided.' });
 
@@ -788,12 +758,11 @@ const googleAuth = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Google Auth Error]', error);
-    res.status(401).json({ success: false, message: 'Invalid or expired Google token.' });
+    next(error);
   }
 };
 
-const forceChangePassword = async (req, res) => {
+const forceChangePassword = async (req, res, next) => {
   const { newPassword } = req.body;
   if (!newPassword || newPassword.length < 6) {
     return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });

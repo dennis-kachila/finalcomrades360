@@ -2044,10 +2044,20 @@ const ComradesProductForm = ({
           setTimeout(() => navigate('/login'), 2000);
         } else if (error.response.status === 400) {
           // Handle validation errors specifically
-          if (error.response.data?.code === 'VALIDATION_ERROR') {
-            errorMessage = `Validation failed: ${error.response.data.message}`;
-            if (error.response.data?.details?.fields) {
-              errorDetails = `Missing fields: ${error.response.data.details.fields.join(', ')}`;
+          if (error.response.data?.code === 'VALIDATION_ERROR' || error.response.data?.code === 'DATABASE_VALIDATION_ERROR') {
+            errorMessage = `Validation failed: ${error.response.data.message || 'Required fields are missing'}`;
+            
+            // Check for manual validation fields
+            const missingFields = error.response.data?.details?.fields || error.response.data?.missing;
+            if (missingFields && Array.isArray(missingFields) && missingFields.length > 0) {
+              errorDetails = `Missing fields: ${missingFields.join(', ')}`;
+            } 
+            // Check for Sequelize validation errors
+            else if (error.response.data?.errors && Array.isArray(error.response.data.errors)) {
+              const fieldErrors = error.response.data.errors.map(e => e.field || e.path).filter(Boolean);
+              if (fieldErrors.length > 0) {
+                errorDetails = `Invalid fields: ${[...new Set(fieldErrors)].join(', ')}`;
+              }
             }
           } else if (error.response.data?.code === 'COVER_REQUIRED') {
             errorMessage = 'Cover image is required. Please upload a cover image.';

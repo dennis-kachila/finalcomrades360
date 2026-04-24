@@ -48,6 +48,8 @@ export default function SellerBusinessLocation() {
             setProfileComplete(isSellerProfileComplete(data));
         } catch (error) {
             console.error('Error fetching profile:', error);
+            const data = error.response?.data
+            alert(data?.message || 'Error fetching profile data');
         } finally {
             setLoading(false);
         }
@@ -128,7 +130,16 @@ export default function SellerBusinessLocation() {
             navigate('/seller');
         } catch (error) {
             console.error('Error saving location:', error);
-            alert('Failed to save business location: ' + (error.response?.data?.message || error.message));
+            const data = error.response?.data
+            let msg = data?.message || error.message
+            
+            if (data?.details?.fields) {
+                msg = `The following fields are missing or invalid: ${data.details.fields.join(', ')}`
+            } else if (data?.errors && Array.isArray(data.errors)) {
+                msg = data.errors.map(e => e.message || e).join('. ')
+            }
+
+            alert('Failed to save business location: ' + msg);
         } finally {
             setSaving(false);
         }

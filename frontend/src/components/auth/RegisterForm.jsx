@@ -139,7 +139,12 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
             setStep('verify')
             setResendCooldown(60)
         } catch (err) {
-            const msg = err.response?.data?.message || 'Failed to send verification code. Please try again.'
+            const data = err.response?.data
+            let msg = data?.message || 'Failed to send verification code. Please try again.'
+            
+            if (data?.details?.fields) {
+                msg = `Missing or invalid: ${data.details.fields.join(', ')}`
+            }
             setError(msg)
         } finally {
             setLoading(false)
@@ -156,7 +161,8 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
             const from = location.state?.from?.pathname || '/';
             navigate(from);
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to authenticate with Google. Please try again.');
+            const data = err.response?.data
+            setError(data?.message || 'Failed to authenticate with Google. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -219,7 +225,16 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
             })
             setShowModal(true)
         } catch (err) {
-            setError(err.response?.data?.message || 'Verification failed. Please try again.')
+            const data = err.response?.data
+            let msg = data?.message || 'Verification failed. Please try again.'
+            
+            if (data?.details?.fields) {
+                msg = `Validation error for: ${data.details.fields.join(', ')}`
+            } else if (data?.errors && Array.isArray(data.errors)) {
+                msg = data.errors.map(e => e.message || e).join('. ')
+            }
+
+            setError(msg)
         } finally {
             setVerifying(false)
         }
@@ -236,7 +251,8 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
             setOtp(['', '', '', '', '', ''])
             otpRefs.current[0]?.focus()
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to resend code. Please try again.')
+            const data = err.response?.data
+            setError(data?.message || 'Failed to resend code. Please try again.')
         }
     }
 

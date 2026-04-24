@@ -68,6 +68,8 @@ const DeliveryAgentAccount = () => {
       }
     } catch (error) {
       console.error('Failed to fetch profile:', error);
+      const data = error.response?.data
+      setMessage({ type: 'error', text: data?.message || 'Failed to fetch profile' });
     } finally {
       setLoading(false);
     }
@@ -117,7 +119,16 @@ const DeliveryAgentAccount = () => {
       // navigate('/delivery/available');
     } catch (error) {
       console.error('Failed to update profile:', error);
-      setMessage({ type: 'error', text: 'Failed to update profile' });
+      const data = error.response?.data
+      let msg = data?.message || 'Failed to update profile'
+      
+      if (data?.details?.fields) {
+          msg = `Required fields are missing or invalid: ${data.details.fields.join(', ')}`
+      } else if (data?.errors && Array.isArray(data.errors)) {
+          msg = data.errors.map(e => e.message || e).join('. ')
+      }
+      
+      setMessage({ type: 'error', text: msg });
     } finally {
       setSaving(false);
     }

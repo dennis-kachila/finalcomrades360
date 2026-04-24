@@ -202,7 +202,7 @@ const hydrateOrderItemsFallback = async (orders = []) => {
 
 
 // GET /api/delivery/orders?status=
-const listMyAssignedOrders = async (req, res) => {
+const listMyAssignedOrders = async (req, res, next) => {
   try {
     const { status, q, from, to, deliveryType } = req.query;
     const page = Math.max(1, parseInt(req.query.page || '1', 10));
@@ -292,13 +292,12 @@ const listMyAssignedOrders = async (req, res) => {
     const rowsWithItems = await hydrateOrderItemsFallback(rows);
     res.json({ data: rowsWithItems, meta: { page, pageSize, total: count, totalPages: Math.ceil(count / pageSize) } });
   } catch (e) {
-    console.error('Error in listMyAssignedOrders:', e);
-    res.status(500).json({ error: 'Failed to load orders', message: e.message, stack: process.env.NODE_ENV === 'development' ? e.stack : undefined });
+    next(e);
   }
 };
 
 // GET /api/delivery/available
-const listAvailableOrders = async (req, res) => {
+const listAvailableOrders = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page || '1', 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize || '20', 10)));
@@ -532,13 +531,12 @@ const listAvailableOrders = async (req, res) => {
       }
     });
   } catch (e) {
-    console.error('Error in listAvailableOrders:', e);
-    res.status(500).json({ error: 'Failed to load available orders' });
+    next(e);
   }
 };
 
 // GET /api/delivery/profile
-const getMyProfile = async (req, res) => {
+const getMyProfile = async (req, res, next) => {
   try {
     console.log('[getMyProfile] Fetching profile for user:', req.user.id);
     const profile = await DeliveryAgentProfile.findOne({ where: { userId: req.user.id } });
@@ -553,21 +551,12 @@ const getMyProfile = async (req, res) => {
       missingFields: missing
     });
   } catch (e) {
-    console.error('[getMyProfile] Error:', e);
-    console.error('[getMyProfile] Error stack:', e.stack);
-    console.error('[getMyProfile] Error name:', e.name);
-    console.error('[getMyProfile] Error message:', e.message);
-    res.status(500).json({
-      error: 'Failed to load profile',
-      message: e.message,
-      code: e.code,
-      name: e.name
-    });
+    next(e);
   }
 };
 
 // PUT /api/delivery/profile
-const upsertMyProfile = async (req, res) => {
+const upsertMyProfile = async (req, res, next) => {
   try {
     const {
       // Basic
@@ -649,13 +638,12 @@ const upsertMyProfile = async (req, res) => {
     console.log(`[upsertMyProfile] Profile created. isComplete=${isComplete}, missing=${JSON.stringify(missing)}`);
     res.json({ message: 'Profile created', profile: { ...created.get({ plain: true }), isComplete, missingFields: missing } });
   } catch (e) {
-    console.error('Error in upsertMyProfile:', e);
-    res.status(500).json({ error: 'Failed to save profile', details: e.message });
+    next(e);
   }
 };
 
 // PATCH /api/delivery/orders/:orderId/status
-const updateMyOrderStatus = async (req, res) => {
+const updateMyOrderStatus = async (req, res, next) => {
   try {
     const { orderId } = req.params;
     const { status, notes } = req.body;
@@ -749,17 +737,12 @@ const updateMyOrderStatus = async (req, res) => {
 
     res.json({ message: 'Status updated', status });
   } catch (e) {
-    console.error('Error in updateMyOrderStatus:', e);
-
-    // Check if headers already sent (in case of notification error inside try block? Unlikely but safe)
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Failed to update status' });
-    }
+    next(e);
   }
 };
 
 // POST /api/delivery/tasks/:taskId/accept
-const acceptDeliveryTask = async (req, res) => {
+const acceptDeliveryTask = async (req, res, next) => {
   try {
     const { taskId } = req.params;
     const task = await DeliveryTask.findByPk(taskId, {
@@ -2524,8 +2507,7 @@ const toggleAgentActiveStatus = async (req, res) => {
       isActive
     });
   } catch (e) {
-    console.error('Error in toggleAgentActiveStatus:', e);
-    res.status(500).json({ error: 'Failed to update agent status' });
+    next(e);
   }
 };
 

@@ -110,6 +110,13 @@ Comrades360 Team`;
     });
   } catch (error) {
     console.error('Error creating user:', error);
+    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({
+        message: 'Validation failed',
+        details: { fields: error.errors?.map(e => e.path) || [] },
+        errors: error.errors
+      });
+    }
     res.status(500).json({ message: 'Error creating user', error: error.message });
   }
 });
@@ -235,25 +242,11 @@ router.get('/users', auth, adminOnly, async (req, res) => {
 
   } catch (error) {
     console.error('❌ Unhandled error in /users route:', error);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      ...(error.original && { originalError: error.original })
-    });
-
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: 'An unexpected error occurred',
       error: error.message,
-      code: 'INTERNAL_SERVER_ERROR',
-      ...(process.env.NODE_ENV === 'development' && {
-        details: {
-          name: error.name,
-          stack: error.stack,
-          ...(error.original && { originalError: error.original })
-        }
-      })
+      code: 'INTERNAL_SERVER_ERROR'
     });
   }
 });
@@ -306,7 +299,7 @@ router.patch('/users/:userId/role', auth, adminOnly, async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating user role:', error);
-    res.status(500).json({ message: 'Server error while updating user role.' });
+    res.status(500).json({ message: 'Server error while updating user role.', error: error.message });
   }
 });
 
@@ -549,10 +542,14 @@ router.patch('/users/:userId', auth, adminOnly, async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating user:', error);
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ message: 'Email or phone already exists' });
+    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({
+        message: 'Validation failed',
+        details: { fields: error.errors?.map(e => e.path) || [] },
+        errors: error.errors
+      });
     }
-    res.status(500).json({ message: 'Server error while updating user.' });
+    res.status(500).json({ message: 'Server error while updating user.', error: error.message });
   }
 });
 

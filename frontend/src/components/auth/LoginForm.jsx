@@ -99,9 +99,14 @@ export default function LoginForm({ onSuccess, isModal = false, initialMode = 'u
             }
 
             if (err.response) {
-                errorMessage = err.response.data?.message ||
-                    err.response.data?.error ||
-                    `Server responded with status ${err.response.status}`
+                const data = err.response.data
+                errorMessage = data?.message || data?.error || `Server responded with status ${err.response.status}`
+                
+                if (data?.details?.fields) {
+                    errorMessage = `Missing fields: ${data.details.fields.join(', ')}`
+                } else if (data?.errors && Array.isArray(data.errors)) {
+                    errorMessage = data.errors.map(e => e.message || e).join('. ')
+                }
             } else if (err.request) {
                 errorMessage = 'No response from server. Please check your connection.'
             } else {

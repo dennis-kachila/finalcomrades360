@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
 const { Product, Category, Order, OrderItem, User, FastFood, DeliveryTask, Warehouse, PickupStation, Batch } = require('../models/index');
 
-const getMyProducts = async (req, res) => {
+const getMyProducts = async (req, res, next) => {
   console.log(`[getMyProducts] User: ${req?.user?.id} Query: ${JSON.stringify(req.query)}`);
   try {
     const page = Math.max(1, parseInt(req.query.page || '1', 10));
@@ -77,12 +77,12 @@ const getMyProducts = async (req, res) => {
       }
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    next(e);
   }
 };
 
 // GET /api/seller/kpis
-const getMyKpis = async (req, res) => {
+const getMyKpis = async (req, res, next) => {
   const start = Date.now();
   console.log(`[getMyKpis] Start for user: ${req?.user?.id}`);
   try {
@@ -135,13 +135,12 @@ const getMyKpis = async (req, res) => {
       rejectedCount: rejectedProducts + rejectedMeals
     });
   } catch (e) {
-    console.error('[getMyKpis] Error:', e);
-    res.status(500).json({ error: e.message });
+    next(e);
   }
 };
 
 // GET /api/seller/products/:id
-const getMyProductById = async (req, res) => {
+const getMyProductById = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
@@ -215,21 +214,12 @@ const getMyProductById = async (req, res) => {
 
     res.json(plain);
   } catch (e) {
-    console.error('Error in getMyProductById:', {
-      message: e.message,
-      stack: e.stack,
-      params: req.params,
-      user: req.user ? { id: req.user.id } : 'No user'
-    });
-    res.status(500).json({
-      error: 'Failed to fetch product',
-      details: process.env.NODE_ENV === 'development' ? e.message : undefined
-    });
+    next(e);
   }
-}
+};
 
 // PATCH /api/seller/products/:id
-const updateMyProduct = async (req, res) => {
+const updateMyProduct = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) return res.status(400).json({ message: 'Invalid product id' })
@@ -320,9 +310,9 @@ const updateMyProduct = async (req, res) => {
     await row.update(updates)
     res.json({ message: 'Product updated. Await admin review.', product: row })
   } catch (e) {
-    res.status(500).json({ error: e.message })
+    next(e);
   }
-}
+};
 
 // Helper to find all order IDs where a user has at least one item
 const getSellersItemOrderIds = async (userId) => {
@@ -364,7 +354,7 @@ const getSellersItemOrderIds = async (userId) => {
 };
 
 // GET /api/seller/orders
-const getMyOrders = async (req, res) => {
+const getMyOrders = async (req, res, next) => {
   console.log(`[getMyOrders] User: ${req?.user?.id} Query: ${JSON.stringify(req.query)}`);
   const startTime = Date.now();
   try {
@@ -501,13 +491,12 @@ const getMyOrders = async (req, res) => {
       }
     });
   } catch (e) {
-    console.error('[SellerOrders] API Error:', e);
-    res.status(500).json({ error: e.message });
+    next(e);
   }
 };
 
 // GET /api/seller/products/duplicate-check?name=...&categoryId=...
-const duplicateCheck = async (req, res) => {
+const duplicateCheck = async (req, res, next) => {
   try {
     const name = String(req.query.name || '').trim();
     const categoryId = parseInt(req.query.categoryId, 10);
@@ -531,12 +520,12 @@ const duplicateCheck = async (req, res) => {
     });
     res.json({ duplicate: !!exists });
   } catch (e) {
-    res.status(500).json({ error: e.message })
+    next(e);
   }
-}
+};
 
 // GET /api/sellers/overview
-const getOverview = async (req, res) => {
+const getOverview = async (req, res, next) => {
   const start = Date.now();
   const userId = req.user.id;
   console.log(`[getOverview] Start for user: ${userId}`);
@@ -716,8 +705,7 @@ const getOverview = async (req, res) => {
       }
     });
   } catch (e) {
-    console.error('[getOverview] Error:', e);
-    res.status(500).json({ error: e.message });
+    next(e);
   }
 };
 

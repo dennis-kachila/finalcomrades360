@@ -11,7 +11,7 @@ const { geocodeAddress } = require("../utils/geocodingUtils");
 const genPublic = async () => { const y = new Date().getFullYear(); const seq = `${Math.floor(Math.random() * 1e6)}`.padStart(6, "0"); return `C360-${y}-${seq}`; };
 
 // Admin: directly set a user's role (e.g., to 'delivery_agent')
-const adminSetUserRole = async (req, res) => {
+const adminSetUserRole = async (req, res, next) => {
   const { userId, role } = req.body || {};
   try {
     const allowed = ['customer', 'seller', 'marketer', 'delivery_agent', 'admin'];
@@ -37,12 +37,12 @@ const adminSetUserRole = async (req, res) => {
     const payload = { id: user.id, name: user.name, email: user.email, role: user.role, roles: user.roles };
     return res.json({ message: 'User role updated.', user: payload });
   } catch (e) {
-    return res.status(500).json({ message: 'Server error updating user role.', error: e.message });
+    next(e);
   }
 };
 
 // Request email change: generate token and set pendingEmail
-const requestEmailChange = async (req, res) => {
+const requestEmailChange = async (req, res, next) => {
   const userId = req.user.id;
   const { newEmail } = req.body || {};
   try {
@@ -63,12 +63,12 @@ const requestEmailChange = async (req, res) => {
     try { await Notification.create({ userId, title: 'Confirm Email Change', message: 'A verification token was sent to your new email address.' }); } catch { }
     res.json({ message: 'Email change initiated. Check your new email for the verification token.' });
   } catch (e) {
-    res.status(500).json({ message: 'Server error requesting email change.', error: e.message });
+    next(e);
   }
 };
 
 // Confirm email change using token
-const confirmEmailChange = async (req, res) => {
+const confirmEmailChange = async (req, res, next) => {
     const { token } = req.body;
     try {
         const user = await User.findByPk(req.user.id);
@@ -93,13 +93,13 @@ const confirmEmailChange = async (req, res) => {
 
         res.json({ message: 'Email updated successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error confirming email change', error: error.message });
+        next(error);
     }
 };
 
 // Request phone change: generate OTP, store pendingPhone
 // Request phone change: generate OTP, store pendingPhone
-const requestPhoneOtp = async (req, res) => {
+const requestPhoneOtp = async (req, res, next) => {
   const userId = req.user.id;
   const { newPhone, method } = req.body || {};
   try {
@@ -147,13 +147,12 @@ const requestPhoneOtp = async (req, res) => {
 
     res.json({ message: `OTP sent to your new phone via ${method === 'sms' ? 'SMS' : 'WhatsApp'}. Please confirm to update phone.` });
   } catch (e) {
-    console.error('Critical Error in requestPhoneOtp:', e);
-    res.status(500).json({ message: 'Server error requesting phone OTP.', error: e.message });
+    next(e);
   }
 };
 
 // Confirm phone change with OTP
-const confirmPhoneOtp = async (req, res) => {
+const confirmPhoneOtp = async (req, res, next) => {
   const userId = req.user.id;
   const { otp, phone } = req.body || {};
   try {
@@ -188,12 +187,12 @@ const confirmPhoneOtp = async (req, res) => {
 
     res.json({ message: 'Phone updated successfully.' });
   } catch (e) {
-    res.status(500).json({ message: 'Server error confirming phone change.', error: e.message });
+    next(e);
   }
 };
 
 // Change password with current password confirmation
-const changePassword = async (req, res) => {
+const changePassword = async (req, res, next) => {
   const userId = req.user.id;
   const { currentPassword, newPassword } = req.body || {};
   try {
@@ -207,7 +206,7 @@ const changePassword = async (req, res) => {
     await user.save();
     res.json({ message: 'Password updated successfully.' });
   } catch (e) {
-    res.status(500).json({ message: 'Server error changing password.', error: e.message });
+    next(e);
   }
 };
 const makeRef = () => `COMRADES360-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -257,7 +256,7 @@ const listPendingRoles = async (_req, res) => {
 };
 
 // Update current user's profile
-const updateProfile = async (req, res) => {
+const updateProfile = async (req, res, next) => {
   const userId = req.user.id;
   const {
     name, phone, username, county, town, estate, houseNumber, additionalPhone, bio, gender, dateOfBirth, profileVisibility,
@@ -427,13 +426,12 @@ const updateProfile = async (req, res) => {
       }
     });
   } catch (e) {
-    console.error('Error updating profile:', e);
-    res.status(500).json({ message: 'Server error updating profile.', error: e.message });
+    next(e);
   }
 };
 
 // User requests account deletion (admin must approve)
-const requestAccountDeletion = async (req, res) => {
+const requestAccountDeletion = async (req, res, next) => {
   const userId = req.user.id;
   const { reason } = req.body || {};
   try {
@@ -450,7 +448,7 @@ const requestAccountDeletion = async (req, res) => {
     // Optionally notify admin(s) - if you have an admin user id listing, here we skip and rely on admin UI to list
     res.status(200).json({ message: 'Deletion request submitted. Admin will review shortly.' });
   } catch (error) {
-    res.status(500).json({ message: 'Server error processing deletion request', error: error.message });
+    next(error);
   }
 };
 

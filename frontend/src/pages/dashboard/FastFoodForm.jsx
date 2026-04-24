@@ -1598,8 +1598,13 @@ const FastFoodForm = ({
       let errorMessage = error.response?.data?.message || error.message || 'Unknown error';
 
       // Enhanced error handling
-      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
-        const fieldErrors = error.response.data.errors.map(e => `${e.path}: ${e.message}`).join(', ');
+      if (error.response?.data?.details?.fields || error.response?.data?.missing) {
+        const missingFields = error.response.data?.details?.fields || error.response.data?.missing;
+        if (Array.isArray(missingFields) && missingFields.length > 0) {
+          errorMessage = `${error.response.data.message || 'Validation failed'}: Missing ${missingFields.join(', ')}`;
+        }
+      } else if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        const fieldErrors = error.response.data.errors.map(e => `${e.field || e.path}: ${e.message}`).join(', ');
         if (fieldErrors) {
           errorMessage = `${error.response.data.message || 'Validation failed'}: ${fieldErrors}`;
         }

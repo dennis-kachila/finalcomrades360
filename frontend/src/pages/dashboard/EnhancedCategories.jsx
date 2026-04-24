@@ -130,13 +130,8 @@ export default function EnhancedCategories() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (e) {
       console.error('❌ Failed to load categories:', e);
-      
-      if (e.response) {
-        console.error('📊 Response status:', e.response.status);
-        console.error('📊 Response data:', e.response.data);
-      }
-      
-      setError(e.response?.data?.error || e.response?.data?.message || 'Failed to load categories. Please try again.');
+      const data = e.response?.data
+      setError(data?.message || data?.error || 'Failed to load categories. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -222,26 +217,16 @@ export default function EnhancedCategories() {
       return true;
     } catch (e) {
       console.error('❌ Category creation failed:', e);
-      
-      // Enhanced error handling
-      if (e.response) {
-        console.error('📊 Response status:', e.response.status);
-        console.error('📊 Response data:', e.response.data);
-        
-        if (e.response.status === 401) {
-          setError('Authentication failed. Please log out and log back in as an admin.');
-        } else if (e.response.status === 403) {
-          setError('You do not have permission to create categories. Admin access required.');
-        } else if (e.response.status === 500 && e.response.data?.error?.includes('already exists')) {
-          setError(`A category with the name "${newSubcategory.name}" already exists. Please choose a different name.`);
-        } else {
-          setError(e.response.data?.error || e.response.data?.message || 'Failed to create category');
-        }
-      } else if (e.request) {
-        setError('Network error: Unable to connect to server. Please check if the backend is running.');
-      } else {
-        setError(e.message || 'Failed to create category');
+      const data = e.response?.data
+      let msg = data?.message || data?.error || e.message || 'Failed to create category'
+
+      if (data?.details?.fields) {
+          msg = `Required fields missing: ${data.details.fields.join(', ')}`
+      } else if (data?.errors && Array.isArray(data.errors)) {
+          msg = data.errors.map(err => err.message || err).join('. ')
       }
+
+      setError(msg);
       return false;
     }
   };
@@ -275,7 +260,16 @@ export default function EnhancedCategories() {
         loadCategories();
       } catch (e) {
         console.error('❌ Update failed with details:', e.response?.data);
-        setError(e.response?.data?.details || e.response?.data?.error || 'Failed to update');
+        const data = e.response?.data
+        let msg = data?.message || data?.error || 'Failed to update'
+
+        if (data?.details?.fields) {
+            msg = `Required fields missing: ${data.details.fields.join(', ')}`
+        } else if (data?.errors && Array.isArray(data.errors)) {
+            msg = data.errors.map(err => err.message || err).join('. ')
+        }
+
+        setError(msg);
       }
     };
 

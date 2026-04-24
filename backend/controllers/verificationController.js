@@ -6,7 +6,7 @@ const { normalizeKenyanPhone } = require('../middleware/validators');
  * Calculate and return user verification status
  * Checks 4 requirements: profile, address, email, phone
  */
-const getVerificationStatus = async (req, res) => {
+const getVerificationStatus = async (req, res, next) => {
     try {
         const userId = req.user.id;
 
@@ -112,19 +112,14 @@ const getVerificationStatus = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error fetching verification status:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch verification status',
-            error: error.message
-        });
+        next(error);
     }
 };
 
 /**
  * Request Phone Verification OTP
  */
-const requestPhoneVerificationOtp = async (req, res) => {
+const requestPhoneVerificationOtp = async (req, res, next) => {
     try {
         const { phone } = req.body;
         if (!phone) return res.status(400).json({ message: 'Phone number is required' });
@@ -156,15 +151,14 @@ const requestPhoneVerificationOtp = async (req, res) => {
 
         res.json({ success: true, message: 'Verification code sent successfully' });
     } catch (error) {
-        console.error('[Verification] OTP Request Error:', error);
-        res.status(500).json({ message: 'Failed to send verification code' });
+        next(error);
     }
 };
 
 /**
  * Verify Phone OTP and update user
  */
-const verifyPhoneOtp = async (req, res) => {
+const verifyPhoneOtp = async (req, res, next) => {
     try {
         const { phone, otp } = req.body;
         const userId = req.user.id;
@@ -206,12 +200,11 @@ const verifyPhoneOtp = async (req, res) => {
             phone: normalizedPhone
         });
     } catch (error) {
-        console.error('[Verification] OTP Verify Error:', error);
-        res.status(500).json({ message: 'Failed to verify phone' });
+        next(error);
     }
 };
 
-const approveNationalId = async (req, res) => {
+const approveNationalId = async (req, res, next) => {
     const { userId } = req.params;
     try {
         const user = await User.findByPk(userId);
@@ -226,11 +219,11 @@ const approveNationalId = async (req, res) => {
 
         res.json({ message: 'National ID approved successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error approving National ID', error: error.message });
+        next(error);
     }
 };
 
-const rejectNationalId = async (req, res) => {
+const rejectNationalId = async (req, res, next) => {
     const { userId } = req.params;
     const { reason } = req.body;
     try {
@@ -247,7 +240,7 @@ const rejectNationalId = async (req, res) => {
 
         res.json({ message: 'National ID rejected successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error rejecting National ID', error: error.message });
+        next(error);
     }
 };
 

@@ -27,7 +27,7 @@ const removeInlineListImages = (item) => {
   return plain;
 };
 
-const createProduct = async (req, res) => {
+const createProduct = async (req, res, next) => {
   const sellerId = req.user.id;
   const {
     name,
@@ -183,11 +183,13 @@ const createProduct = async (req, res) => {
 
     if (missing.length) {
       return res.status(400).json({
+        success: false,
         code: 'VALIDATION_ERROR',
         message: 'Missing or invalid required fields',
         details: {
           fields: missing
-        }
+        },
+        missing: missing // Keep for backward compatibility
       });
     }
   }
@@ -507,36 +509,15 @@ const createProduct = async (req, res) => {
 
     if (error && (error.name === 'SequelizeForeignKeyConstraintError' || String(error.message || '').includes('FOREIGN KEY'))) {
       return res.status(400).json({
+        success: false,
         code: 'FOREIGN_KEY_FAILED',
         message: 'Invalid foreign key value (sellerId or categoryId).',
         error: error.message
       });
     }
 
-    // Handle specific validation errors
-    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
-      const errors = error.errors ? error.errors.map(err => ({
-        field: err.path,
-        message: err.message,
-        value: err.value,
-        type: err.type
-      })) : [];
-
-      return res.status(400).json({
-        code: 'VALIDATION_ERROR',
-        message: 'Validation error occurred',
-        errors: errors
-      });
-    }
-
-    // Handle general server errors
-    console.error('[createProduct] UNHANDLED ERROR:', error);
-    res.status(500).json({
-      code: 'SERVER_ERROR',
-      message: 'Server error while creating product.',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    // Pass all errors to the global error handler for consistent reporting
+    next(error);
   }
 };
 
@@ -1439,7 +1420,7 @@ const getProductById = async (req, res) => {
   }
 };
 
-const updateProduct = async (req, res) => {
+const updateProduct = async (req, res, next) => {
   const productId = parseInt(req.params.id, 10);
   const sellerId = req.user.id;
 
@@ -1945,11 +1926,8 @@ const updateProduct = async (req, res) => {
       product: updatedProduct
     });
   } catch (error) {
-    console.error('Error updating product:', error);
-    res.status(500).json({
-      message: 'Server error while updating product',
-      error: error.message
-    });
+    // Use global error handler
+    next(error);
   }
 };
 

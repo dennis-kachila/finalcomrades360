@@ -1410,13 +1410,23 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
 
     // Validate required fields (skip strict validation for drafts)
     if (!isDraft) {
-      if (!formData.categoryId && !formData.subcategoryId) {
+      const missing = [];
+      if (!formData.name?.trim()) missing.push('Name');
+      if (!formData.basePrice || isNaN(parseFloat(formData.basePrice))) missing.push('Base Price');
+      if (!formData.stock || isNaN(parseInt(formData.stock, 10))) missing.push('Stock');
+      if (!formData.shortDescription?.trim()) missing.push('Short Description');
+      if (!formData.fullDescription?.trim()) missing.push('Full Description');
+      if (!formData.unitOfMeasure?.trim()) missing.push('Unit of Measure');
+      if (!formData.categoryId && !formData.subcategoryId) missing.push('Category');
+
+      if (missing.length > 0) {
+        const msg = `Please provide the following required fields: ${missing.join(', ')}.`;
         toast({
           title: 'Validation Error',
-          description: 'Please select a category or subcategory',
+          description: msg,
           variant: 'destructive',
         });
-        setErrorMsg('Please select a category or subcategory.');
+        setErrorMsg(msg);
         setLoading(false);
         isSavingRef.current = false;
         return;
@@ -1761,15 +1771,20 @@ const ProductForm = ({ mode: propMode = 'create' }) => {
       console.error('Error saving product:', error);
 
       let errorMessage = 'Failed to save product';
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-        // If backend tells us which fields are missing, surface them
-        const missingFields = error.response?.data?.missing || error.response?.data?.details?.fields;
-        if (missingFields && missingFields.length > 0) {
-          errorMessage += `: ${missingFields.join(', ')}`;
+      if (error.response?.data?.message || error.response?.data?.error) {
+        errorMessage = error.response.data.message || error.response.data.error;
+        
+        // Handle validation details
+        const missingFields = error.response.data?.details?.fields || error.response.data?.missing;
+        if (missingFields && Array.isArray(missingFields) && missingFields.length > 0) {
+          errorMessage += `: Missing ${missingFields.join(', ')}`;
+        } 
+        else if (error.response.data?.errors && Array.isArray(error.response.data.errors)) {
+          const fieldErrors = error.response.data.errors.map(e => e.field || e.path).filter(Boolean);
+          if (fieldErrors.length > 0) {
+            errorMessage += `: Invalid ${[...new Set(fieldErrors)].join(', ')}`;
+          }
         }
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
       }
 
       // Set and show error dialog

@@ -3,13 +3,15 @@ if (!global.crypto) {
     global.crypto = require('crypto');
 }
 
-const { 
-    default: makeWASocket, 
-    useMultiFileAuthState, 
-    DisconnectReason,
-    fetchLatestBaileysVersion,
-    makeCacheableSignalKeyStore
-} = require('@whiskeysockets/baileys');
+let baileys;
+
+async function getBaileys() {
+    if (!baileys) {
+        baileys = await import('@whiskeysockets/baileys');
+    }
+    return baileys;
+}
+
 const P = require('pino');
 const africastalking = require('africastalking');
 const { sendWhatsAppCloud } = require('./metaWhatsAppService');
@@ -72,6 +74,14 @@ const initWhatsApp = async () => {
     latestQr = null;
 
     try {
+        const { 
+            default: makeWASocket, 
+            useMultiFileAuthState, 
+            fetchLatestBaileysVersion, 
+            makeCacheableSignalKeyStore,
+            DisconnectReason
+        } = await getBaileys();
+
         logWhatsApp(`SESSION: Using ${sessionDir}`);
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
         logWhatsApp('VERSION: Fetching latest...');

@@ -622,7 +622,17 @@ if (global.__serverStarted) {
   console.log('ℹ️ Module re-entry detected, skipping startup.');
 } else {
   global.__serverStarted = true;
-  startServer();
+  
+  // CRITICAL: Only call listen if this file is run directly (Terminal)
+  // If required by cPanel/Passenger, it will handle the startup itself.
+  if (require.main === module) {
+    console.log('🚀 RUNNING DIRECTLY: Starting standalone server...');
+    startServer();
+  } else {
+    console.log('📦 REQUIRED BY PASSENGER: Handing over server instance.');
+    // When required as a module, we just need to ensure the app is configured
+    // startServer() is called internally by Passenger through module.exports
+  }
 }
 
 // Export for cPanel/Passenger

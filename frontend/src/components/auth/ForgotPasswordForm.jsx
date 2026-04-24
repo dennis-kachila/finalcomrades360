@@ -41,7 +41,13 @@ export default function ForgotPasswordForm({ isModal = false }) {
             setMessage('If that account exists, a reset code has been sent to your email and phone.')
             setStep('confirm')
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to request password reset')
+            const data = err.response?.data
+            let msg = data?.message || data?.error || 'Failed to request password reset'
+            
+            if (data?.details?.fields) {
+                msg = `Missing or invalid: ${data.details.fields.join(', ')}`
+            }
+            setError(msg)
         } finally {
             setLoading(false)
         }
@@ -70,7 +76,13 @@ export default function ForgotPasswordForm({ isModal = false }) {
                 })
             }, 2000)
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to reset password')
+            const data = err.response?.data
+            let msg = data?.message || data?.error || 'Failed to reset password'
+            
+            if (data?.details?.fields) {
+                msg = `Validation error for: ${data.details.fields.join(', ')}`
+            }
+            setError(msg)
         } finally {
             setLoading(false)
         }

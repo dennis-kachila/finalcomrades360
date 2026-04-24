@@ -28,7 +28,13 @@ const NotificationsPage = () => {
             setNotifications(res.data || []);
             setError('');
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to load notifications. Please try again.');
+            const data = err.response?.data
+            let msg = data?.message || data?.error || 'Failed to load notifications. Please try again.'
+            
+            if (data?.details?.fields) {
+                msg = `Server validation failed: ${data.details.fields.join(', ')}`
+            }
+            setError(msg);
             console.error('[NotificationsPage] Load error:', err);
         } finally {
             setLoading(false);

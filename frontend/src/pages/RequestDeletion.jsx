@@ -14,7 +14,12 @@ export default function RequestDeletion() {
       const { data } = await api.post('/users/me/request-deletion', { reason });
       setMessage({ type: 'success', text: data?.message || 'Request sent.' });
     } catch (err) {
-      const text = err?.response?.data?.message || 'Failed to submit request.';
+      const data = err?.response?.data
+      let text = data?.message || data?.error || 'Failed to submit request.'
+      
+      if (data?.details?.fields) {
+        text = `Validation error for: ${data.details.fields.join(', ')}`
+      }
       setMessage({ type: 'error', text });
     } finally {
       setSubmitting(false);

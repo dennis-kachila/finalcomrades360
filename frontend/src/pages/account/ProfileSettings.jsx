@@ -121,7 +121,13 @@ const ProfileSettings = () => {
       updateUser(res.data.user);
       setProfileMsg({ type: 'success', text: 'Profile updated successfully!' });
     } catch (err) {
-      setProfileMsg({ type: 'error', text: err.response?.data?.message || 'Failed to update profile.' });
+      const data = err.response?.data
+      let text = data?.message || data?.error || 'Failed to update profile.'
+      
+      if (data?.details?.fields) {
+        text = `Required fields missing: ${data.details.fields.join(', ')}`
+      }
+      setProfileMsg({ type: 'error', text });
     } finally {
       setProfileSaving(false);
     }
@@ -146,7 +152,13 @@ const ProfileSettings = () => {
       setPhoneMsg({ type: 'success', text: res.data.message });
       setPhoneStep('awaiting_otp');
     } catch (err) {
-      setPhoneMsg({ type: 'error', text: err.response?.data?.message || 'Could not send OTP. Try again.' });
+      const data = err.response?.data
+      let text = data?.message || data?.error || 'Could not send OTP. Try again.'
+      
+      if (data?.details?.fields) {
+        text = `Missing fields: ${data.details.fields.join(', ')}`
+      }
+      setPhoneMsg({ type: 'error', text });
     } finally {
       setPhoneLoading(false);
     }
@@ -168,7 +180,13 @@ const ProfileSettings = () => {
       const me = await api.get('/users/me');
       updateUser(me.data);
     } catch (err) {
-      setPhoneMsg({ type: 'error', text: err.response?.data?.message || 'Invalid or expired OTP.' });
+      const data = err.response?.data
+      let text = data?.message || data?.error || 'Invalid or expired OTP.'
+      
+      if (data?.details?.fields) {
+        text = `Validation error: ${data.details.fields.join(', ')}`
+      }
+      setPhoneMsg({ type: 'error', text });
     } finally {
       setPhoneLoading(false);
     }
@@ -194,7 +212,13 @@ const ProfileSettings = () => {
       setEmailMsg({ type: 'success', text: res.data.message });
       setEmailStep('awaiting_token');
     } catch (err) {
-      setEmailMsg({ type: 'error', text: err.response?.data?.message || 'Could not request email change.' });
+      const data = err.response?.data
+      let text = data?.message || data?.error || 'Could not request email change.'
+      
+      if (data?.details?.fields) {
+        text = `Missing fields: ${data.details.fields.join(', ')}`
+      }
+      setEmailMsg({ type: 'error', text });
     } finally {
       setEmailLoading(false);
     }
@@ -212,7 +236,13 @@ const ProfileSettings = () => {
       const me = await api.get('/users/me');
       updateUser(me.data);
     } catch (err) {
-      setEmailMsg({ type: 'error', text: err.response?.data?.message || 'Invalid or expired token.' });
+      const data = err.response?.data
+      let text = data?.message || data?.error || 'Invalid or expired token.'
+      
+      if (data?.details?.fields) {
+        text = `Validation error: ${data.details.fields.join(', ')}`
+      }
+      setEmailMsg({ type: 'error', text });
     } finally {
       setEmailLoading(false);
     }
@@ -242,7 +272,13 @@ const ProfileSettings = () => {
       setDashMsg({ type: 'success', text: 'Dashboard password updated!' });
       setDashForm({ currentPassword: '', dashboardPassword: '', confirmDashboardPassword: '' });
     } catch (err) {
-      setDashMsg({ type: 'error', text: err.response?.data?.message || 'Failed to update dashboard password.' });
+      const data = err.response?.data
+      let text = data?.message || data?.error || 'Failed to update dashboard password.'
+      
+      if (data?.details?.fields) {
+        text = `Required fields missing: ${data.details.fields.join(', ')}`
+      }
+      setDashMsg({ type: 'error', text });
     } finally {
       setDashSaving(false);
     }

@@ -38,7 +38,12 @@ export default function EditAccount() {
       const { data } = await api.patch('/users/me', { name });
       setNameMsg({ type: 'success', text: data?.message || 'Profile updated.' });
     } catch (err) {
-      const text = err?.response?.data?.message || 'Failed to update profile.';
+      const data = err?.response?.data
+      let text = data?.message || data?.error || 'Failed to update profile.'
+      
+      if (data?.details?.fields) {
+        text = `Required fields missing: ${data.details.fields.join(', ')}`
+      }
       setNameMsg({ type: 'error', text });
     } finally {
       setSavingName(false);
@@ -53,7 +58,12 @@ export default function EditAccount() {
       const { data } = await api.post('/users/me/email-change/request', { newEmail });
       setEmailMsg({ type: 'success', text: data?.message || 'Verification sent to your new email. Please enter the token below.' });
     } catch (err) {
-      const text = err?.response?.data?.message || 'Failed to request email change.';
+      const data = err?.response?.data
+      let text = data?.message || data?.error || 'Failed to request email change.'
+      
+      if (data?.details?.fields) {
+        text = `Missing fields: ${data.details.fields.join(', ')}`
+      }
       setEmailMsg({ type: 'error', text });
     } finally {
       setEmailLoading(false);
@@ -67,7 +77,12 @@ export default function EditAccount() {
       const { data } = await api.post('/users/me/email-change/confirm', { token: emailToken });
       setEmailMsg({ type: 'success', text: data?.message || 'Email updated.' });
     } catch (err) {
-      const text = err?.response?.data?.message || 'Failed to confirm email change.';
+      const data = err?.response?.data
+      let text = data?.message || data?.error || 'Failed to confirm email change.'
+      
+      if (data?.details?.fields) {
+        text = `Validation error: ${data.details.fields.join(', ')}`
+      }
       setEmailMsg({ type: 'error', text });
     } finally {
       setEmailLoading(false);
@@ -82,7 +97,12 @@ export default function EditAccount() {
       const { data } = await api.post('/users/me/phone-otp/request', { newPhone });
       setPhoneMsg({ type: 'success', text: data?.message || 'OTP sent to your new phone. Please enter it below.' });
     } catch (err) {
-      const text = err?.response?.data?.message || 'Failed to request OTP.';
+      const data = err?.response?.data
+      let text = data?.message || data?.error || 'Failed to request OTP.'
+      
+      if (data?.details?.fields) {
+        text = `Missing fields: ${data.details.fields.join(', ')}`
+      }
       setPhoneMsg({ type: 'error', text });
     } finally {
       setPhoneLoading(false);
@@ -96,7 +116,12 @@ export default function EditAccount() {
       const { data } = await api.post('/users/me/phone-otp/confirm', { otp: phoneOtp });
       setPhoneMsg({ type: 'success', text: data?.message || 'Phone updated.' });
     } catch (err) {
-      const text = err?.response?.data?.message || 'Failed to confirm OTP.';
+      const data = err?.response?.data
+      let text = data?.message || data?.error || 'Failed to confirm OTP.'
+      
+      if (data?.details?.fields) {
+        text = `Validation error: ${data.details.fields.join(', ')}`
+      }
       setPhoneMsg({ type: 'error', text });
     } finally {
       setPhoneLoading(false);
@@ -114,7 +139,12 @@ export default function EditAccount() {
       setCurrentPassword('');
       setNewPassword('');
     } catch (err) {
-      const text = err?.response?.data?.message || 'Failed to change password.';
+      const data = err?.response?.data
+      let text = data?.message || data?.error || 'Failed to change password.'
+      
+      if (data?.details?.fields) {
+        text = `Required fields missing: ${data.details.fields.join(', ')}`
+      }
       setPwdMsg({ type: 'error', text });
     } finally {
       setPwdLoading(false);

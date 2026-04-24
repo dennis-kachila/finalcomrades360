@@ -61,7 +61,13 @@ const DashboardLogin = () => {
                 }
             }
         } catch (err) {
-            setError(err.response?.data?.message || err.message || "An error occurred.");
+            const data = err.response?.data
+            let msg = data?.message || err.message || "An error occurred."
+            
+            if (data?.details?.fields) {
+                msg = `Validation failed for: ${data.details.fields.join(', ')}`
+            }
+            setError(msg)
         } finally {
             setLoading(false);
         }

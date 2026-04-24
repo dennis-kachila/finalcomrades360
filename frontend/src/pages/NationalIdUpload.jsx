@@ -117,7 +117,13 @@ const NationalIdUpload = () => {
 
         } catch (error) {
             console.error('Error uploading IDs:', error);
-            toast.error('Failed to upload National ID. Please try again.');
+            const data = error.response?.data
+            let msg = data?.message || data?.error || 'Failed to upload National ID. Please try again.'
+            
+            if (data?.details?.fields) {
+                msg = `Missing or invalid: ${data.details.fields.join(', ')}`
+            }
+            toast.error(msg);
         } finally {
             setUploading(false);
         }

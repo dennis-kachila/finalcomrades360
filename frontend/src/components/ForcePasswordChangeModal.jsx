@@ -42,7 +42,13 @@ const ForcePasswordChangeModal = ({ isOpen, user }) => {
         }, 2000);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update password. Please try again.');
+      const data = err.response?.data
+      let msg = data?.message || data?.error || 'Failed to update password. Please try again.'
+      
+      if (data?.details?.fields) {
+        msg = `Validation error for: ${data.details.fields.join(', ')}`
+      }
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }

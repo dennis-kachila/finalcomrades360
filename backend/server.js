@@ -623,18 +623,21 @@ if (global.__serverStarted) {
 } else {
   global.__serverStarted = true;
   
-  // CRITICAL: Only call listen if this file is run directly (Terminal)
-  // If required by cPanel/Passenger, it will handle the startup itself.
+  // 1. ALWAYS initialize the app logic (routes, middleware, database)
+  // This must happen even for Passenger!
+  const bootPromise = startServer();
+
+  // 2. Only bind to a PORT if running directly in Terminal
   if (require.main === module) {
-    console.log('🚀 RUNNING DIRECTLY: Starting standalone server...');
-    startServer();
+    bootPromise.then(() => {
+      console.log('🚀 STANDALONE MODE: Server logic ready and listening.');
+    }).catch(err => {
+      console.error('❌ STANDALONE BOOT FAILED:', err);
+    });
   } else {
-    console.log('📦 REQUIRED BY PASSENGER: Handing over server instance.');
-    // When required as a module, we just need to ensure the app is configured
-    // startServer() is called internally by Passenger through module.exports
+    console.log('📦 PASSENGER MODE: Logic initialized, handing over to Apache.');
   }
 }
 
 // Export for cPanel/Passenger
-// We export the APP instance, which Passenger uses to mount the server.
 module.exports = server;

@@ -1,5 +1,5 @@
 import React from 'react'
-import { AppRegistry } from 'react-native-web';
+import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { BrowserRouter } from 'react-router-dom'
@@ -42,20 +42,17 @@ const queryClient = new QueryClient({
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
-// Wrap App with all top-level providers before registering
-const AppWithRootProviders = () => (
-  <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id'}>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </QueryClientProvider>
-  </GoogleOAuthProvider>
-);
+const container = document.getElementById('root');
+const root = createRoot(container);
 
-// Register the main application component
-AppRegistry.registerComponent('App', () => AppWithRootProviders);
-AppRegistry.runApplication('App', {
-  initialProps: {},
-  rootTag: document.getElementById('root'),
-});
+root.render(
+  <React.StrictMode>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id'}>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </GoogleOAuthProvider>
+  </React.StrictMode>
+);

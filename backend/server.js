@@ -627,4 +627,4 @@ if (global.__serverStarted) {
 
 // Export for cPanel/Passenger
 // We export the APP instance, which Passenger uses to mount the server.
-module.exports = app;
+module.exports = server;

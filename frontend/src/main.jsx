@@ -56,17 +56,15 @@ const queryClient = new QueryClient({
   },
 });
 
-import { GoogleOAuthProvider } from '@react-oauth/google';
+
 
 const container = document.getElementById('root');
 const root = createRoot(container);
 
 root.render(
-  <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id'}>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </QueryClientProvider>
-  </GoogleOAuthProvider>
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </QueryClientProvider>
 );

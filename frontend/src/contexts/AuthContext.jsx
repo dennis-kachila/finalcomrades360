@@ -153,6 +153,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = () => {
+    return new Promise((resolve, reject) => {
+      if (typeof window.google === 'undefined') {
+        reject(new Error('Google Identity Services script not loaded. Please refresh the page.'));
+        return;
+      }
+
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        scope: 'email profile openid',
+        callback: async (response) => {
+          if (response.error) {
+            reject(response);
+            return;
+          }
+          try {
+            const user = await googleLogin(response.access_token, 'access_token');
+            resolve(user);
+          } catch (err) {
+            reject(err);
+          }
+        },
+      });
+
+      client.requestAccessToken();
+    });
+  };
+
   const googleLogin = async (googleToken, tokenType = 'id_token') => {
     try {
       const response = await api.post('/auth/google', { token: googleToken, tokenType });

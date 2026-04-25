@@ -4,13 +4,13 @@ import api from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { validateKenyanPhone, PHONE_VALIDATION_ERROR, formatKenyanPhoneInput } from '../../utils/validation'
 import SystemFeedbackModal from '../ui/SystemFeedbackModal'
-import { useGoogleLogin } from '@react-oauth/google'
+
 import { Eye, EyeOff } from 'lucide-react'
 
 export default function RegisterForm({ onSuccess, initialReferralCode, isModal = false }) {
     const location = useLocation()
     const navigate = useNavigate()
-    const { setSession, googleLogin } = useAuth()
+    const { setSession, googleLogin, loginWithGoogle } = useAuth()
 
     // ── Form state ───────────────────────────────────────────────────────────────
     const [contact, setContact] = useState('')          // email OR phone
@@ -151,25 +151,19 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
         }
     }
 
-    const handleGoogleSuccess = async (tokenResponse) => {
+    const startGoogleLogin = async () => {
         try {
             setLoading(true);
-            await googleLogin(tokenResponse.access_token, 'access_token');
+            await loginWithGoogle();
             const from = location.state?.from?.pathname || '/';
             navigate(from);
         } catch (err) {
-            const data = err.response?.data
-            setError(data?.message || 'Failed to authenticate with Google. Please try again.');
+            console.error('[GoogleAuth] Manual registration error:', err);
+            setError(err.message || 'Google Authentication Failed. Please try again.');
         } finally {
             setLoading(false);
         }
     };
-
-    const startGoogleLogin = useGoogleLogin({
-        onSuccess: handleGoogleSuccess,
-        onError: () => setError('Google Authentication Failed.'),
-        flow: 'implicit',
-    });
 
     // ── OTP input handlers ────────────────────────────────────────────────────
     const handleOtpChange = (index, value) => {

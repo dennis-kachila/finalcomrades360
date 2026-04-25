@@ -3,11 +3,11 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatKenyanPhoneInput } from '../../utils/validation'
 import SystemFeedbackModal from '../ui/SystemFeedbackModal'
-import { useGoogleLogin } from '@react-oauth/google'
+
 import { Eye, EyeOff } from 'lucide-react'
 
 export default function LoginForm({ onSuccess, isModal = false, initialMode = 'user', lockMode = false }) {
-    const { login, googleLogin } = useAuth()
+    const { login, googleLogin, loginWithGoogle } = useAuth()
     const navigate = useNavigate();
     const location = useLocation();
     const [form, setForm] = useState({ identifier: '', password: '' })
@@ -121,30 +121,22 @@ export default function LoginForm({ onSuccess, isModal = false, initialMode = 'u
         }
     }
 
-    const handleGoogleSuccess = async (tokenResponse) => {
+    const startGoogleLogin = async () => {
         try {
             setLoading(true);
-            const user = await googleLogin(tokenResponse.access_token, 'access_token');
+            const user = await loginWithGoogle();
             if (onSuccess) {
                 onSuccess(user, { hasFastFood: false });
             } else {
                 navigate('/');
             }
         } catch (err) {
-            setError(err.message || 'Google Login failed.');
+            console.error('[GoogleAuth] Manual sign-in error:', err);
+            setError(err.message || 'Google Authentication Failed. Please try again.');
         } finally {
             setLoading(false);
         }
     };
-
-    const startGoogleLogin = useGoogleLogin({
-        onSuccess: handleGoogleSuccess,
-        onError: () => {
-            console.error('[GoogleAuth] Sign-in failed. Origin:', window.location.origin);
-            setError('Google Authentication Failed. Please try again.');
-        },
-        flow: 'implicit',
-    });
 
     return (
         <div>

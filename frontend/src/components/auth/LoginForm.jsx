@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatKenyanPhoneInput } from '../../utils/validation'
 import SystemFeedbackModal from '../ui/SystemFeedbackModal'
-import { GoogleLogin, useGoogleOneTapLogin } from '@react-oauth/google'
+import { GoogleLogin } from '@react-oauth/google'
 import { Eye, EyeOff } from 'lucide-react'
 
 export default function LoginForm({ onSuccess, isModal = false, initialMode = 'user', lockMode = false }) {
@@ -137,13 +137,6 @@ export default function LoginForm({ onSuccess, isModal = false, initialMode = 'u
             setLoading(false);
         }
     };
-
-    // Enable Google One Tap Login for instant experience
-    useGoogleOneTapLogin({
-        onSuccess: handleGoogleSuccess,
-        onError: () => console.error('Google One Tap Login failed'),
-        disabled: loginMode !== 'user' || loading
-    });
 
     return (
         <div>

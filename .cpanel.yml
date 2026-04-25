@@ -5,6 +5,8 @@ deployment:
     - /bin/mkdir -p /home/vdranjxy/comrades-master
     # Sync frontend: rsync is faster and cleaner than cp
     - /usr/bin/rsync -avz --delete frontend/dist/ /home/vdranjxy/public_html/
+    # Copy .htaccess to public_html for SPA routing
+    - /bin/cp .htaccess /home/vdranjxy/public_html/.htaccess
     # Sync backend: Exclude node_modules and uploads to prevent hanging
     - /usr/bin/rsync -avz --exclude 'node_modules' --exclude 'uploads' backend/ /home/vdranjxy/comrades-master/
     - /bin/mkdir -p /home/vdranjxy/comrades-master/tmp

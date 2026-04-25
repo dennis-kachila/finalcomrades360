@@ -68,26 +68,30 @@ console.error('🚀 SERVER RESTARTED - LOGGING INITIALIZED');
 
 // DETECT STATIC PATHS GLOBALLY
 const IS_PROD = process.env.NODE_ENV === 'production';
-const rootStaticPath = path.resolve(__dirname, 'public'); 
-const cpanelPath = path.resolve(__dirname, '../public_html');
-const productionPath = path.join(__dirname, 'public');
-const developmentPath = path.join(__dirname, '../frontend/dist');
 
-// PRODUCTION PRIORITY: In cPanel/Passenger, the backend is often in a peer folder to public_html
-let GLOBAL_STATIC_PATH = developmentPath;
-if (IS_PROD) {
-  if (fs.existsSync(cpanelPath)) {
-    GLOBAL_STATIC_PATH = cpanelPath;
-  } else if (fs.existsSync(productionPath)) {
-    GLOBAL_STATIC_PATH = productionPath;
-  } else if (fs.existsSync(rootStaticPath)) {
-    GLOBAL_STATIC_PATH = rootStaticPath;
-  } else if (fs.existsSync(path.resolve(__dirname, '../../public_html'))) {
-    // Extra fallback for deep structures
-    GLOBAL_STATIC_PATH = path.resolve(__dirname, '../../public_html');
+// Common paths where frontend files might live in various deployment scenarios
+const possiblePaths = [
+  path.resolve(__dirname, '../public_html'),    // cPanel: backend/ next to public_html/
+  path.resolve(__dirname, '../../public_html'), // cPanel: backend/ in a subfolder next to public_html/
+  path.resolve(__dirname, '../frontend/dist'),  // Local development structure
+  path.resolve(__dirname, 'public'),             // Generic production build folder
+  path.resolve(__dirname, '../public')          // Project root public folder
+];
+
+let GLOBAL_STATIC_PATH = path.resolve(__dirname, '../frontend/dist'); // Default to dev path
+
+// Select the first path that actually contains an index.html
+for (const testPath of possiblePaths) {
+  const testIndex = path.join(testPath, 'index.html');
+  if (fs.existsSync(testIndex)) {
+    GLOBAL_STATIC_PATH = testPath;
+    console.error(`[Static] Found valid frontend at: ${testPath}`);
+    break;
   }
 }
-console.log(`[server] Static System Initialized: ${GLOBAL_STATIC_PATH} (Mode: ${process.env.NODE_ENV || 'development'})`);
+
+console.error(`[Init] GLOBAL_STATIC_PATH set to: ${GLOBAL_STATIC_PATH} (Mode: ${process.env.NODE_ENV || 'development'})`);
+
 if (!fs.existsSync(GLOBAL_STATIC_PATH)) {
   console.error(`⚠️ WARNING: GLOBAL_STATIC_PATH does not exist: ${GLOBAL_STATIC_PATH}`);
 }
@@ -239,27 +243,27 @@ apiRouter.use('/wishlist', require('./routes/wishlistRoutes'));
 apiRouter.use('/ultra-fast', require('./routes/ultraFastRoutes'));
 apiRouter.use('/orders', require('./routes/orderRoutes'));
 apiRouter.use('/products', require('./routes/productRoutes'));
-apiRouter.use('/stats', require('./routes/statsRoutes'));
+// apiRouter.use('/stats', require('./routes/statsRoutes'));
 apiRouter.use('/marketing', require('./routes/marketingRoutes'));
 apiRouter.use('/inventory', require('./routes/inventoryRoutes'));
 apiRouter.use('/services', require('./routes/serviceRoutes'));
 apiRouter.use('/finance', require('./routes/financeRoutes'));
 apiRouter.use('/payments', require('./routes/paymentRoutes'));
-apiRouter.use('/mpesa', require('./routes/mpesaRoutes'));
+// apiRouter.use('/mpesa', require('./routes/mpesaRoutes'));
 apiRouter.use('/notifications', require('./routes/notificationRoutes'));
 apiRouter.use('/fastfood', require('./routes/fastFoodRoutes'));
-apiRouter.use('/referrals', require('./routes/referralRoutes'));
-apiRouter.use('/tickets', require('./routes/ticketRoutes'));
-apiRouter.use('/config', require('./routes/configRoutes'));
+// apiRouter.use('/referrals', require('./routes/referralRoutes'));
+// apiRouter.use('/tickets', require('./routes/ticketRoutes'));
+// apiRouter.use('/config', require('./routes/configRoutes'));
 apiRouter.use('/warehouse', require('./routes/warehouseRoutes'));
 apiRouter.use('/pickup-stations', require('./routes/pickupStationRoutes'));
 apiRouter.use('/station-managers', require('./routes/stationManagerRoutes'));
 apiRouter.use('/support', require('./routes/supportRoutes'));
 apiRouter.use('/hero-promotions', require('./routes/heroPromotionRoutes'));
 apiRouter.use('/delivery', require('./routes/deliveryRoutes'));
-apiRouter.use('/payouts', require('./routes/payoutRoutes'));
+// apiRouter.use('/payouts', require('./routes/payoutRoutes'));
 apiRouter.use('/commissions', require('./routes/commissionRoutes'));
-apiRouter.use('/driver', require('./routes/driverRoutes'));
+// apiRouter.use('/driver', require('./routes/driverRoutes'));
 apiRouter.use('/admin', require('./routes/adminRoutes'));
 
 // Mount the API router on both prefixes for maximum compatibility
@@ -326,7 +330,6 @@ app.use('/', apiRouter);
   app.use('/api/2fa', require('./routes/twoFactorAuthRoutes'));
 
   console.error('✅ 35+ Route modules successfully lazy-loaded.');
-}
 
 // Final Middleware Function (Deferred to stay at end of stack)
 function finalizeMiddleware(app) {

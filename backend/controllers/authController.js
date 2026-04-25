@@ -654,17 +654,19 @@ const googleAuth = async (req, res, next) => {
 
     if (tokenType === 'access_token') {
       // Implicit flow: use access_token to fetch user info from Google
-      const fetch = (await import('node-fetch')).default;
-      const userInfoRes = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!userInfoRes.ok) {
+      const axios = require('axios');
+      try {
+        const userInfoRes = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const userInfo = userInfoRes.data;
+        email = userInfo.email;
+        name = userInfo.name;
+        picture = userInfo.picture;
+      } catch (axiosError) {
+        console.error('[authController] Failed to verify Google access token:', axiosError.message);
         return res.status(401).json({ success: false, message: 'Failed to verify Google access token.' });
       }
-      const userInfo = await userInfoRes.json();
-      email = userInfo.email;
-      name = userInfo.name;
-      picture = userInfo.picture;
     } else {
       // Default: id_token flow (legacy credential response)
       const clients = [process.env.GOOGLE_CLIENT_ID, process.env.VITE_GOOGLE_CLIENT_ID].filter(Boolean);

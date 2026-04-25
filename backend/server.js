@@ -647,15 +647,37 @@ if (global.__serverStarted) {
   // This must happen even for Passenger!
   const bootPromise = startServer();
 
-  // 2. Only bind to a PORT if running directly in Terminal
-  if (require.main === module) {
-    bootPromise.then(() => {
-      console.log('🚀 STANDALONE MODE: Server logic ready and listening.');
-    }).catch(err => {
-      console.error('❌ STANDALONE BOOT FAILED:', err);
+  // -----------------------------------------------------------------
+  // 4. SERVER BINDING (Environment Aware)
+  // -----------------------------------------------------------------
+  const isPassenger = typeof(PhusionPassenger) !== 'undefined' || process.env.PASSENGER_APP_ENV;
+
+  if (isPassenger) {
+    // In Passenger mode, we listen on the 'passenger' string or the provided PORT socket
+    console.log('📦 PASSENGER MODE: Detected. Binding to Passenger socket...');
+    server.listen('passenger');
+  } else if (require.main === module) {
+    // Standalone/Development mode
+    const DEFAULT_PORT = process.env.PORT || 5000;
+    server.listen(DEFAULT_PORT, () => {
+      console.log(`🚀 Step 2: Server bound to port ${DEFAULT_PORT} - SUCCESS`);
+      console.log(`🚀 STANDALONE MODE: Server logic ready and listening.`);
+      
+      // Begin background initialization only after successful bind
+      initBackgroundServices();
     });
   } else {
-    console.log('📦 PASSENGER MODE: Logic initialized, handing over to Apache.');
+    console.log('📦 MODULE MODE: Logic initialized, awaiting external bind.');
+  }
+
+  async function initBackgroundServices() {
+    console.log('[BOOT-STEP] 1/4: Beginning background service initialization...');
+    try {
+      const { sequelize } = require('./models');
+      await sequelize.authenticate();
+    } catch (e) {
+      console.error(e);
+    }
   }
 }
 

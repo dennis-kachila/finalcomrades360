@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // Backend API base URL - relative path for production, key for Vite proxy in development
-const API_BASE = '/api';
+// Using VITE_API_URL ensures absolute URLs are used in production to prevent mobile routing issues
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 /**
  * Returns true if the currently logged-in user has an admin or superadmin role.

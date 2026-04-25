@@ -7,10 +7,19 @@ PassengerStartupFile server.js
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
-  
-  # 1. EXCLUDE API FROM REDIRECTS (Passenger handles these)
+
+  # 0. Force HTTPS (prevents protocol mismatch on mobile)
+  RewriteCond %{HTTPS} off
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # 0b. Redirect www to non-www (canonical domain)
+  RewriteCond %{HTTP_HOST} ^www\.comrades360\.shop$ [NC]
+  RewriteRule ^ https://comrades360.shop%{REQUEST_URI} [L,R=301]
+
+  # 1. EXCLUDE API and Socket.IO FROM SPA REDIRECTS (Passenger handles these)
   RewriteCond %{REQUEST_URI} ^/api [OR]
-  RewriteCond %{REQUEST_URI} ^/socket.io
+  RewriteCond %{REQUEST_URI} ^/socket.io [OR]
+  RewriteCond %{REQUEST_URI} ^/uploads
   RewriteRule .* - [L]
 
   # 2. React Router SPA Routing

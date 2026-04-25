@@ -1,3 +1,19 @@
+// Unregister ALL service workers on startup to prevent stale caches from serving 404s
+// (sw.js / sw-enhanced.js pre-cache API endpoints and can serve broken responses)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister();
+    }
+  }).catch(() => {});
+  // Also clear API-related caches left by old SWs
+  caches.keys().then((cacheNames) => {
+    cacheNames.forEach((cacheName) => {
+      caches.delete(cacheName);
+    });
+  }).catch(() => {});
+}
+
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

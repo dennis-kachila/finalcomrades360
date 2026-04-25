@@ -8,7 +8,9 @@
 
   # 2. React Router SPA Routing
   # If the requested resource is not a file or directory, serve index.html
+  # BUT exclude /api requests so they reach the Node.js backend
   RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_URI} !^/api
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME} !-l

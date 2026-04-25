@@ -11,6 +11,7 @@ const googleClient = new OAuth2Client(); // Audience verified in method
 
 const { isValidEmail, normalizeKenyanPhone } = require('../middleware/validators');
 const { sendEmail } = require('../utils/mailer');
+const { sanitizeUserPayload } = require('../utils/userUtils');
 
 const { 
   sendMessage 
@@ -21,23 +22,9 @@ const {
 } = require('../utils/notificationHelpers');
 
 // Helper to strip placeholders so frontend forms show empty fields
-const sanitizeUserPayload = (userData) => {
-  const u = { ...userData };
-  let originalEmail = u.email;
+// DEPRECATED: Moved to shared utils/userUtils.js
+// const sanitizeUserPayload = (userData) => { ... }
 
-  if (u.email && u.email.startsWith('noemail_')) u.email = '';
-  if (u.phone && u.phone.startsWith('nophone_')) u.phone = '';
-
-  if (u.name) {
-    if (/^User\d{0,4}$/.test(u.name)) {
-      u.name = '';
-    } else if (originalEmail && typeof originalEmail === 'string') {
-      const prefix = originalEmail.split('@')[0];
-      if (u.name === prefix) u.name = '';
-    }
-  }
-  return u;
-};
 
 const register = async (req, res, next) => {
   console.log('[authController] Registration attempt:', req.body);
@@ -369,10 +356,6 @@ const login = async (req, res, next) => {
     
     const cleanUser = sanitizeUserPayload(rawUser);
 
-    // SAFETY: Ensure role and roles are always defined to prevent frontend crashes
-    if (!cleanUser.role) cleanUser.role = 'customer';
-    if (!Array.isArray(cleanUser.roles)) cleanUser.roles = [];
-
     console.log(`[authController] Login Success return 200 for role: ${cleanUser.role}`);
     return res.status(200).json({
       success: true,
@@ -380,7 +363,7 @@ const login = async (req, res, next) => {
       token,
       user: {
         ...cleanUser,
-        mustChangePassword: user.mustChangePassword
+        mustChangePassword: user.mustChangePassword || false
       }
     });
 

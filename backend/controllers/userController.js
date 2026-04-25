@@ -4,6 +4,7 @@ const { User, UserRole, Notification, Order, Otp } = require("../models");
 const { isValidEmail, normalizeKenyanPhone } = require("../middleware/validators");
 const { sendEmail } = require("../utils/mailer");
 const { sendMessage } = require("../utils/messageService");
+const { sanitizeUserPayload } = require("../utils/userUtils");
 const { getDynamicMessage } = require("../utils/templateUtils");
 
 const { uploadProfileImages } = require("../config/multer");
@@ -212,25 +213,9 @@ const changePassword = async (req, res, next) => {
 const makeRef = () => `COMRADES360-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
 // Helper to strip placeholders so frontend forms show empty fields
-const sanitizeUserPayload = (userData) => {
-  const u = { ...userData };
-  let originalEmail = u.email;
-  let originalPhone = u.phone;
+// DEPRECATED: Moved to shared utils/userUtils.js
+// const sanitizeUserPayload = (userData) => { ... }
 
-  if (u.email && u.email.startsWith('noemail_')) u.email = '';
-  if (u.phone && u.phone.startsWith('nophone_')) u.phone = '';
-
-  // Clear name if it matches the email prefix or is "UserXXXX"
-  if (u.name) {
-    if (/^User\d{0,4}$/.test(u.name)) {
-      u.name = '';
-    } else if (originalEmail && typeof originalEmail === 'string') {
-      const prefix = originalEmail.split('@')[0];
-      if (u.name === prefix) u.name = '';
-    }
-  }
-  return u;
-};
 
 const me = async (req, res) => {
   const u = await User.findByPk(req.user.id, {

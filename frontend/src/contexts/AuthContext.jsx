@@ -92,38 +92,56 @@ export const AuthProvider = ({ children }) => {
         password: credentials?.password
       };
       const response = await api.post(authPath, payload);
-      console.log('[AuthContext] Login response received:', response.data);
-      const { token, user } = response.data;
+      
+      // Safety: Handle non-object or missing data
+      if (!response.data || typeof response.data !== 'object') {
+        console.warn('[AuthContext] Unexpected non-object response from login:', response.data);
+        throw new Error('Server returned an invalid response. Please try again.');
+      }
 
-      localStorage.setItem('token', token);
-      console.log('Login success - Token saved. User data:', user);
+      // Support both nested and flattened response structures
+      const token = response.data.token || localStorage.getItem('token');
+      let userData = response.data.user || response.data;
+
+      // Log the full response for production debugging
+      if (!response.data.user) {
+        console.warn('[AuthContext] "user" key missing in login response. Using root data as fallback.', response.data);
+      }
+
+      if (token) {
+        localStorage.setItem('token', token);
+        console.log('Login success - Token saved.');
+      } else {
+        console.warn('[AuthContext] No token found in login response.');
+      }
 
       const sessionUser = {
-        ...user,
-        role: user.role || 'customer',
-        roles: user.roles || [user.role || 'customer']
+        ...userData,
+        role: userData.role || 'customer',
+        roles: Array.isArray(userData.roles) ? userData.roles : (userData.role ? [userData.role] : ['customer'])
       };
 
       setUser(sessionUser);
       localStorage.setItem('user', JSON.stringify(sessionUser));
-      joinUserRoom(sessionUser.id);
-      console.log('User state set in AuthContext:', { email: sessionUser.email, role: sessionUser.role, isVerified: sessionUser.isVerified });
+      
+      if (sessionUser.id) joinUserRoom(sessionUser.id);
+      
+      console.log('User state set in AuthContext:', { email: sessionUser.email, role: sessionUser.role });
 
       const userRoles = sessionUser.roles;
       const isAdmin = userRoles.some(r => ['admin', 'superadmin', 'super_admin'].includes(r));
       const hasSpecialistRole = userRoles.some(r => r !== 'customer' && !['admin', 'superadmin', 'super_admin'].includes(r));
 
-      if (hasSpecialistRole && !isAdmin && !user.isVerified) {
+      if (hasSpecialistRole && !isAdmin && !sessionUser.isVerified) {
         console.log('Verification required for specialist roles:', userRoles);
         setVerificationRequired(true);
         setVerificationMessage('Account verification required. Please complete your role application approval.');
       } else {
-        console.log('No verification required');
         setVerificationRequired(false);
         setVerificationMessage('');
       }
 
-      return user;
+      return sessionUser;
     } catch (error) {
       console.error('[AuthContext] Login failed:', error.message);
       if (error.response) {
@@ -138,24 +156,32 @@ export const AuthProvider = ({ children }) => {
   const googleLogin = async (googleToken) => {
     try {
       const response = await api.post('/auth/google', { token: googleToken });
-      const { token, user } = response.data;
+      
+      if (!response.data || typeof response.data !== 'object') {
+        throw new Error('Google Login failed: Invalid response from server.');
+      }
 
-      localStorage.setItem('token', token);
+      const token = response.data.token;
+      let userData = response.data.user || response.data;
+
+      if (token) {
+        localStorage.setItem('token', token);
+      }
 
       const sessionUser = {
-        ...user,
-        role: user.role || 'customer',
-        roles: user.roles || [user.role || 'customer']
+        ...userData,
+        role: userData.role || 'customer',
+        roles: Array.isArray(userData.roles) ? userData.roles : (userData.role ? [userData.role] : ['customer'])
       };
 
       setUser(sessionUser);
       localStorage.setItem('user', JSON.stringify(sessionUser));
-      joinUserRoom(sessionUser.id);
+      if (sessionUser.id) joinUserRoom(sessionUser.id);
 
       setVerificationRequired(false);
       setVerificationMessage('');
 
-      return user;
+      return sessionUser;
     } catch (error) {
       console.error('[AuthContext] Google Login failed:', error.message);
       setError(error.message);

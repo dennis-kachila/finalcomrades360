@@ -71,14 +71,15 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 
 // Common paths where frontend files might live in various deployment scenarios
 const possiblePaths = [
-  path.resolve(__dirname, '../public_html'),    // cPanel: backend/ next to public_html/
+  '/home/vdranjxy/public_html',
+  path.resolve(__dirname, '../public_html'),
   path.resolve(__dirname, '../../public_html'), // cPanel: backend/ in a subfolder next to public_html/
   path.resolve(__dirname, '../frontend/dist'),  // Local development structure
   path.resolve(__dirname, 'public'),             // Generic production build folder
   path.resolve(__dirname, '../public')          // Project root public folder
 ];
 
-let GLOBAL_STATIC_PATH = path.resolve(__dirname, '../frontend/dist'); // Default to dev path
+let GLOBAL_STATIC_PATH = '/home/vdranjxy/public_html';
 
 // Select the first path that actually contains an index.html
 for (const testPath of possiblePaths) {

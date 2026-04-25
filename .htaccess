@@ -8,7 +8,7 @@ PassengerStartupFile server.js
   RewriteEngine On
   RewriteBase /
   
-  # 1. EXCLUDE API FROM REDIRECTS (So it reaches Node.js)
+  # 1. EXCLUDE API FROM REDIRECTS (Passenger handles these)
   RewriteCond %{REQUEST_URI} ^/api [OR]
   RewriteCond %{REQUEST_URI} ^/socket.io
   RewriteRule .* - [L]

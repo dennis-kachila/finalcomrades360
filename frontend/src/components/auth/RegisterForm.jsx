@@ -4,7 +4,7 @@ import api from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { validateKenyanPhone, PHONE_VALIDATION_ERROR, formatKenyanPhoneInput } from '../../utils/validation'
 import SystemFeedbackModal from '../ui/SystemFeedbackModal'
-import { GoogleLogin } from '@react-oauth/google'
+import { useGoogleLogin } from '@react-oauth/google'
 import { Eye, EyeOff } from 'lucide-react'
 
 export default function RegisterForm({ onSuccess, initialReferralCode, isModal = false }) {
@@ -151,13 +151,10 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
         }
     }
 
-    const handleGoogleSuccess = async (credentialResponse) => {
+    const handleGoogleSuccess = async (tokenResponse) => {
         try {
             setLoading(true);
-            await googleLogin(credentialResponse.credential);
-            // Navigate to the destination using client-side routing so that
-            // CartContext stays mounted and can detect the user change, pick up
-            // the guest cart from localStorage, and merge it with the server.
+            await googleLogin(tokenResponse.access_token, 'access_token');
             const from = location.state?.from?.pathname || '/';
             navigate(from);
         } catch (err) {
@@ -167,6 +164,12 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
             setLoading(false);
         }
     };
+
+    const startGoogleLogin = useGoogleLogin({
+        onSuccess: handleGoogleSuccess,
+        onError: () => setError('Google Authentication Failed.'),
+        flow: 'implicit',
+    });
 
     // ── OTP input handlers ────────────────────────────────────────────────────
     const handleOtpChange = (index, value) => {
@@ -468,13 +471,20 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
             </div>
 
             <div className="flex justify-center mb-6">
-                <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={() => setError('Google Authentication Failed.')}
-                    theme="filled_blue"
-                    shape="pill"
-                    text="continue_with"
-                />
+                <button
+                    type="button"
+                    onClick={() => startGoogleLogin()}
+                    disabled={loading}
+                    className="flex items-center gap-3 px-6 py-2.5 rounded-full bg-[#4285F4] text-white font-medium text-sm hover:bg-[#357abd] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
+                >
+                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#fff"/>
+                        <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#fff" opacity=".9"/>
+                        <path d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#fff" opacity=".8"/>
+                        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#fff" opacity=".7"/>
+                    </svg>
+                    Continue with Google
+                </button>
             </div>
 
             <div className="mt-5 text-center text-sm text-gray-500">

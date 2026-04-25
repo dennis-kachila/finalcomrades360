@@ -644,43 +644,56 @@ const sendRegistrationOtp = async (req, res, next) => {
     next(error);
   }
 };
-// Google OAuth handler
+// Google OAuth handler — supports both id_token (old) and access_token (implicit flow)
 const googleAuth = async (req, res, next) => {
-  const { token } = req.body;
+  const { token, tokenType } = req.body;
   if (!token) return res.status(400).json({ success: false, message: 'No Google token provided.' });
 
   try {
-    const clients = [process.env.GOOGLE_CLIENT_ID, process.env.VITE_GOOGLE_CLIENT_ID].filter(Boolean);
-    console.log('[authController] Verifying Google token for clients:', clients);
-    
-    let ticket;
-    try {
-      ticket = await googleClient.verifyIdToken({
-        idToken: token,
-        audience: clients
+    let email, name, picture;
+
+    if (tokenType === 'access_token') {
+      // Implicit flow: use access_token to fetch user info from Google
+      const fetch = (await import('node-fetch')).default;
+      const userInfoRes = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-    } catch (verifyError) {
-      console.error('[authController] Google verifyIdToken CRITICALLY failed!', {
-        error: verifyError.message,
-        clients,
-        env_client: process.env.GOOGLE_CLIENT_ID,
-        vite_env_client: process.env.VITE_GOOGLE_CLIENT_ID
-      });
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Google verification failed.',
-        error: verifyError.message,
-        details: 'The token provided by your browser was rejected by the server.' 
-      });
+      if (!userInfoRes.ok) {
+        return res.status(401).json({ success: false, message: 'Failed to verify Google access token.' });
+      }
+      const userInfo = await userInfoRes.json();
+      email = userInfo.email;
+      name = userInfo.name;
+      picture = userInfo.picture;
+    } else {
+      // Default: id_token flow (legacy credential response)
+      const clients = [process.env.GOOGLE_CLIENT_ID, process.env.VITE_GOOGLE_CLIENT_ID].filter(Boolean);
+      console.log('[authController] Verifying Google id_token for clients:', clients);
+      let ticket;
+      try {
+        ticket = await googleClient.verifyIdToken({ idToken: token, audience: clients });
+      } catch (verifyError) {
+        console.error('[authController] Google verifyIdToken failed!', {
+          error: verifyError.message,
+          clients,
+        });
+        return res.status(401).json({
+          success: false,
+          message: 'Google verification failed.',
+          error: verifyError.message,
+        });
+      }
+      const payload = ticket.getPayload();
+      email = payload.email;
+      name = payload.name;
+      picture = payload.picture;
     }
-    
-    const payload = ticket.getPayload();
-    const { email, name, picture } = payload;
+
     if (!email) return res.status(400).json({ success: false, message: 'No email found in Google token.' });
-    
+
     // Look up user
     let user = await User.findOne({ where: { email } });
-    
+
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || 'Unknown';
 
@@ -709,13 +722,10 @@ const googleAuth = async (req, res, next) => {
       // Background tasks: Update profile, last login, and history
       setImmediate(async () => {
         try {
-          let needsSave = false;
-          if (!user.profileImage && picture) { user.profileImage = picture; needsSave = true; }
-          if (!user.emailVerified) { user.emailVerified = true; needsSave = true; }
-          
+          if (!user.profileImage && picture) { user.profileImage = picture; }
+          if (!user.emailVerified) { user.emailVerified = true; }
           user.lastLogin = new Date();
           await user.save();
-
           await LoginHistory.create({
             userId: user.id, ipAddress, browser: 'GoogleLogin', os: 'Unknown', device: 'Unknown', location: 'Unknown', status: 'success'
           });
@@ -726,13 +736,11 @@ const googleAuth = async (req, res, next) => {
       return;
     } else {
       // New user creation
-      // Optimize hashing by using a lower cost factor for this random password (since they will never use it)
-      // Salt rounds 10 takes ~100ms, 4 takes ~2ms. We use 8 to balance security and speed.
-      const password = crypto.randomBytes(16).toString('hex') + 'A1!'; 
+      const password = crypto.randomBytes(16).toString('hex') + 'A1!';
       const hashedPassword = await bcrypt.hash(password, 8);
       const newReferralCode = await generateUniqueReferralCode();
       const placeholderPhone = `nophone_${uuidv4()}`;
-      
+
       const genPublic = async () => {
          const y = new Date().getFullYear();
          const seq = `${Math.floor(Math.random() * 1e6)}`.padStart(6, "0");
@@ -756,7 +764,7 @@ const googleAuth = async (req, res, next) => {
         process.env.JWT_SECRET || 'your-secret-key',
         { expiresIn: '1d' }
       );
-      
+
       const rawUser = user.toJSON();
       delete rawUser.password;
       delete rawUser.resetToken;
@@ -771,7 +779,6 @@ const googleAuth = async (req, res, next) => {
         user: sanitizeUserPayload(rawUser)
       });
 
-      // Send welcome notification and save login history in background
       setImmediate(async () => {
         try {
           await LoginHistory.create({
@@ -791,6 +798,8 @@ const googleAuth = async (req, res, next) => {
     next(error);
   }
 };
+
+
 
 const forceChangePassword = async (req, res, next) => {
   const { newPassword } = req.body;

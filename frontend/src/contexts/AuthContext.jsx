@@ -153,9 +153,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const googleLogin = async (googleToken) => {
+  const googleLogin = async (googleToken, tokenType = 'id_token') => {
     try {
-      const response = await api.post('/auth/google', { token: googleToken });
+      const response = await api.post('/auth/google', { token: googleToken, tokenType });
       
       if (!response.data || typeof response.data !== 'object') {
         throw new Error('Google Login failed: Invalid response from server.');

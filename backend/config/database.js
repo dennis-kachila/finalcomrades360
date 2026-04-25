@@ -35,11 +35,11 @@ module.exports = {
     logging: false
   },
   production: {
-    username: process.env.PROD_DB_USER,
-    password: process.env.PROD_DB_PASS,
-    database: process.env.PROD_DB_NAME,
-    host: process.env.PROD_DB_HOST,
-    dialect: process.env.PROD_DB_DIALECT || 'mysql',
+    username: process.env.PROD_DB_USER || process.env.DB_USER,
+    password: process.env.PROD_DB_PASS || process.env.DB_PASS,
+    database: process.env.PROD_DB_NAME || process.env.DB_NAME,
+    host: process.env.PROD_DB_HOST || process.env.DB_HOST,
+    dialect: process.env.PROD_DB_DIALECT || process.env.DB_DIALECT || 'mysql',
     logging: false,
     // Connection pool for production
     pool: {

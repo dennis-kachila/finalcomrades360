@@ -651,7 +651,7 @@ if (global.__serverStarted) {
   // -----------------------------------------------------------------
   // 4. SERVER BINDING (Environment Aware)
   // -----------------------------------------------------------------
-  const isPassenger = typeof(PhusionPassenger) !== 'undefined' || process.env.PASSENGER_APP_ENV;
+  const isPassenger = true;
 
   if (isPassenger) {
     // In Passenger mode, we listen on the 'passenger' string or the provided PORT socket

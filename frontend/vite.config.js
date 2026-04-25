@@ -32,6 +32,9 @@ export default defineConfig(({ mode }) => ({
     host: '0.0.0.0',
     port: 4000,
     strictPort: true,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
     hmr: {
       protocol: 'ws',
       clientPort: 4000,

@@ -1,4 +1,4 @@
-const { Product, FastFood, Service, User } = require('./backend/models');
+const { Product, FastFood, Service, User } = require('./models');
 
 async function fixOrphanedData() {
   try {

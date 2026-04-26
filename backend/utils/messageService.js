@@ -35,9 +35,12 @@ if (!fs.existsSync(sessionDir)) {
 const logWhatsApp = (msg) => {
     const logPath = path.join(__dirname, '../whatsapp_engine.log');
     const line = `[${new Date().toISOString()}] ${msg}\n`;
-    try { fs.appendFileSync(logPath, line); } catch (e) {}
-    // Mirror to console.error for immediate visibility in cPanel stderr.log
-    console.error(`[WhatsApp JS] ${msg}`);
+    // Use async append to avoid blocking the Node.js event loop
+    fs.appendFile(logPath, line, (err) => { /* silently ignore write errors */ });
+    // Only mirror to console in development to avoid disk I/O spam in production
+    if (process.env.NODE_ENV !== 'production') {
+        console.error(`[WhatsApp JS] ${msg}`);
+    }
 };
 
 const initWhatsApp = async () => {

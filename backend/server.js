@@ -46,21 +46,32 @@ if (env === 'production') {
 }
 
 // Redirect console logs to file for production debugging
+// PERFORMANCE: Use async writes and only write ERROR-level logs in production
+// to prevent disk I/O from blocking the Node.js event loop on every request.
 const logFile = path.join(__dirname, 'error.log');
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
 const originalLog = console.log;
 const originalError = console.error;
 
-console.log = function(...args) {
-  const msg = `[${new Date().toISOString()}] [LOG] ${args.join(' ')}\n`;
-  logStream.write(msg);
-  originalLog.apply(console, args);
-};
+// In production, suppress verbose console.log to avoid disk I/O on every request
+if (process.env.NODE_ENV === 'production') {
+  console.log = function(...args) {
+    // Silently drop noisy debug logs in production (no disk write)
+    // Only uncomment below for active debugging sessions:
+    // originalLog.apply(console, args);
+  };
+} else {
+  console.log = function(...args) {
+    const msg = `[${new Date().toISOString()}] [LOG] ${args.join(' ')}\n`;
+    logStream.write(msg); // async, non-blocking
+    originalLog.apply(console, args);
+  };
+}
 
 console.error = function(...args) {
   const msg = `[${new Date().toISOString()}] [ERROR] ${args.join(' ')}\n`;
-  logStream.write(msg);
+  logStream.write(msg); // async, non-blocking
   originalError.apply(console, args);
 };
 
@@ -154,11 +165,14 @@ const authLimiter = rateLimit({
   message: { error: 'Too many authentication attempts, please try again in 15 minutes.' },
   validate: { trustProxy: false } // Acknowledge proxy trust to stop validation warnings
 });
-// DIAGNOSTIC LOGGING: Enabled for ALL environments temporarily to debug 404s
-app.use('/api', (req, res, next) => {
-  console.error(`[ROUTE-DIAGNOSTIC] ${req.method} ${req.url} (Path: ${req.path})`);
-  next();
-});
+// DIAGNOSTIC LOGGING: Only enabled in development. In production this was
+// causing a disk write on EVERY API request, severely blocking the event loop.
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/api', (req, res, next) => {
+    console.error(`[ROUTE-DIAGNOSTIC] ${req.method} ${req.url} (Path: ${req.path})`);
+    next();
+  });
+}
 
 app.use('/api', globalLimiter); // Apply global rate limit to all API routes
 app.use('/api/auth/login', authLimiter); // Stricter limit on login

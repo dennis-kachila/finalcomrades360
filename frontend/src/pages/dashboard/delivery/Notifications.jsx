@@ -3,12 +3,7 @@ import { FaBell, FaCheckCircle, FaInfoCircle, FaExclamationTriangle, FaTrash } f
 
 const DeliveryNotifications = () => {
     const [activeTab, setActiveTab] = useState('all');
-    const [notifications, setNotifications] = useState([
-        { id: 1, type: 'success', title: 'Payment Received', message: 'You received KES 1,500 for your deliveries today.', time: '2 mins ago', read: false },
-        { id: 2, type: 'info', title: 'New Zone Available', message: 'Calculated tips are now higher in Nairobi CBD zone.', time: '1 hour ago', read: false },
-        { id: 3, type: 'warning', title: 'Insurance Expiring', message: 'Your vehicle insurance expires in 3 days. Please renew it.', time: '5 hours ago', read: true },
-        { id: 4, type: 'success', title: '5-Star Rating!', message: 'A customer gave you a 5-star rating for Order #1234.', time: '1 day ago', read: true },
-    ]);
+    const [notifications, setNotifications] = useState([]);
 
     const unreadCount = notifications.filter(n => !n.read).length;
 

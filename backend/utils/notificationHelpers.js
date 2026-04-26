@@ -4,6 +4,7 @@ const { Notification, PlatformConfig, User } = require('../models');
 const { sendMessage } = require('./messageService');
 const { getDynamicMessage, getEnabledChannels } = require('./templateUtils');
 const { sendEmail } = require('./mailer');
+const { getIO } = require('../realtime/socket');
 /**
  * File-based diagnostic logging
  */
@@ -141,6 +142,28 @@ async function createNotification(userId, title, message, type = 'info') {
             type,
             read: false
         });
+
+        // Emit real-time notification via Socket.IO
+        try {
+            const io = getIO();
+            if (io) {
+                console.log(`[Notification] Emitting real-time notification to user_${userId}`);
+                io.to(`user_${userId}`).emit('notification:new', {
+                    id: notification.id,
+                    title,
+                    message,
+                    type,
+                    createdAt: notification.createdAt,
+                    read: false
+                });
+                
+                // Also emit a general data-update event for background sync
+                io.emit('realtime:data-updated', { scope: 'notifications', userId });
+            }
+        } catch (socketErr) {
+            console.error('[Notification] Socket emission failed:', socketErr.message);
+        }
+
         return notification;
     } catch (error) {
         console.error('Error creating notification:', error);

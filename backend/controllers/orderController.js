@@ -1029,14 +1029,14 @@ const createOrderFromCart = async (req, res) => {
           }).join('\n');
 
           // Pass the order and customer (even if null) to the helper which handles fallbacks
-          await notifyCustomerOrderPlaced(order, customer, cartItems.length, itemNames);
+          notifyCustomerOrderPlaced(order, customer, cartItems.length, itemNames).catch(e => console.error('Customer notification failed:', e.message));
           
           // NEW: Also notify the MARKETER who placed this order
           if (order.isMarketingOrder && order.marketerId) {
             logNotify(`📢 [Marketer Notif] Notifying marketer ID=${order.marketerId}`);
             const marketerUser = await User.findByPk(order.marketerId);
             if (marketerUser) {
-              await notifyMarketerOrderPlaced(order, marketerUser, (customer?.name || order.customerName));
+              notifyMarketerOrderPlaced(order, marketerUser, (customer?.name || order.customerName)).catch(e => console.error('Marketer notification failed:', e.message));
             }
           }
           

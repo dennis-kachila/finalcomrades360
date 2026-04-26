@@ -1,14 +1,30 @@
-# DO NOT REMOVE THIS - Needed for Node.js to run on cPanel
+# Keep Passenger directives as fallback
 PassengerAppRoot "/home/vdranjxy/comrades-master"
 PassengerBaseURI "/"
 PassengerAppType node
 PassengerStartupFile server.js
 
+<IfModule mod_proxy.c>
+  ProxyPreserveHost On
+
+  # Proxy API requests to Node.js on port 5000
+  ProxyPass /api http://localhost:5000/api
+  ProxyPassReverse /api http://localhost:5000/api
+
+  # Proxy Socket.IO (polling + websocket)
+  ProxyPass /socket.io http://localhost:5000/socket.io
+  ProxyPassReverse /socket.io http://localhost:5000/socket.io
+
+  # Proxy uploads
+  ProxyPass /uploads http://localhost:5000/uploads
+  ProxyPassReverse /uploads http://localhost:5000/uploads
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
 
-  # 0. Force HTTPS (prevents protocol mismatch on mobile)
+  # 0. Force HTTPS
   RewriteCond %{HTTPS} off
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
@@ -16,7 +32,7 @@ PassengerStartupFile server.js
   RewriteCond %{HTTP_HOST} ^www\.comrades360\.shop$ [NC]
   RewriteRule ^ https://comrades360.shop%{REQUEST_URI} [L,R=301]
 
-  # 1. EXCLUDE API and Socket.IO FROM SPA REDIRECTS (Passenger handles these)
+  # 1. Skip rewrite for API, Socket.IO and uploads (handled by ProxyPass above)
   RewriteCond %{REQUEST_URI} ^/api [OR]
   RewriteCond %{REQUEST_URI} ^/socket.io [OR]
   RewriteCond %{REQUEST_URI} ^/uploads

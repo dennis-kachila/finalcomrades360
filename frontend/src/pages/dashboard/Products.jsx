@@ -1108,7 +1108,7 @@ const Products = () => {
       }
 
       return (
-        <div className="bg-white rounded-lg shadow-lg h-full max-w-7xl mx-auto w-full flex flex-col overflow-hidden border">
+        <div className="bg-white rounded-lg shadow-lg h-full w-full flex flex-col overflow-hidden border">
           <div className="flex items-center justify-between p-6 border-b bg-gray-50/50">
             <div className="flex items-center gap-4">
               <button
@@ -1130,7 +1130,7 @@ const Products = () => {
           </div>
 
           <div className="flex-1 min-w-0 overflow-auto p-2 md:p-4 scrollbar-thin scrollbar-thumb-gray-200">
-            <div className="w-full max-w-5xl ml-0 mr-auto">
+            <div className="w-full">
               {itemType === 'service' ? (
                 <ServiceForm
                   onSuccess={handleFormSuccess}

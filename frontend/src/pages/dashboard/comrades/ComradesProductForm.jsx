@@ -2115,7 +2115,7 @@ const ComradesProductForm = ({
   const isSuperAdminCreate = !id && initialProduct?.addedBy?.role === 'superadmin';
 
   return (
-    <div className="w-auto max-w-5xl ml-0 mr-auto overflow-x-hidden mx-2 sm:mx-0">
+    <div className="w-full overflow-x-hidden mx-2 sm:mx-0">
       <div className="sm:rounded-lg rounded-none shadow-md sm:shadow-lg bg-white overflow-hidden">
         <div className="px-3 py-4 sm:p-5 md:p-8">
           <div className="flex justify-between items-center mb-6">

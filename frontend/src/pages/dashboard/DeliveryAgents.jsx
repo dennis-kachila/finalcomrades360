@@ -21,7 +21,11 @@ import {
   Shield,
   Truck,
   Bike,
-  Navigation
+  Navigation,
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { 
   Chart as ChartJS, 
@@ -47,6 +51,182 @@ ChartJS.register(
   Filler
 );
 
+// ─── Delivery History List (Inner Table) ─────────────────────────────────────
+const DeliveryHistoryList = ({ agentId }) => {
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({
+    orderNumber: '',
+    status: '',
+  });
+  const pageSize = 10;
+
+  const loadHistory = useCallback(async (isMore = false) => {
+    if (isMore) setLoadingMore(true);
+    else setLoading(true);
+
+    try {
+      const currentPage = isMore ? page + 1 : 1;
+      const params = new URLSearchParams({
+        page: currentPage,
+        pageSize,
+        orderNumber: filters.orderNumber,
+        status: filters.status,
+      });
+
+      const res = await api.get(`/admin/delivery/agents/${agentId}/history?${params.toString()}`);
+      if (res.data.tasks) {
+        if (isMore) {
+          setTasks(prev => [...prev, ...res.data.tasks]);
+        } else {
+          setTasks(res.data.tasks);
+        }
+        setTotal(res.data.meta?.total || 0);
+        setPage(currentPage);
+      }
+    } catch (err) {
+      console.error('Failed to load delivery history:', err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [agentId, page, filters]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [agentId, filters.status]);
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSearch = (e) => {
+    if (e) e.preventDefault();
+    setPage(1);
+    loadHistory(false);
+  };
+
+  return (
+    <div className="bg-blue-50/50 p-4 border-t border-b border-blue-100 animate-in fade-in slide-in-from-top-2 duration-300">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+        <h4 className="text-sm font-bold text-blue-900 flex items-center gap-2">
+          <Truck className="w-4 h-4" /> Delivery History
+          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-black">{total} TOTAL</span>
+        </h4>
+
+        {/* Filters */}
+        <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3 h-3" />
+            <input
+              type="text"
+              name="orderNumber"
+              placeholder="Order #..."
+              value={filters.orderNumber}
+              onChange={handleFilterChange}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none w-32"
+            />
+          </div>
+          <select
+            name="status"
+            value={filters.status}
+            onChange={handleFilterChange}
+            className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value="">All Status</option>
+            <option value="assigned">Assigned</option>
+            <option value="accepted">Accepted</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <button
+            type="submit"
+            className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Filter size={12} />
+          </button>
+        </form>
+      </div>
+
+      {loading ? (
+        <div className="py-10 text-center text-gray-400 text-xs flex flex-col items-center gap-2">
+          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          Loading tasks...
+        </div>
+      ) : tasks.length === 0 ? (
+        <div className="py-10 text-center text-gray-400 text-xs bg-white/50 rounded-xl border border-dashed border-gray-200">
+          No delivery history found matching criteria.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm bg-white">
+            <table className="min-w-full text-xs">
+              <thead className="bg-gray-50/50">
+                <tr className="border-b border-gray-100">
+                  <th className="p-3 text-left font-bold text-gray-500 uppercase">Order #</th>
+                  <th className="p-3 text-left font-bold text-gray-500 uppercase">Type</th>
+                  <th className="p-3 text-right font-bold text-gray-500 uppercase">Total Fee</th>
+                  <th className="p-3 text-right font-bold text-gray-500 uppercase">Fee Share</th>
+                  <th className="p-3 text-center font-bold text-gray-500 uppercase">Status</th>
+                  <th className="p-3 text-right font-bold text-gray-500 uppercase">Completed At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {tasks.map((t) => (
+                  <tr key={t.id} className="hover:bg-blue-50/20 transition-colors">
+                    <td className="p-3 font-mono font-bold text-blue-600">{t.order?.orderNumber || `#${t.id}`}</td>
+                    <td className="p-3">
+                      <div className="font-medium text-gray-900 uppercase tracking-tighter">
+                        {t.deliveryType?.split('_').join(' ')}
+                      </div>
+                    </td>
+                    <td className="p-3 text-right text-gray-500">KES {(t.deliveryFee || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right font-black text-green-600">KES {(t.agentEarnings || 0).toFixed(2)}</td>
+                    <td className="p-3 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        t.status === 'completed' ? 'bg-green-100 text-green-700' : 
+                        t.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {t.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right text-gray-400">
+                      {t.completedAt ? new Date(t.completedAt).toLocaleDateString() : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {tasks.length < total && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => loadHistory(true)}
+                disabled={loadingMore}
+                className="px-6 py-2 bg-white border border-blue-200 text-blue-600 rounded-xl text-xs font-bold shadow-sm hover:bg-blue-50 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {loadingMore ? (
+                  <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <span>Load More History</span>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function DeliveryAgents() {
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -62,6 +242,11 @@ export default function DeliveryAgents() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyTotal, setHistoryTotal] = useState(0);
+  const [expandedAgentId, setExpandedAgentId] = useState(null);
+
+  const toggleExpand = (id) => {
+    setExpandedAgentId(expandedAgentId === id ? null : id);
+  };
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -333,58 +518,72 @@ export default function DeliveryAgents() {
                     const isAvailable = isAgentAvailableNow(agent);
                     
                     return (
-                      <tr 
-                        key={agent.id} 
-                        className="hover:bg-blue-50/30 transition-colors cursor-pointer group"
-                        onClick={() => openAgent(agent.id)}
-                      >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-white shadow-sm overflow-hidden uppercase">
-                              {agent.profileImage ? (
-                                <img src={agent.profileImage} alt="" className="w-full h-full object-cover" />
-                              ) : agent.name?.charAt(0)}
+                      <React.Fragment key={agent.id}>
+                        <tr 
+                          className={`hover:bg-blue-50/30 transition-colors cursor-pointer group ${expandedAgentId === agent.id ? 'bg-blue-50/50' : ''}`}
+                          onClick={() => toggleExpand(agent.id)}
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <span className="text-gray-400">
+                                {expandedAgentId === agent.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </span>
+                              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-white shadow-sm overflow-hidden uppercase">
+                                {agent.profileImage ? (
+                                  <img src={agent.profileImage} alt="" className="w-full h-full object-cover" />
+                                ) : agent.name?.charAt(0)}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">{agent.name}</div>
+                                <div className="text-xs text-gray-500 font-medium">{agent.phone || 'No phone'}</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">{agent.name}</div>
-                              <div className="text-xs text-gray-500 font-medium">{agent.phone || 'No phone'}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col items-center gap-1">
+                              <AgentVehicleIcon type={prof.vehicleType} color={prof.isActive ? 'blue' : 'gray'} />
+                              <span className="text-[10px] font-bold uppercase tracking-tighter text-gray-400">
+                                {prof.vehiclePlate || 'N/A'}
+                              </span>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col items-center gap-1">
-                            <AgentVehicleIcon type={prof.vehicleType} color={prof.isActive ? 'blue' : 'gray'} />
-                            <span className="text-[10px] font-bold uppercase tracking-tighter text-gray-400">
-                              {prof.vehiclePlate || 'N/A'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                            <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                            {prof.location || 'Unknown'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="inline-flex flex-col items-center">
-                            <span className="text-lg font-bold text-gray-800 leading-none">{prof.completedDeliveries || 0}</span>
-                            <span className="text-xs text-gray-400 font-medium mt-1">Total</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <StatusBadge 
-                            isActive={prof.isActive} 
-                            isSuspended={agent.isDeliverySuspended} 
-                            isDeactivated={agent.isDeactivated}
-                            isAvailable={isAvailable} 
-                          />
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button className="p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-gray-400 hover:text-blue-600">
-                            <ChevronRight className="w-5 h-5" />
-                          </button>
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                              <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                              {prof.location || 'Unknown'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <div className="inline-flex flex-col items-center">
+                              <span className="text-lg font-bold text-gray-800 leading-none">{prof.completedDeliveries || 0}</span>
+                              <span className="text-xs text-gray-400 font-medium mt-1">Total</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <StatusBadge 
+                              isActive={prof.isActive} 
+                              isSuspended={agent.isDeliverySuspended} 
+                              isDeactivated={agent.isDeactivated}
+                              isAvailable={isAvailable} 
+                            />
+                          </td>
+                          <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
+                            <button 
+                              onClick={() => openAgent(agent.id)}
+                              className="p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-gray-400 hover:text-blue-600"
+                            >
+                              <ChevronRight className="w-5 h-5" />
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedAgentId === agent.id && (
+                          <tr>
+                            <td colSpan="6" className="p-0">
+                              <DeliveryHistoryList agentId={agent.id} />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                   {agents.length === 0 && !loading && (
@@ -497,7 +696,7 @@ export default function DeliveryAgents() {
                     <InfoItem icon={<CreditCard className="text-purple-500" />} label="Account / Number" value={agentDetail?.agent?.deliveryProfile?.mobileMoneyNumber || agentDetail?.agent?.deliveryProfile?.accountNumber} />
                     <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-2 gap-4">
                       <div className="text-center">
-                        <div className="text-[10px] uppercase font-bold text-gray-400">Total Profit</div>
+                        <div className="text-[10px] uppercase font-bold text-gray-400">Total Delivery Fee Share</div>
                         <div className="text-lg font-extrabold text-blue-600">KES {agentDetail?.stats?.totalEarnings?.toLocaleString() || '0'}</div>
                       </div>
                       <div className="text-center">

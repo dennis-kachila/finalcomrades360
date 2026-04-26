@@ -271,6 +271,7 @@ apiRouter.use('/delivery', require('./routes/deliveryRoutes'));
 apiRouter.use('/commissions', require('./routes/commissionRoutes'));
 // apiRouter.use('/driver', require('./routes/driverRoutes'));
 apiRouter.use('/admin', require('./routes/adminRoutes'));
+apiRouter.use('/verification', require('./routes/verificationRoutes'));
 
 // Mount the API router on both prefixes for maximum compatibility
 app.use('/api', apiRouter);
@@ -308,7 +309,7 @@ app.use('/', apiRouter);
   app.use('/api/seller', require('./routes/sellerRoutes'));
   app.use('/api/cache', require('./routes/cacheRoutes'));
   app.use('/api/search', require('./routes/searchRoutes'));
-  app.use('/api/verification', require('./routes/verificationRoutes'));
+  // app.use('/api/verification', require('./routes/verificationRoutes')); (Moved to apiRouter)
   app.use('/api/wallet', require('./routes/walletRoutes'));
   app.use('/api/delivery', require('./routes/deliveryRoutes'));
   app.use('/api/warehouse', require('./routes/warehouseRoutes'));

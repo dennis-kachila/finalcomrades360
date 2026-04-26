@@ -54,7 +54,7 @@ const creditAgentForTask = async (taskId, transaction = null) => {
         const profile = await DeliveryAgentProfile.findOne({ where: { userId: agentId }, transaction: t });
         if (profile) {
             await profile.update({
-                totalEarnings: (profile.totalEarnings || 0) + agentEarnings
+                totalEarnings: sequelize.literal(`totalEarnings + ${agentEarnings}`)
             }, { transaction: t });
         }
 

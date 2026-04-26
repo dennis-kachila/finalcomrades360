@@ -204,6 +204,83 @@ const verifyPhoneOtp = async (req, res, next) => {
     }
 };
 
+/**
+ * Request OTP for Guest Checkout (No Auth Required)
+ */
+const requestGuestPhoneOtp = async (req, res, next) => {
+    try {
+        const { phone, method = 'sms' } = req.body;
+        if (!phone) return res.status(400).json({ message: 'Phone number is required' });
+
+        const normalizedPhone = normalizeKenyanPhone(phone);
+        if (!normalizedPhone) return res.status(400).json({ message: 'Invalid Kenyan phone number' });
+
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        // Clear existing OTPs for this phone
+        await Otp.destroy({ where: { phone: normalizedPhone } });
+
+        // Create new OTP
+        await Otp.create({
+            phone: normalizedPhone,
+            otp,
+            expiresAt,
+            isVerified: false
+        });
+
+        // Send OTP via chosen method
+        console.log(`[GuestVerification] 🚀 Sending OTP ${otp} to ${normalizedPhone} via ${method}`);
+        await sendMessage(
+            normalizedPhone,
+            `Your Comrades360 guest checkout code is: ${otp}. Valid for 10 minutes.`,
+            method
+        );
+
+        res.json({ success: true, message: 'Verification code sent to your phone' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Verify OTP for Guest Checkout (No Auth Required)
+ */
+const verifyGuestPhoneOtp = async (req, res, next) => {
+    try {
+        const { phone, otp } = req.body;
+        if (!phone || !otp) return res.status(400).json({ message: 'Phone and OTP are required' });
+
+        const normalizedPhone = normalizeKenyanPhone(phone);
+        if (!normalizedPhone) return res.status(400).json({ message: 'Invalid phone format' });
+
+        // Check if OTP is valid
+        const otpRecord = await Otp.findOne({
+            where: { phone: normalizedPhone, otp }
+        });
+
+        if (!otpRecord) return res.status(400).json({ message: 'Invalid verification code' });
+        if (new Date() > otpRecord.expiresAt) {
+            await otpRecord.destroy();
+            return res.status(400).json({ message: 'Verification code has expired' });
+        }
+
+        // Mark as verified but DON'T destroy yet (order placement will check this)
+        otpRecord.isVerified = true;
+        // Extend expiry for order placement (30 mins from now)
+        otpRecord.expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+        await otpRecord.save();
+
+        res.json({
+            success: true,
+            message: 'Phone number verified successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const approveNationalId = async (req, res, next) => {
     const { userId } = req.params;
     try {
@@ -248,6 +325,8 @@ module.exports = {
     getVerificationStatus,
     requestPhoneVerificationOtp,
     verifyPhoneOtp,
+    requestGuestPhoneOtp,
+    verifyGuestPhoneOtp,
     approveNationalId,
     rejectNationalId
 };

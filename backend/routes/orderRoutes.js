@@ -1,15 +1,15 @@
 const express = require('express');
 const { createOrderFromCart, myOrders, getSuperAdminProductOrders, listAllOrders, updateOrderStatus, bulkUpdateOrderStatus, bulkAssignDeliveryAgent, bulkMarkReadyAtPickupStation, markReadyAtPickupStation, assignDeliveryAgent, unassignDeliveryAgent, cancelOrder, updateOrderAddress, addTrackingUpdate, getOrderTracking, publicTrackOrder, getOrderDetails, sellerConfirmOrder, superAdminConfirmOrder, sendOrderMessage, getOrderCommunication, sellerUpdateStatus, sellerHandoverOrder, getOrderPayments, acquireOrderActionLock, releaseOrderActionLock, getOrderAnalysis, getOrdersByBatch } = require('../controllers/orderController');
-const { auth, adminOnly, requirePermission } = require('../middleware/auth');
+const { auth, optionalAuth, adminOnly, requirePermission } = require('../middleware/auth');
 const { transitionOrderStatus, getValidTransitions } = require('../controllers/orderTransitionController');
 const { validate } = require('../middleware/validation');
 const router = express.Router();
 
 // Create order from cart (checkout)
-router.post('/', auth, createOrderFromCart);
+router.post('/', optionalAuth, createOrderFromCart);
 
 // Legacy checkout route
-router.post('/checkout', auth, validate({
+router.post('/checkout', optionalAuth, validate({
   deliveryAddress: require('joi').string().min(10).max(500).required(),
   paymentMethod: require('joi').string().valid('Cash on Delivery', 'M-Pesa', 'Card').default('Cash on Delivery')
 }), createOrderFromCart);

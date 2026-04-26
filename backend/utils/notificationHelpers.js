@@ -231,7 +231,9 @@ async function notifyAdminTaskRejection(orderId, orderNumber, agentName, reason)
  */
 async function notifyCustomerOrderPlaced(order, customer, itemsCount, itemNames) {
     const deliveryMethod = order.deliveryMethod === 'pick_station' ? 'Pickup Station' : 'Home Delivery';
-    const customerInfo = `${customer.name || order.customerName || 'Customer'}${customer.phone || order.customerPhone ? (', ' + (customer.phone || order.customerPhone)) : ''}`;
+    const name = customer?.name || order.customerName || 'Customer';
+    const phone = customer?.phone || order.customerPhone;
+    const customerInfo = `${name}${phone ? (', ' + phone) : ''}`;
     const deliveryLocation = order.deliveryMethod === 'pick_station' 
         ? (order.pickStation || 'N/A') 
         : (order.deliveryAddress || order.marketingDeliveryAddress || 'N/A');
@@ -239,12 +241,12 @@ async function notifyCustomerOrderPlaced(order, customer, itemsCount, itemNames)
     const paymentMethod = order.paymentType === 'cash_on_delivery' ? 'Cash on Delivery' : 'Paid';
 
     const siteUrl = process.env.FRONTEND_URL || 'https://comrades360.shop';
-    const trackUrl = `${siteUrl}/account`;
+    const trackUrl = `${siteUrl}/track/${order.orderNumber}`;
 
     const defaultTemplate = `Hello {name}, your order #{orderNumber} has been placed successfully! 🛍️\n\nItems:\n{itemsList}\n\nTotal: KES {total}\nPayment: {paymentMethod}\n\nDelivery Information:\nMethod: {deliveryMethod}\nLocation: {deliveryLocation}\n\nTrack your order here: {trackUrl}`;
 
     await sendCustomerNotificationAcrossChannels('orderPlaced', {
-        name: customer.name || 'Customer',
+        name: name,
         orderNumber: order.orderNumber,
         itemsList: itemNames || `${itemsCount} items`,
         total: order.total?.toLocaleString() || '0',
@@ -319,7 +321,7 @@ async function notifyCustomerAgentArrived(order, agent) {
     const defaultTemplate = `Your delivery agent {agentName} has arrived at your location! 📍\n\nPlease meet them to collect your order #{orderNumber}.\nAgent Phone: {phone}`;
 
     await sendCustomerNotificationAcrossChannels('agentArrived', {
-        name: order.User?.name || 'Customer',
+        name: order.User?.name || order.customerName || 'Customer',
         agentName: agent.name,
         orderNumber: order.orderNumber,
         phone: agent.phone || 'N/A',

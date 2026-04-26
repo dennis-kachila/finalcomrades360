@@ -1,18 +1,45 @@
-const { Wallet, Transaction } = require('../models');
+const { Wallet, Transaction, sequelize } = require('../models');
+const { Op } = require('sequelize');
 
 /**
  * Credits the pending balance of a user and creates a pending transaction.
+ * Includes idempotency check to prevent double-crediting for the same order.
  */
 const creditPending = async (userId, amount, description, orderId = null, transaction = null, walletType = null) => {
     if (amount <= 0) return;
 
-    let wallet = await Wallet.findOne({ where: { userId }, transaction });
+    // 1. Idempotency Check: Prevent duplicate pending credits for the same order and description
+    if (orderId) {
+        const existingTx = await Transaction.findOne({
+            where: {
+                userId,
+                orderId,
+                type: 'credit',
+                status: 'pending',
+                // Description check helps differentiate between different commission items in the same order
+                description
+            },
+            transaction
+        });
+        if (existingTx) {
+            console.log(`[walletHelpers] Skip creditPending: Transaction already exists for order ${orderId}`);
+            return;
+        }
+    }
+
+    let wallet = await Wallet.findOne({ 
+        where: { userId }, 
+        transaction,
+        lock: transaction ? transaction.LOCK.UPDATE : false 
+    });
+    
     if (!wallet) {
         wallet = await Wallet.create({ userId, balance: 0, pendingBalance: 0, successBalance: 0 }, { transaction });
     }
 
+    // 2. Atomic Update: Use sequelize.literal to prevent race conditions
     await wallet.update({
-        pendingBalance: (wallet.pendingBalance || 0) + amount
+        pendingBalance: sequelize.literal(`pendingBalance + ${amount}`)
     }, { transaction });
 
     await Transaction.create({
@@ -28,51 +55,60 @@ const creditPending = async (userId, amount, description, orderId = null, transa
 
 /**
  * Moves funds from pendingBalance to successBalance and updates transaction status.
+ * Includes protection against double-processing.
  */
 const moveToSuccess = async (userId, amount, orderNumber, description, orderId = null, transaction = null, walletType = null) => {
     if (amount <= 0) return;
 
     const { PlatformConfig } = require('../models');
-    const wallet = await Wallet.findOne({ where: { userId }, transaction });
-    if (wallet) {
-        await wallet.update({
-            pendingBalance: Math.max(0, (wallet.pendingBalance || 0) - amount),
-            successBalance: (wallet.successBalance || 0) + amount
-        }, { transaction });
+    
+    const wallet = await Wallet.findOne({ 
+        where: { userId }, 
+        transaction,
+        lock: transaction ? transaction.LOCK.UPDATE : false
+    });
 
-        // Update the transaction status from pending to success
-        // Prefer lookup by orderId, fallback to description containing orderNumber
+    if (wallet) {
+        // 1. Find the pending transaction to clear
         const txWhere = { userId, status: 'pending' };
         if (orderId) {
             txWhere.orderId = orderId;
         } else {
-            txWhere.description = { [require('sequelize').Op.like]: `%#${orderNumber}%` };
+            txWhere.description = { [Op.like]: `%#${orderNumber}%` };
         }
 
         const tx = await Transaction.findOne({
             where: txWhere,
-            transaction
+            transaction,
+            lock: transaction ? transaction.LOCK.UPDATE : false
         });
 
-        let successTxId = null;
-        if (tx) {
-            await tx.update({ status: 'success', walletType: walletType || tx.walletType }, { transaction });
-            successTxId = tx.id;
-        } else {
-            // Fallback: Create a new success transaction if not found (though ideally we update existing)
-            const newTx = await Transaction.create({
-                userId,
-                amount,
-                type: 'credit',
-                status: 'success',
-                description: `${description} (Cleared Pending)`,
-                orderId,
-                walletType
-            }, { transaction });
-            successTxId = newTx.id;
+        if (!tx) {
+            console.warn(`[walletHelpers] No pending transaction found for order ${orderId || orderNumber}. Skipping moveToSuccess.`);
+            return;
         }
 
-        // CHECK FOR AUTOMATIC PAYOUT MODE
+        // 2. Atomic Balance Swap
+        // We use GREATEST(0, ...) for MySQL and MAX(0, ...) for SQLite. 
+        // For portability, we can check the dialect or just rely on the tx existence as a guard.
+        const isSqlite = sequelize.getDialect() === 'sqlite';
+        const maxFunc = isSqlite ? 'MAX' : 'GREATEST';
+
+        await wallet.update({
+            pendingBalance: sequelize.literal(`${maxFunc}(0, pendingBalance - ${amount})`),
+            successBalance: sequelize.literal(`successBalance + ${amount}`)
+        }, { transaction });
+
+        // 3. Update Transaction status
+        await tx.update({ 
+            status: 'success', 
+            walletType: walletType || tx.walletType,
+            description: tx.description + ' (Cleared)'
+        }, { transaction });
+
+        const successTxId = tx.id;
+
+        // 4. CHECK FOR AUTOMATIC PAYOUT MODE
         try {
             const autoPayoutConfig = await PlatformConfig.findOne({
                 where: { key: 'automatic_delivery_payout_enabled' },
@@ -95,16 +131,27 @@ const moveToSuccess = async (userId, amount, orderNumber, description, orderId =
 const moveToPaid = async (userId, amount, transactionId = null, transaction = null) => {
     if (amount <= 0) return;
 
-    const wallet = await Wallet.findOne({ where: { userId }, transaction });
+    const wallet = await Wallet.findOne({ 
+        where: { userId }, 
+        transaction,
+        lock: transaction ? transaction.LOCK.UPDATE : false
+    });
+
     if (wallet) {
+        const isSqlite = sequelize.getDialect() === 'sqlite';
+        const maxFunc = isSqlite ? 'MAX' : 'GREATEST';
+
         await wallet.update({
-            successBalance: Math.max(0, (wallet.successBalance || 0) - amount),
-            balance: (wallet.balance || 0) + amount
+            successBalance: sequelize.literal(`${maxFunc}(0, successBalance - ${amount})`),
+            balance: sequelize.literal(`balance + ${amount}`)
         }, { transaction });
 
         if (transactionId) {
-            const tx = await Transaction.findByPk(transactionId, { transaction });
-            if (tx) {
+            const tx = await Transaction.findByPk(transactionId, { 
+                transaction,
+                lock: transaction ? transaction.LOCK.UPDATE : false
+            });
+            if (tx && tx.status !== 'completed') {
                 await tx.update({ status: 'completed', description: tx.description + ' (Paid)' }, { transaction });
             }
         }
@@ -117,20 +164,32 @@ const moveToPaid = async (userId, amount, transactionId = null, transaction = nu
 const revertPending = async (userId, amount, orderId, transaction = null) => {
     if (amount <= 0) return;
 
-    const wallet = await Wallet.findOne({ where: { userId }, transaction });
-    if (wallet) {
-        await wallet.update({
-            pendingBalance: Math.max(0, (wallet.pendingBalance || 0) - amount)
-        }, { transaction });
+    const wallet = await Wallet.findOne({ 
+        where: { userId }, 
+        transaction,
+        lock: transaction ? transaction.LOCK.UPDATE : false
+    });
 
-        // Update the transaction from pending to cancelled
+    if (wallet) {
+        const isSqlite = sequelize.getDialect() === 'sqlite';
+        const maxFunc = isSqlite ? 'MAX' : 'GREATEST';
+
+        // Find the pending transaction first to ensure it exists and hasn't been reverted yet
         const tx = await Transaction.findOne({
             where: { userId, orderId, status: 'pending' },
-            transaction
+            transaction,
+            lock: transaction ? transaction.LOCK.UPDATE : false
         });
 
         if (tx) {
-            await tx.update({ status: 'cancelled', description: tx.description + ' (Reverted/Rejected)' }, { transaction });
+            await wallet.update({
+                pendingBalance: sequelize.literal(`${maxFunc}(0, pendingBalance - ${amount})`)
+            }, { transaction });
+
+            await tx.update({ 
+                status: 'cancelled', 
+                description: tx.description + ' (Reverted/Rejected)' 
+            }, { transaction });
         }
     }
 };

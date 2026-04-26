@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../../services/api';
+import { FaChevronDown, FaChevronUp, FaSearch, FaFilter } from 'react-icons/fa';
 
 // ─── Small stateless components ──────────────────────────────────────────────
 const Badge = ({ suspended, deactivated }) => {
@@ -89,6 +90,176 @@ const PasswordPromptModal = ({ isOpen, onConfirm, onCancel, title, loading }) =>
           </button>
         </div>
       </div>
+    </div>
+  );
+};
+
+// ─── Referral Orders List (Inner Table) ──────────────────────────────────────
+const ReferralOrdersList = ({ marketerId }) => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [filters, setFilters] = useState({
+    orderNumber: '',
+    status: '',
+  });
+  const limit = 10;
+
+  const loadOrders = useCallback(async (isMore = false) => {
+    if (isMore) setLoadingMore(true);
+    else setLoading(true);
+
+    try {
+      const currentOffset = isMore ? offset + limit : 0;
+      const params = new URLSearchParams({
+        marketerId,
+        limit,
+        offset: currentOffset,
+        orderNumber: filters.orderNumber,
+        status: filters.status,
+      });
+
+      const res = await api.get(`/commissions?${params.toString()}`);
+      if (res.data.commissions) {
+        if (isMore) {
+          setOrders(prev => [...prev, ...res.data.commissions]);
+        } else {
+          setOrders(res.data.commissions);
+        }
+        setTotal(res.data.total || 0);
+        setOffset(currentOffset);
+      }
+    } catch (err) {
+      console.error('Failed to load referral orders:', err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [marketerId, offset, filters]);
+
+  useEffect(() => {
+    loadOrders();
+  }, [marketerId, filters.status]); // Only auto-reload on status change; orderNumber uses a search button/enter
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSearch = (e) => {
+    if (e) e.preventDefault();
+    setOffset(0);
+    loadOrders(false);
+  };
+
+  return (
+    <div className="bg-blue-50/50 p-4 border-t border-b border-blue-100 animate-in fade-in slide-in-from-top-2 duration-300">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+        <h4 className="text-sm font-bold text-blue-900 flex items-center gap-2">
+          <span>📦</span> Referral Orders
+          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-black">{total} TOTAL</span>
+        </h4>
+
+        {/* Filters */}
+        <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+            <input
+              type="text"
+              name="orderNumber"
+              placeholder="Order #..."
+              value={filters.orderNumber}
+              onChange={handleFilterChange}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none w-32"
+            />
+          </div>
+          <select
+            name="status"
+            value={filters.status}
+            onChange={handleFilterChange}
+            className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="paid">Paid</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <button
+            type="submit"
+            className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <FaFilter size={12} />
+          </button>
+        </form>
+      </div>
+
+      {loading ? (
+        <div className="py-10 text-center text-gray-400 text-xs flex flex-col items-center gap-2">
+          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          Loading orders...
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="py-10 text-center text-gray-400 text-xs bg-white/50 rounded-xl border border-dashed border-gray-200">
+          No referral orders found matching criteria.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm bg-white">
+            <table className="min-w-full text-xs">
+              <thead className="bg-gray-50/50">
+                <tr className="border-b border-gray-100">
+                  <th className="p-3 text-left font-bold text-gray-500 uppercase">Order #</th>
+                  <th className="p-3 text-left font-bold text-gray-500 uppercase">Item</th>
+                  <th className="p-3 text-right font-bold text-gray-500 uppercase">Sale Amt</th>
+                  <th className="p-3 text-right font-bold text-gray-500 uppercase">Comm. Amt</th>
+                  <th className="p-3 text-center font-bold text-gray-500 uppercase">Status</th>
+                  <th className="p-3 text-right font-bold text-gray-500 uppercase">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {orders.map((o) => (
+                  <tr key={o.id} className="hover:bg-blue-50/20 transition-colors">
+                    <td className="p-3 font-mono font-bold text-blue-600">{o.Order?.orderNumber || `#${o.orderId}`}</td>
+                    <td className="p-3">
+                      <div className="font-medium text-gray-900 truncate max-w-[150px]">
+                        {o.Product?.name || o.FastFood?.name || 'Unknown Item'}
+                      </div>
+                      <div className="text-[10px] text-gray-400 uppercase tracking-tighter">{o.commissionType}</div>
+                    </td>
+                    <td className="p-3 text-right text-gray-500">KES {(o.saleAmount || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right font-black text-green-600">KES {(o.commissionAmount || 0).toFixed(2)}</td>
+                    <td className="p-3 text-center">
+                      <StatusBadge status={o.status} />
+                    </td>
+                    <td className="p-3 text-right text-gray-400">
+                      {o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {orders.length < total && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => loadOrders(true)}
+                disabled={loadingMore}
+                className="px-6 py-2 bg-white border border-blue-200 text-blue-600 rounded-xl text-xs font-bold shadow-sm hover:bg-blue-50 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {loadingMore ? (
+                  <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <span>More Orders</span>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -567,6 +738,11 @@ export default function MarketerManagement() {
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [activeTab, setActiveTab] = useState('all-marketers');
   const [profileMarketer, setProfileMarketer] = useState(null);
+  const [expandedMarketerId, setExpandedMarketerId] = useState(null);
+
+  const toggleExpand = (id) => {
+    setExpandedMarketerId(expandedMarketerId === id ? null : id);
+  };
 
   const clearMsg = () => setMsg({ type: '', text: '' });
 
@@ -723,72 +899,86 @@ export default function MarketerManagement() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {marketers.map(m => (
-                      <tr key={m.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="p-3">
-                          <button
-                            onClick={() => setProfileMarketer(m)}
-                            className="text-left hover:text-blue-600 transition-colors"
-                          >
-                            <div className="font-medium text-gray-900">{m.name}</div>
-                            <div className="text-xs text-gray-400">{m.email}</div>
-                          </button>
-                        </td>
-                        <td className="p-3">
-                          {m.referralCode
-                            ? <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{m.referralCode}</span>
-                            : <span className="text-gray-400 italic text-xs">No code</span>}
-                        </td>
-                        <td className="p-3 text-center">
-                          <Badge suspended={m.isMarketerSuspended} deactivated={m.isDeactivated} />
-                        </td>
-                        <td className="p-3 text-right font-medium">{m.referralCount || 0}</td>
-                        <td className="p-3 text-right font-semibold text-green-600">
-                          KES {(m.totalCommission || 0).toFixed(2)}
-                        </td>
-                        <td className="p-3 text-right text-xs text-gray-400">
-                          {m.createdAt ? new Date(m.createdAt).toLocaleDateString() : '—'}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex flex-wrap gap-2">
-                            {m.referralCode ? (
+                      <React.Fragment key={m.id}>
+                        <tr 
+                          className={`hover:bg-blue-50/30 transition-colors cursor-pointer ${expandedMarketerId === m.id ? 'bg-blue-50/50' : ''}`}
+                          onClick={() => toggleExpand(m.id)}
+                        >
+                          <td className="p-3">
+                            <div className="flex items-center gap-3">
+                              <span className="text-gray-400">
+                                {expandedMarketerId === m.id ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
+                              </span>
+                              <div className="text-left">
+                                <div className="font-medium text-gray-900">{m.name}</div>
+                                <div className="text-xs text-gray-400">{m.email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            {m.referralCode
+                              ? <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{m.referralCode}</span>
+                              : <span className="text-gray-400 italic text-xs">No code</span>}
+                          </td>
+                          <td className="p-3 text-center">
+                            <Badge suspended={m.isMarketerSuspended} deactivated={m.isDeactivated} />
+                          </td>
+                          <td className="p-3 text-right font-medium">{m.referralCount || 0}</td>
+                          <td className="p-3 text-right font-semibold text-green-600">
+                            KES {(m.totalCommission || 0).toFixed(2)}
+                          </td>
+                          <td className="p-3 text-right text-xs text-gray-400">
+                            {m.createdAt ? new Date(m.createdAt).toLocaleDateString() : '—'}
+                          </td>
+                          <td className="p-3" onClick={e => e.stopPropagation()}>
+                            <div className="flex flex-wrap gap-2">
+                              {m.referralCode ? (
+                                <button
+                                  onClick={() => revokeReferralCode(m.id)}
+                                  className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors"
+                                >
+                                  Revoke Code
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => assignReferralCode(m.id)}
+                                  className="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors"
+                                >
+                                  Assign Code
+                                </button>
+                              )}
+                              {!m.isMarketerSuspended ? (
+                                <button
+                                  onClick={() => suspendMarketer(m.id)}
+                                  className="px-2.5 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs font-medium rounded-lg hover:bg-yellow-100 transition-colors"
+                                >
+                                  Suspend
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => reactivateMarketer(m.id)}
+                                  className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 text-xs font-medium rounded-lg hover:bg-green-100 transition-colors"
+                                >
+                                  Reactivate
+                                </button>
+                              )}
                               <button
-                                onClick={() => revokeReferralCode(m.id)}
-                                className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors"
+                                onClick={() => setProfileMarketer(m)}
+                                className="px-2.5 py-1 bg-gray-50 text-gray-600 border border-gray-200 text-xs font-medium rounded-lg hover:bg-gray-100 transition-colors"
                               >
-                                Revoke Code
+                                View Profile
                               </button>
-                            ) : (
-                              <button
-                                onClick={() => assignReferralCode(m.id)}
-                                className="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors"
-                              >
-                                Assign Code
-                              </button>
-                            )}
-                            {!m.isMarketerSuspended ? (
-                              <button
-                                onClick={() => suspendMarketer(m.id)}
-                                className="px-2.5 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs font-medium rounded-lg hover:bg-yellow-100 transition-colors"
-                              >
-                                Suspend
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => reactivateMarketer(m.id)}
-                                className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 text-xs font-medium rounded-lg hover:bg-green-100 transition-colors"
-                              >
-                                Reactivate
-                              </button>
-                            )}
-                            <button
-                              onClick={() => setProfileMarketer(m)}
-                              className="px-2.5 py-1 bg-gray-50 text-gray-600 border border-gray-200 text-xs font-medium rounded-lg hover:bg-gray-100 transition-colors"
-                            >
-                              View Profile
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                            </div>
+                          </td>
+                        </tr>
+                        {expandedMarketerId === m.id && (
+                          <tr>
+                            <td colSpan="7" className="p-0">
+                              <ReferralOrdersList marketerId={m.id} />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>

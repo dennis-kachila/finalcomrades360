@@ -56,8 +56,7 @@ export function CartProvider({ children }) {
   const fastFoodConflictResolverRef = useRef(null);
 
   const getActiveCartType = useCallback(() => {
-    // All users are now restricted to personal cart; no marketing mode bypass
-    return 'personal';
+    return localStorage.getItem('marketing_mode') === 'true' ? 'marketing' : 'personal';
   }, []);
 
   const calculateSummary = useCallback((items) => {
@@ -421,16 +420,24 @@ export function CartProvider({ children }) {
   const clearCart = useCallback(async () => {
     const cartType = getActiveCartType();
 
+    // 1. Reset in-memory state immediately
     setCart({ items: [], summary: { subtotal: 0, deliveryFee: 0, totalCommission: 0, total: 0, itemCount: 0 } });
     setCount(0);
+
+    // 2. Clear all possible local storage keys for guests
+    localStorage.removeItem('cartState_personal');
+    localStorage.removeItem('cartState_marketing');
+    localStorage.removeItem('queued_fastfood_items');
+
     try {
       if (localStorage.getItem('token')) {
+        // 3. Clear backend cart for logged in users
         await api.delete(`/cart?cartType=${cartType}`);
+        // Silent refresh to sync with backend state
         await refresh(true);
-      } else {
-        localStorage.removeItem(`cartState_${cartType}`);
       }
     } catch (error) {
+      console.error('[CartContext] Failed to clear backend cart:', error);
       if (localStorage.getItem('token')) await refresh(true);
     }
   }, [refresh, getActiveCartType]);

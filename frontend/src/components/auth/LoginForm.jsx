@@ -232,14 +232,25 @@ export default function LoginForm({ onSuccess, isModal = false, initialMode = 'u
                 </>
             )}
 
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center space-y-3">
+                {location.state?.from === '/checkout' && (
+                  <div className="mb-4">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/checkout')}
+                      className="w-full py-2.5 px-6 rounded-lg border-2 border-orange-500 text-orange-600 font-bold hover:bg-orange-50 transition-colors"
+                    >
+                      Continue as Guest
+                    </button>
+                  </div>
+                )}
                 <p className="text-gray-600">
                     Don't have an account?
                     <Link to="/register" className="text-blue-600 hover:underline ml-1">
                         Register here
                     </Link>
                 </p>
-                <p className="text-gray-600 mt-2">
+                <p className="text-gray-600">
                     Trouble signing in?{' '}
                     <Link to="/forgot-password" className="text-blue-600 hover:underline">
                         Reset your password

@@ -127,9 +127,6 @@ export default function Cart() {
     }
   };
 
-  // Redirect to login if not authenticated
-
-
   const isInitialLoading = loading && (!cart || !cart.items || cart.items.length === 0);
 
   if (isInitialLoading) {
@@ -139,8 +136,6 @@ export default function Cart() {
       </div>
     );
   }
-
-
 
   if (!cart || !cart.items || cart.items.length === 0 || visibleItems.length === 0) {
     return (
@@ -168,7 +163,6 @@ export default function Cart() {
 
   const handleQuantityChange = async (item, newQuantity) => {
     const id = item.itemType === 'fastfood' ? item.fastFoodId : (item.itemType === 'service' ? item.serviceId : item.productId);
-    // Fire and forget - optimistic update already happened in updateCartItem
     updateCartItem(id, newQuantity, item.itemType, { variantId: item.variantId, comboId: item.comboId }).then(() => {
       toast({
         title: "Quantity updated",
@@ -186,7 +180,6 @@ export default function Cart() {
 
   const handleRemoveItem = async (item) => {
     const id = item.itemType === 'fastfood' ? item.fastFoodId : (item.itemType === 'service' ? item.serviceId : item.productId);
-    // Fire and forget - optimistic update already happened in removeFromCart
     removeFromCart(id, item.itemType, { variantId: item.variantId, comboId: item.comboId, batchId: item.batchId || null }).then(() => {
       toast({
         title: "Item removed",
@@ -203,12 +196,10 @@ export default function Cart() {
   };
 
   const moveToWishlist = async (productId) => {
-    // Fire and forget - optimistic updates already happened
     Promise.all([
-      addToWishlist(productId), // Use WishlistContext to properly update wishlist state
+      addToWishlist(productId),
       removeFromCart(productId)
     ]).then((results) => {
-      // addToWishlist returns true/false, removeFromCart is fire-and-forget
       const [wishlistSuccess] = results;
       if (wishlistSuccess) {
         toast({
@@ -226,18 +217,8 @@ export default function Cart() {
     });
   };
 
-
-
   const handleCheckout = () => {
-    if (!user) {
-      toast({
-        title: "Login Required",
-        description: "Please login to checkout.",
-      });
-      navigate('/login', { state: { from: '/checkout' } });
-      return;
-    }
-    // Navigate to checkout page instead of inline checkout
+    // Navigate to checkout page - now supports Guest Checkout!
     navigate(`/checkout?scope=${cartScope}`, {
       state: { from: `/cart?scope=${cartScope}` }
     });
@@ -304,7 +285,6 @@ export default function Cart() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             <div className="bg-white md:rounded-2xl shadow-sm border-0 md:border border-gray-100 overflow-hidden">
               {visibleItems.map((item) => {
@@ -329,10 +309,8 @@ export default function Cart() {
                   ? (product?.coverImage || product?.mainImage || fastfoodGallery[0] || product?.image)
                   : (product?.coverImage || product?.mainImage || productImages[0] || product?.image);
 
-                // Create unique key that includes variant/combo info
                 const uniqueKey = `${item.itemType}-${id}-${item.variantId || 'novar'}-${item.comboId || 'nocombo'}`;
 
-                // Unified Variant/Combo Resolution
                 let variantName = (item.variantName && !isSku(item.variantName)) ? item.variantName : null;
                 let comboName = item.comboName || null;
 
@@ -358,7 +336,6 @@ export default function Cart() {
                   }
                 }
 
-                // Check availability
                 const isAvailable = isItemAvailable(item);
                 const updateKey = `${item.itemType}-${id}-${item.variantId || ''}-${item.comboId || ''}`;
                 const isUpdating = updatingItems.has(updateKey);
@@ -366,7 +343,6 @@ export default function Cart() {
                 return (
                   <div key={uniqueKey} className={`border-b border-gray-200 last:border-b-0 p-3 sm:p-6 transition-opacity duration-200 ${!isAvailable ? 'bg-red-50' : ''}`}>
                     <div className="flex items-start sm:items-center space-x-4">
-                      {/* Left Block: Image & Mobile Quantity */}
                       <div className="flex flex-col items-center gap-3 flex-shrink-0">
                         <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 rounded-xl overflow-hidden relative shadow-sm">
                           {!isAvailable && (
@@ -383,7 +359,6 @@ export default function Cart() {
                           />
                         </div>
 
-                        {/* Quantity Controls - MOBILE ONLY (Under Image) */}
                         <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200 sm:hidden">
                           <button
                             onClick={() => handleQuantityChange(item, item.quantity - 1)}
@@ -403,9 +378,7 @@ export default function Cart() {
                         </div>
                       </div>
 
-                      {/* Right Block: Details, Desktop Quantity, and Price */}
                       <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-4 min-w-0">
-                        {/* Details */}
                          <div className="flex-1 min-w-0">
                           <div className="flex flex-col gap-0.5">
                             <h3
@@ -415,7 +388,6 @@ export default function Cart() {
                               {item.itemName || product?.name || product?.title || item.name || 'Unknown Item'}
                             </h3>
 
-                            {/* Variant/Combo Labels - Primary Identification */}
                             {(variantName || comboName || item.variantName || item.comboName) && (
                               <div className="flex flex-wrap gap-1 mt-0.5">
                                 {(variantName || item.variantName) && item.variantName !== '0-0' && variantName !== '0-0' && (
@@ -454,7 +426,6 @@ export default function Cart() {
                           </div>
                         </div>
 
-                        {/* Quantity Controls - DESKTOP ONLY */}
                         <div className="hidden sm:flex items-center gap-3 p-1.5 bg-gray-50 rounded-xl border border-gray-100">
                           <button
                             onClick={() => handleQuantityChange(item, item.quantity - 1)}
@@ -473,7 +444,6 @@ export default function Cart() {
                           </button>
                         </div>
 
-                        {/* Item Total & Remove */}
                         <div className="text-left sm:text-right sm:min-w-[120px]">
                           <div className="font-black text-lg text-blue-900 mb-1">
                             {formatPrice(item.total)}
@@ -503,7 +473,6 @@ export default function Cart() {
             </div>
           </div>
 
-          {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white md:rounded-2xl shadow-lg border-0 md:border border-gray-100 p-4 sm:p-8 sticky top-4">
               <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-4 sm:mb-6 tracking-tight">Order Summary</h2>
@@ -544,11 +513,6 @@ export default function Cart() {
                   <span className="font-black text-gray-900">{formatPrice(visibleSummary.subtotal || 0)}</span>
                 </div>
 
-                <div className="flex justify-between items-center group">
-                  {/* Delivery fee is not shown in cart. Only shown in checkout after delivery method selection. */}
-                </div>
-
-                {/* Total Commission - Only visible in Marketing Mode */}
                 {localStorage.getItem('marketing_mode') === 'true' && (
                   <div className="flex justify-between items-center border-t border-dashed border-gray-100 pt-4 mt-2 bg-green-50/50 p-2 rounded-lg">
                     <span className="text-green-700 font-black text-[10px] uppercase tracking-widest">Marketer Commission</span>
@@ -569,7 +533,6 @@ export default function Cart() {
                   </div>
                 </div>
               </div>
-
 
               {(() => {
                 const hasUnavailableItems = visibleItems.some(item => !isItemAvailable(item));

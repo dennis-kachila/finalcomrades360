@@ -22,6 +22,11 @@ module.exports = (sequelize, DataTypes) => {
     expiresAt: {
       type: DataTypes.DATE,
       allowNull: false
+    },
+    isVerified: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
     }
   }, {
     tableName: 'Otps',

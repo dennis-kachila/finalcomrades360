@@ -1515,16 +1515,53 @@ const listCommissionsAdmin = async (req, res) => {
   }
 };
 
+const { moveToSuccess } = require('../utils/walletHelpers');
+const { Wallet, Transaction: WalletTransaction } = require('../models');
+
 const bulkPayCommissions = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
     const { ids } = req.body || {};
-    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: 'ids array required' });
-    const [count] = await Commission.update(
-      { status: 'paid', paidAt: new Date() },
-      { where: { id: ids, status: 'pending' } }
-    );
-    res.json({ message: 'Bulk pay completed', updated: count });
+    if (!Array.isArray(ids) || ids.length === 0) {
+      await t.rollback();
+      return res.status(400).json({ message: 'ids array required' });
+    }
+
+    const commissions = await Commission.findAll({
+      where: { id: ids, status: 'pending' },
+      include: [{ model: Order, as: 'Order' }],
+      transaction: t,
+      lock: t.LOCK.UPDATE
+    });
+
+    let updatedCount = 0;
+    for (const comm of commissions) {
+      // 1. Move from Pending to Success Balance (if not already done by delivery logic)
+      // Note: moveToSuccess is idempotent and uses atomic increments
+      await moveToSuccess(
+        comm.marketerId, 
+        comm.commissionAmount, 
+        comm.Order?.orderNumber || 'MANUAL', 
+        'Commission Earning (Manual Payout)', 
+        comm.orderId, 
+        t, 
+        'marketer'
+      );
+
+      // 2. Update status to paid
+      await comm.update({ 
+        status: 'paid', 
+        paidAt: new Date() 
+      }, { transaction: t });
+      
+      updatedCount++;
+    }
+
+    await t.commit();
+    res.json({ message: 'Bulk pay completed', updated: updatedCount });
   } catch (e) {
+    if (t) await t.rollback();
+    console.error('[bulkPayCommissions ERROR]:', e);
     res.status(500).json({ message: 'Error bulk paying commissions', error: e.message });
   }
 };

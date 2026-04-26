@@ -25,6 +25,37 @@ const {
 // DEPRECATED: Moved to shared utils/userUtils.js
 // const sanitizeUserPayload = (userData) => { ... }
 
+/**
+ * Link guest orders to a newly created user account
+ */
+const linkGuestOrders = async (userId, email, phone) => {
+  try {
+    const conditions = [];
+    if (email) conditions.push({ customerEmail: email });
+    if (phone) conditions.push({ customerPhone: phone });
+
+    if (conditions.length === 0) return 0;
+
+    const [updatedCount] = await Order.update(
+      { userId },
+      { 
+        where: { 
+          userId: null, 
+          [Op.or]: conditions 
+        } 
+      }
+    );
+
+    if (updatedCount > 0) {
+      console.log(`🔗 Linked ${updatedCount} guest orders to user ID: ${userId}`);
+    }
+    return updatedCount;
+  } catch (err) {
+    console.error('Failed to link guest orders:', err);
+    return 0;
+  }
+};
+
 
 const register = async (req, res, next) => {
   console.log('[authController] Registration attempt:', req.body);
@@ -140,6 +171,11 @@ const register = async (req, res, next) => {
       emailVerified: !!email,
       phoneVerified: !!normalizedPhone,
       mustChangePassword: validatedIsMarketerRegistration ? true : false
+    });
+
+    // Link past guest orders to this new account
+    setImmediate(() => {
+      linkGuestOrders(newUser.id, email, normalizedPhone);
     });
 
     // If user was referred by someone
@@ -759,6 +795,11 @@ const googleAuth = async (req, res, next) => {
         role: 'customer',
         emailVerified: true,
         profileImage: picture || null
+      });
+
+      // Link past guest orders to this new account
+      setImmediate(() => {
+        linkGuestOrders(user.id, email, null); // Google only gives email usually
       });
 
       const jwtToken = jwt.sign(

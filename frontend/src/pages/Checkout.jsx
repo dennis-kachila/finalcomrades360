@@ -88,7 +88,7 @@ const calculateGroupedDeliveryFee = (items = []) => {
 };
 
 function Checkout() {
-  const { cart, loading: cartLoading, removeFromCart, processQueue, queuedItems } = useCart();
+  const { cart, loading: cartLoading, removeFromCart, clearCart, processQueue, queuedItems } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -176,6 +176,15 @@ function Checkout() {
   const [loadingStations, setLoadingStations] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
   const [isReferralLocked, setIsReferralLocked] = useState(!!localStorage.getItem('referrerCode'));
+
+  // Guest Verification States
+  const [otpSent, setOtpSent] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isGuestVerified, setIsGuestVerified] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [verificationMethod, setVerificationMethod] = useState('whatsapp'); // 'sms' or 'whatsapp'
 
   // Fetch pick stations from API
   useEffect(() => {
@@ -311,6 +320,14 @@ function Checkout() {
         } catch (error) {
           console.error('Failed to load user profile:', error);
         }
+      } else {
+        // GUEST MODE: Clear profile and ensure editing is enabled for address entry
+        setUserProfile(null);
+        setFormData(prev => ({
+          ...prev,
+          isEditingAddress: true, // Guests must enter address manually
+          deliveryMethod: 'home_delivery' // Default for guests
+        }));
       }
     };
 
@@ -402,12 +419,11 @@ function Checkout() {
     }
   }, [paymentId, pollingPayment, paymentCompleted]);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (NOW DISABLED for Guest Checkout)
   useEffect(() => {
-    if (!user && !cartLoading) {
-      navigate('/login', { state: { from: '/checkout' } });
-    }
-  }, [user, cartLoading, navigate]);
+    // We no longer redirect to login. Guests are welcome!
+    console.log('👤 Checkout Auth State:', user ? `Logged in as ${user.name}` : 'Guest User');
+  }, [user, cartLoading]);
 
   const selectedOrderBatch = useMemo(() => {
     if (!selectedOrderBatchId) return null;
@@ -429,8 +445,13 @@ function Checkout() {
     );
   }
 
-  if (!user || (!isSuccessDialogOpen && (!cart || !cart.items || scopedItems.length === 0))) {
-    return null; // Will redirect
+  if (!isSuccessDialogOpen && (!cart || !cart.items || scopedItems.length === 0)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <h2 className="text-2xl font-bold mb-4">Your cart is empty</h2>
+        <Link to="/" className="bg-blue-600 text-white px-6 py-2 rounded-lg">Start Shopping</Link>
+      </div>
+    );
   }
 
   const handleCustomerLookup = async (query) => {
@@ -485,6 +506,53 @@ function Checkout() {
     if (lookupInput) lookupInput.value = '';
   };
 
+  const handleRequestGuestOtp = async () => {
+    if (!formData.customerPhone || !validateKenyanPhone(formData.customerPhone)) {
+      alert(`Invalid Phone Number: ${PHONE_VALIDATION_ERROR}`);
+      return;
+    }
+
+    setIsSendingOtp(true);
+    setOtpError('');
+    try {
+      const res = await api.post('/verification/request-guest-otp', { 
+        phone: formData.customerPhone,
+        method: verificationMethod
+      });
+      if (res.data.success) {
+        setOtpSent(true);
+      }
+    } catch (err) {
+      setOtpError(err.response?.data?.message || 'Failed to send OTP');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyGuestOtp = async () => {
+    if (!otpCode || otpCode.length < 4) {
+      setOtpError('Please enter the verification code');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setOtpError('');
+    try {
+      const res = await api.post('/verification/verify-guest-otp', { 
+        phone: formData.customerPhone,
+        otp: otpCode 
+      });
+      if (res.data.success) {
+        setIsGuestVerified(true);
+        // alert('Phone number verified successfully!');
+      }
+    } catch (err) {
+      setOtpError(err.response?.data?.message || 'Verification failed');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -506,10 +574,10 @@ function Checkout() {
     }
 
     if (formData.deliveryMethod === 'home_delivery') {
-      if (isMarketingMode) {
-        // Marketing mode: require customer address text
+      if (isMarketingMode || !user) {
+        // Marketing mode or Guest checkout: require customer address text
         if (!formData.customerAddress || !formData.customerAddress.trim()) {
-          alert('📍 Customer Delivery Address Required\n\nPlease enter the customer\'s complete delivery address to continue.');
+          alert('📍 Customer Delivery Address Required\n\nPlease enter your complete delivery address to continue.');
           const addressField = document.querySelector('textarea[name="customerAddress"]');
           if (addressField) { addressField.focus(); addressField.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
           return;
@@ -565,22 +633,34 @@ function Checkout() {
       return;
     }
 
-    // Validate customer details in marketing mode
-    if (isMarketingMode) {
+    // Validate customer details in marketing mode OR guest checkout
+    if (isMarketingMode || !user) {
       if (!formData.customerName.trim()) {
-        alert('Please enter the customer name');
+        alert('Please enter your full name');
         return;
       }
       if (!formData.customerPhone.trim()) {
-        alert('Please enter the customer phone number');
+        alert('Please enter your phone number');
         return;
       }
       if (formData.customerPhone.trim() && !validateKenyanPhone(formData.customerPhone.trim())) {
-        alert(`Customer Phone: ${PHONE_VALIDATION_ERROR}`);
+        alert(`Phone Number: ${PHONE_VALIDATION_ERROR}`);
         return;
       }
-      if (!formData.customerAddress.trim()) {
+      
+      // Address is only required via 'customerAddress' field if in marketing mode.
+      // Otherwise, we use the 'editedCounty/town/etc' fields which are validated below.
+      if (isMarketingMode && !formData.customerAddress.trim()) {
         alert('Please enter the customer delivery address');
+        return;
+      }
+
+      // Enforcement: Guest must be verified
+      if (!user && !isMarketingMode && !isGuestVerified) {
+        alert('Please verify your phone number via OTP before placing the order.');
+        // Scroll to the verification section
+        const verifyBtn = document.getElementById('request-otp-btn');
+        if (verifyBtn) verifyBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
     }
@@ -626,7 +706,7 @@ function Checkout() {
           checkoutGroupId,
           deliveryMethod: formData.deliveryMethod,
           deliveryAddress: formData.deliveryMethod === 'home_delivery' ? (
-            isMarketingMode ? formData.customerAddress.trim() : (
+            (isMarketingMode || !user) ? formData.customerAddress.trim() : (
               formData.isEditingAddress ?
                 [formData.editedCounty, formData.editedTown, formData.editedEstate, formData.editedHouseNumber].filter(Boolean).join(', ') :
                 formData.deliveryAddress.trim()
@@ -688,9 +768,10 @@ function Checkout() {
           deliveryFee,
           total,
           isMarketingOrder: localStorage.getItem('marketing_mode') === 'true',
-          customerName: isMarketingMode ? formData.customerName : (userProfile?.name || formData.customerName),
+          isGuestOrder: !user,
+          customerName: (isMarketingMode || !user) ? formData.customerName : (userProfile?.name || formData.customerName),
           customerPhone: formData.mobileMoneyPhone || formData.customerPhone || userProfile?.phone,
-          customerEmail: isMarketingMode ? formData.customerEmail : (userProfile?.email || formData.customerEmail),
+          customerEmail: (isMarketingMode || !user) ? formData.customerEmail : (userProfile?.email || formData.customerEmail),
           marketingDeliveryAddress: isMarketingMode ? formData.customerAddress : formData.deliveryAddress,
           deliveryInstructions: isFastFoodScope ? (formData.specialInstructions?.trim() || null) : null,
           totalCommission: scopedSummary.totalCommission || 0,
@@ -709,22 +790,12 @@ function Checkout() {
         if (data.success || response.status === 200) {
           console.log('✅ Step 4: Order created successfully');
 
-          // Step 5: Clear cart and show success
-          console.log('🧹 Step 5: Clearing cart and showing success...');
-          // Store order details and show success dialog
+          // Step 5: Show success dialog immediately to prevent "empty cart" redirect
           setCreatedOrder(data.order);
           setIsSuccessDialogOpen(true);
 
-          await Promise.all(
-            scopedItems.map((item) => {
-              const id = item.itemType === 'fastfood' ? item.fastFoodId : (item.itemType === 'service' ? item.serviceId : item.productId);
-              return removeFromCart(id, item.itemType, {
-                variantId: item.variantId,
-                comboId: item.comboId,
-                batchId: item.itemType === 'fastfood' ? (item.batchId || Number(selectedOrderBatchId) || null) : null
-              });
-            })
-          );
+          // Step 6: Clear cart (handles both backend and local storage)
+          await clearCart();
 
           // Reset payment states
           setPaymentCompleted(false);
@@ -1086,6 +1157,17 @@ function Checkout() {
                       </p>
                     </div>
 
+                    {/* Guest Checkout Indicator */}
+                    {!user && (
+                      <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-orange-800">Checkout as Guest</p>
+                          <p className="text-xs text-orange-700">You don't need an account to place this order.</p>
+                        </div>
+                        <Link to="/login" state={{ from: '/checkout' }} className="text-xs font-bold text-blue-600 underline">Login instead?</Link>
+                      </div>
+                    )}
+
                     {/* Marketing Mode Lookup Section */}
                     {localStorage.getItem('marketing_mode') === 'true' && (
                       <div className={`bg-orange-50 p-4 rounded-lg border border-orange-100 mb-4 transition-all ${(!isLookupUsed && (formData.customerName || formData.customerPhone || formData.customerAddress)) ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
@@ -1183,12 +1265,12 @@ function Checkout() {
                         </div>
                       )}
 
-                    {/* Integrated Manual Entry for Marketing Mode (Consolidated) */}
-                    {localStorage.getItem('marketing_mode') === 'true' && (
-                      <div className="mt-4 space-y-4 bg-orange-50/30 p-4 rounded-lg border border-orange-100">
+                    {/* Integrated Manual Entry for Marketing Mode or Guest (Consolidated) */}
+                    {(localStorage.getItem('marketing_mode') === 'true' || !user) && (
+                      <div className="mt-4 space-y-4 bg-orange-50/30 p-4 rounded-lg border border-orange-100 mb-6">
                         <div className="flex justify-between items-center">
                           <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider">
-                            {isLookupUsed ? 'Refine Customer Details' : 'Manual Customer Details'}
+                            {!user ? 'Guest Contact Details' : (isLookupUsed ? 'Refine Customer Details' : 'Manual Customer Details')}
                           </h3>
                           {(formData.customerName || formData.customerPhone || formData.customerAddress) && (
                             <button
@@ -1213,7 +1295,7 @@ function Checkout() {
                               onChange={handleInputChange}
                               placeholder="Full name"
                               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                              required={localStorage.getItem('marketing_mode') === 'true'}
+                              required={(localStorage.getItem('marketing_mode') === 'true' || !user)}
                             />
                           </div>
                           <div>
@@ -1226,10 +1308,107 @@ function Checkout() {
                               onChange={handleInputChange}
                               placeholder="e.g., 0712345678, 0123456789, or +254712345678"
                               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                              required={localStorage.getItem('marketing_mode') === 'true'}
+                              required={(localStorage.getItem('marketing_mode') === 'true' || !user)}
                             />
                           </div>
                         </div>
+
+                        {/* Guest OTP Verification UI */}
+                        {!user && localStorage.getItem('marketing_mode') !== 'true' && (
+                          <div className="mt-4 p-4 bg-white rounded-lg border border-orange-200 shadow-sm">
+                            {!isGuestVerified ? (
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs font-bold text-gray-700 uppercase">Phone Verification Required</label>
+                                  {otpSent && (
+                                    <button 
+                                      type="button" 
+                                      onClick={handleRequestGuestOtp}
+                                      disabled={isSendingOtp}
+                                      className="text-[10px] text-blue-600 font-bold hover:underline"
+                                    >
+                                      Resend Code
+                                    </button>
+                                  )}
+                                </div>
+
+                                {!otpSent ? (
+                                  <div className="space-y-3">
+                                    <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+                                      <button
+                                        type="button"
+                                        onClick={() => setVerificationMethod('sms')}
+                                        className={`flex-1 py-1.5 px-3 rounded-md text-[10px] font-bold uppercase transition-all ${
+                                          verificationMethod === 'sms' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-gray-200'
+                                        }`}
+                                      >
+                                        SMS
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setVerificationMethod('whatsapp')}
+                                        className={`flex-1 py-1.5 px-3 rounded-md text-[10px] font-bold uppercase transition-all ${
+                                          verificationMethod === 'whatsapp' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:bg-gray-200'
+                                        }`}
+                                      >
+                                        WhatsApp
+                                      </button>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      id="request-otp-btn"
+                                      onClick={handleRequestGuestOtp}
+                                      disabled={isSendingOtp || !formData.customerPhone}
+                                      className={`w-full py-2.5 text-white rounded-md font-bold text-sm shadow-md disabled:opacity-50 transition-all flex items-center justify-center gap-2 ${
+                                        verificationMethod === 'whatsapp' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                                      }`}
+                                    >
+                                      {isSendingOtp ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                                      Send Verification Code
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    <div className="bg-blue-50 p-3 rounded text-[11px] text-blue-800 leading-relaxed">
+                                      We've sent a verification code to <strong>{formData.customerPhone}</strong> via <strong>{verificationMethod.toUpperCase()}</strong>.
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={otpCode}
+                                        onChange={(e) => setOtpCode(e.target.value)}
+                                        placeholder="Enter 6-digit code"
+                                        maxLength={6}
+                                        className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-center font-bold tracking-widest focus:ring-2 focus:ring-orange-500"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={handleVerifyGuestOtp}
+                                        disabled={isVerifyingOtp || otpCode.length < 4}
+                                        className="px-6 py-2 bg-green-600 text-white rounded-md font-bold text-sm hover:bg-green-700 disabled:opacity-50 transition-all flex items-center justify-center min-w-[100px]"
+                                      >
+                                        {isVerifyingOtp ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Verify'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                                {otpError && <p className="text-[11px] text-red-600 font-bold">{otpError}</p>}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-3 text-green-700">
+                                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                  </svg>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold">Phone Number Verified</p>
+                                  <p className="text-[11px] opacity-80">You can now proceed to place your order.</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">Customer Email (Optional)</label>
                           <input
@@ -1250,13 +1429,13 @@ function Checkout() {
                             placeholder="Precise delivery details (Estate, House No, Town)"
                             rows="2"
                             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                            required={localStorage.getItem('marketing_mode') === 'true'}
+                            required={(localStorage.getItem('marketing_mode') === 'true' || !user)}
                           />
                         </div>
                       </div>
                     )}
 
-                    {localStorage.getItem('marketing_mode') !== 'true' && (
+                    {localStorage.getItem('marketing_mode') !== 'true' && user && (
                       formData.isEditingAddress ? (
                         <div className="space-y-4">
                           {/* Basic info (read-only) */}
@@ -1622,7 +1801,7 @@ function Checkout() {
                 </div>
               </div>
 
-              {!user?.phoneVerified ? (
+              {user && !user?.phoneVerified ? (
                 <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
                   <h3 className="text-sm font-semibold text-blue-800 mb-2">Phone Verification Required</h3>
                   <PhoneVerification currentPhone={user?.phone} onVerified={() => window.location.reload()} />
@@ -1680,18 +1859,20 @@ function Checkout() {
             <button
               onClick={() => {
                 const isMarketing = localStorage.getItem('marketing_mode') === 'true';
-                // Only redirect to marketing dashboard if user is actually a marketer/admin
                 const isMarketer = user?.role === 'marketer' || user?.role === 'marketing' || user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'super_admin';
 
                 if (isMarketing && isMarketer) {
                   navigate('/marketing?tab=orders');
-                } else {
+                } else if (user) {
                   navigate('/customer/orders');
+                } else {
+                  // Guest: Go to public tracking page
+                  navigate(`/track/${createdOrder?.orderNumber}`);
                 }
               }}
               className="w-full bg-orange-500 text-white py-2.5 rounded-lg hover:bg-orange-600 transition-colors font-medium"
             >
-              View My Orders
+              {user ? 'View My Orders' : 'Track My Order'}
             </button>
             <button
               onClick={() => navigate('/')}

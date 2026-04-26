@@ -6,7 +6,7 @@ const { creditPending } = require('../utils/walletHelpers');
 // Admin: get all commissions with optional filters
 const getAllCommissions = async (req, res) => {
   try {
-    const { status, marketerId, from, to, limit = 100, offset = 0 } = req.query;
+    const { status, marketerId, from, to, limit = 100, offset = 0, orderNumber } = req.query;
     const where = {};
     if (status) where.status = status;
     if (marketerId) where.marketerId = Number(marketerId);
@@ -16,11 +16,16 @@ const getAllCommissions = async (req, res) => {
       if (to) where.createdAt[Op.lte] = new Date(to);
     }
 
+    const orderInclude = { model: Order, attributes: ['orderNumber', 'createdAt'] };
+    if (orderNumber) {
+      orderInclude.where = { orderNumber: { [Op.like]: `%${orderNumber}%` } };
+    }
+
     const { count, rows } = await Commission.findAndCountAll({
       where,
       include: [
         { model: User, as: 'marketer', attributes: ['id', 'name', 'email', 'referralCode'] },
-        { model: Order, attributes: ['orderNumber', 'createdAt'] },
+        orderInclude,
         { model: Product, attributes: ['name'], required: false },
         { model: FastFood, attributes: ['name'], required: false },
       ],

@@ -1,5 +1,5 @@
 const { sequelize } = require('../database/database');
-const { Product, User, Wallet, Transaction, Order, OrderItem, Commission, DeliveryAgentProfile, Cart, FastFood, Service, DeliveryTask, DeliveryCharge, Warehouse, PickupStation, FastFoodPickupPoint, PlatformConfig, Notification, HandoverCode, Batch, Payment } = require('../models');
+const { Product, User, Wallet, Transaction, Order, OrderItem, Commission, DeliveryAgentProfile, Cart, FastFood, Service, DeliveryTask, DeliveryCharge, Warehouse, PickupStation, FastFoodPickupPoint, PlatformConfig, Notification, HandoverCode, Batch, Payment, Otp } = require('../models');
 
 const { calculateCommission: createCommissionRecords } = require('./commissionController');
 const { isValidTransition, getValidTransitionsForOrder, autoCreateDeliveryTask } = require('./orderTransitionController');
@@ -383,8 +383,43 @@ const createOrderFromCart = async (req, res) => {
     paymentProofUrl,
     paymentId // New field to link pre-initiated payment
   } = req.body;
-  const userId = req.user.id;
+  
+  // Safely extract userId - will be null for guest checkouts
+  const userId = req.user ? req.user.id : null;
   const effectiveReferralCode = referralCode || primaryReferralCode;
+  const customerPhone = req.body.customerPhone;
+  const isMarketingOrder = req.body.isMarketingOrder || false;
+
+  // Guest Verification Check: Force OTP verification for non-logged in users
+  if (!userId && !isMarketingOrder) {
+    if (!customerPhone) {
+      return res.status(400).json({ success: false, message: 'Phone number is required for guest checkout' });
+    }
+    
+    try {
+      const { normalizeKenyanPhone } = require('../middleware/validators');
+      const normalizedPhone = normalizeKenyanPhone(customerPhone);
+      
+      const verifiedOtp = await Otp.findOne({
+        where: {
+          phone: normalizedPhone,
+          isVerified: true
+        }
+      });
+
+      if (!verifiedOtp || new Date() > verifiedOtp.expiresAt) {
+        return res.status(403).json({
+          success: false,
+          message: 'Phone number verification required. Please verify your phone number via OTP first.'
+        });
+      }
+      
+      console.log(`✅ Guest phone ${normalizedPhone} verified. Proceeding with order...`);
+    } catch (err) {
+      console.error('Guest verification error:', err);
+      // If normalization fails, we'll catch it later or here
+    }
+  }
 
   console.log('⚙️ Backend: Starting order creation process...');
 
@@ -714,7 +749,7 @@ const createOrderFromCart = async (req, res) => {
       }]),
       isMarketingOrder: req.body.isMarketingOrder || false,
       customerName: req.body.customerName || null,
-      customerPhone: req.body.customerPhone || null,
+      customerPhone: req.body.customerPhone ? require('../middleware/validators').normalizeKenyanPhone(req.body.customerPhone) : null,
       customerEmail: req.body.customerEmail || null,
       marketingDeliveryAddress: req.body.marketingDeliveryAddress || null,
       deliveryAddress: req.body.deliveryAddress || null,
@@ -956,12 +991,16 @@ const createOrderFromCart = async (req, res) => {
     }
 
     // Step 11: Clear the cart
-    // FIX: Always clear cart for the user who placed the order
-    console.log('🚀 Step 11: Clearing user cart...');
-    await Cart.destroy({
-      where: { userId },
-      transaction: t
-    });
+    // FIX: Only clear cart if user is logged in
+    if (userId) {
+      console.log(`🚀 Step 11: Clearing cart for user ID ${userId}...`);
+      await Cart.destroy({
+        where: { userId },
+        transaction: t
+      });
+    } else {
+      console.log('🚀 Step 11: Guest checkout - skipping database cart clearing (handled by frontend local storage)');
+    }
 
     // Commit the transaction
     await t.commit();

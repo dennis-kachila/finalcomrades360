@@ -9,6 +9,10 @@ router.get('/status', authenticateToken, verificationController.getVerificationS
 router.post('/request-otp', authenticateToken, verificationController.requestPhoneVerificationOtp);
 router.post('/verify-otp', authenticateToken, verificationController.verifyPhoneOtp);
 
+// Guest routes (No Auth)
+router.post('/request-guest-otp', verificationController.requestGuestPhoneOtp);
+router.post('/verify-guest-otp', verificationController.verifyGuestPhoneOtp);
+
 // Admin routes
 router.get('/admin/pending', authenticateToken, checkRole(['admin', 'superadmin', 'super_admin']), adminVerificationController.getPendingVerifications);
 router.post('/admin/review', authenticateToken, checkRole(['admin', 'superadmin', 'super_admin']), adminVerificationController.reviewVerification);

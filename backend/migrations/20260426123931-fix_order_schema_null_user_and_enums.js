@@ -3,6 +3,7 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
+    const dialect = queryInterface.sequelize.getDialect();
     // Helper to find the correct table name (Order or Orders)
     const tables = await queryInterface.showAllTables();
     const tableName = tables.find(t => ['Order', 'Orders'].includes(t)) || 'Order';
@@ -38,7 +39,6 @@ module.exports = {
     }
 
     // 2. Ensure adminRoutingStrategy ENUM is up to date (MySQL only)
-    const dialect = queryInterface.sequelize.getDialect();
     if (dialect === 'mysql' || dialect === 'mariadb') {
       try {
         await queryInterface.sequelize.query(

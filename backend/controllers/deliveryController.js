@@ -1445,21 +1445,23 @@ const updateTaskStatus = async (req, res) => {
             const platformProfit = orderMarkup - totalCommission;
 
             if (platformProfit > 0) {
-              const wallet = await PlatformWallet.findByPk(1, { transaction: t, lock: true });
-              if (wallet) {
-                wallet.balance = parseFloat(wallet.balance) + platformProfit;
-                wallet.totalEarned = parseFloat(wallet.totalEarned) + platformProfit;
-                await wallet.save({ transaction: t });
+              const [wallet] = await PlatformWallet.findOrCreate({ 
+                where: { id: 1 }, 
+                defaults: { balance: 0 }, 
+                transaction: t 
+              });
+              
+              await wallet.update({
+                balance: sequelize.literal(`balance + ${platformProfit}`)
+              }, { transaction: t });
 
-                await PlatformTransaction.create({
-                  walletId: wallet.id,
-                  amount: platformProfit,
-                  type: 'credit',
-                  sourceType: 'item_sale',
-                  referenceId: task.order.id.toString(),
-                  description: `Sales profit for Order #${task.order.orderNumber}`
-                }, { transaction: t });
-              }
+              await PlatformTransaction.create({
+                amount: platformProfit,
+                type: 'credit',
+                status: 'completed',
+                description: `Markup Profit from Order #${task.order.orderNumber}`,
+                metadata: JSON.stringify({ orderId: task.orderId, markup: orderMarkup, commission: totalCommission })
+              }, { transaction: t });
             }
 
             await t.commit();
@@ -2432,17 +2434,26 @@ const getAdminAgentDetail = async (req, res) => {
 const getAdminAgentHistory = async (req, res) => {
   try {
     const { agentId } = req.params;
+    const { orderNumber } = req.query;
     const page = Math.max(1, parseInt(req.query.page || '1', 10));
     const pageSize = Math.min(50, parseInt(req.query.pageSize || '20', 10));
 
+    const where = { deliveryAgentId: agentId };
+    const orderInclude = {
+      model: Order,
+      as: 'order',
+      attributes: ['id', 'orderNumber', 'status', 'total', 'deliveryMethod', 'deliveryAddress', 'deliveryRating'],
+      required: false
+    };
+
+    if (orderNumber) {
+      orderInclude.where = { orderNumber: { [Op.like]: `%${orderNumber}%` } };
+      orderInclude.required = true;
+    }
+
     const { count, rows } = await DeliveryTask.findAndCountAll({
-      where: { deliveryAgentId: agentId },
-      include: [{
-        model: Order,
-        as: 'order',
-        attributes: ['id', 'orderNumber', 'status', 'total', 'deliveryMethod', 'deliveryAddress', 'deliveryRating'],
-        required: false
-      }],
+      where,
+      include: [orderInclude],
       order: [['createdAt', 'DESC']],
       limit: pageSize,
       offset: (page - 1) * pageSize

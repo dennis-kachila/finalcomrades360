@@ -9,6 +9,7 @@ const { getDynamicMessage } = require("../utils/templateUtils");
 
 const { uploadProfileImages } = require("../config/multer");
 const { geocodeAddress } = require("../utils/geocodingUtils");
+const { deleteFiles } = require('../utils/fileCleanup');
 const genPublic = async () => { const y = new Date().getFullYear(); const seq = `${Math.floor(Math.random() * 1e6)}`.padStart(6, "0"); return `C360-${y}-${seq}`; };
 
 // Admin: directly set a user's role (e.g., to 'delivery_agent')
@@ -254,8 +255,13 @@ const updateProfile = async (req, res, next) => {
 
     // Handle file upload if present
     if (req.file) {
+      const oldProfileImage = user.profileImage;
       const imageUrl = `/uploads/profiles/${req.file.filename}`;
       user.profileImage = imageUrl;
+      
+      if (oldProfileImage && oldProfileImage !== imageUrl) {
+        deleteFiles([oldProfileImage]);
+      }
     }
 
     // Update basic profile fields
@@ -365,6 +371,10 @@ const updateProfile = async (req, res, next) => {
     // Allow updating nationalIdUrl (typically from upload)
     const { nationalIdUrl: nationalIdUrlBody } = req.body || {};
     if (nationalIdUrlBody !== undefined) {
+      if (user.nationalIdUrl && user.nationalIdUrl !== nationalIdUrlBody) {
+        deleteFiles([user.nationalIdUrl]);
+      }
+      
       user.nationalIdUrl = nationalIdUrlBody;
       // If URL is present, status is pending. If cleared, status is none.
       user.nationalIdStatus = nationalIdUrlBody ? 'pending' : 'none';

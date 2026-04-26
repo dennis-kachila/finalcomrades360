@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { optimizeImage } = require('../utils/imageValidation');
 const { normalizeItemName } = require('../utils/itemNamePolicy');
+const { deleteFiles } = require('../utils/fileCleanup');
 
 // Helper function to calculate distance using Haversine formula
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -881,7 +882,31 @@ exports.updateFastFood = async (req, res, next) => {
             }
         }
 
+        // CLEANUP: Find orphaned images
+        const oldFiles = [];
+        if (fastFood.mainImage) oldFiles.push(fastFood.mainImage);
+        if (fastFood.galleryImages && Array.isArray(fastFood.galleryImages)) {
+            oldFiles.push(...fastFood.galleryImages);
+        }
+
+        const newFiles = [];
+        if (updateData.mainImage) newFiles.push(updateData.mainImage);
+        else if (fastFood.mainImage) newFiles.push(fastFood.mainImage);
+        
+        if (updateData.galleryImages && Array.isArray(updateData.galleryImages)) {
+            newFiles.push(...updateData.galleryImages);
+        } else if (fastFood.galleryImages && Array.isArray(fastFood.galleryImages)) {
+            newFiles.push(...fastFood.galleryImages);
+        }
+
+        const filesToDelete = oldFiles.filter(oldFile => !newFiles.includes(oldFile));
+
         await fastFood.update(updateData);
+
+        // Physically delete orphaned files
+        if (filesToDelete.length > 0) {
+            deleteFiles(filesToDelete);
+        }
 
         const shouldSyncSellerDeliveryFee =
             (updateData.approved === true || updateData.reviewStatus === 'approved' || fastFood.approved === true || fastFood.reviewStatus === 'approved')
@@ -1220,7 +1245,23 @@ exports.permanentlyDeleteFastFood = async (req, res) => {
         }
 
         // Permanently delete from recycle bin
+        const filesToDelete = [];
+        try {
+            if (deletedItem.mainImage) filesToDelete.push(deletedItem.mainImage);
+            if (deletedItem.galleryImages) {
+                const images = typeof deletedItem.galleryImages === 'string' ? JSON.parse(deletedItem.galleryImages) : deletedItem.galleryImages;
+                if (Array.isArray(images)) filesToDelete.push(...images);
+            }
+        } catch (e) {
+            console.warn('Error parsing deletedItem images for cleanup', e);
+        }
+
         await deletedItem.destroy();
+
+        // Clean up files
+        if (filesToDelete.length > 0) {
+            deleteFiles(filesToDelete);
+        }
 
         res.status(200).json({
             success: true,

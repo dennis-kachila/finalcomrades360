@@ -6,6 +6,7 @@ const relatedProductsModule = require('../modules/relatedProducts');
 const { validateAndNormalizeImages, validateImageFile, generateUniqueFilename, cleanupOrphanedImages, ensureImagesExist, optimizeImage } = require('../utils/imageValidation');
 const cacheService = require('../scripts/services/cacheService');
 const { normalizeItemName } = require('../utils/itemNamePolicy');
+const { deleteFiles } = require('../utils/fileCleanup');
 
 const isInlineImageData = (value) => typeof value === 'string' && value.trim().toLowerCase().startsWith('data:image');
 
@@ -1887,8 +1888,30 @@ const updateProduct = async (req, res, next) => {
       updateData.basePrice && Math.abs(updateData.basePrice - product.basePrice) > product.basePrice * 0.1 // 10% price change
     );
 
+    // CLEANUP: Find orphaned images that were removed/replaced in this update
+    const oldFiles = [];
+    if (product.coverImage) oldFiles.push(product.coverImage);
+    if (product.galleryImages && Array.isArray(product.galleryImages)) {
+      oldFiles.push(...product.galleryImages);
+    }
+    if (product.media && product.media.videoPath) oldFiles.push(product.media.videoPath);
+
+    const newFiles = [];
+    if (updateData.coverImage) newFiles.push(updateData.coverImage);
+    if (updateData.galleryImages && Array.isArray(updateData.galleryImages)) {
+      newFiles.push(...updateData.galleryImages);
+    }
+    if (mergedTags.media && mergedTags.media.videoPath) newFiles.push(mergedTags.media.videoPath);
+
+    const filesToDelete = oldFiles.filter(oldFile => !newFiles.includes(oldFile));
+
     // Update the product
     await product.update(updateData);
+
+    // Physically delete orphaned files
+    if (filesToDelete.length > 0) {
+      deleteFiles(filesToDelete);
+    }
 
     // Recalculate related products if significant changes were made
     if (shouldRecalculateRelated && product.approved) {
@@ -2505,7 +2528,26 @@ const permanentlyDeleteProduct = async (req, res) => {
     }
 
     // Permanently delete from recycle bin
+    const filesToDelete = [];
+    try {
+      if (deletedProduct.images) {
+        const images = typeof deletedProduct.images === 'string' ? JSON.parse(deletedProduct.images) : deletedProduct.images;
+        if (Array.isArray(images)) filesToDelete.push(...images);
+      }
+      if (deletedProduct.logistics) {
+        const logistics = typeof deletedProduct.logistics === 'string' ? JSON.parse(deletedProduct.logistics) : deletedProduct.logistics;
+        if (logistics.videoPath) filesToDelete.push(logistics.videoPath);
+      }
+    } catch (e) {
+      console.warn('Error parsing deletedProduct images for cleanup', e);
+    }
+
     await deletedProduct.destroy();
+    
+    // Clean up files
+    if (filesToDelete.length > 0) {
+      deleteFiles(filesToDelete);
+    }
 
     res.status(200).json({
       message: 'Product permanently deleted successfully'

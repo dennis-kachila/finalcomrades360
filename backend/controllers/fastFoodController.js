@@ -515,17 +515,30 @@ exports.createFastFood = async (req, res, next) => {
 
         const newItem = await FastFood.create(createData);
 
-        if (newItem.approved || newItem.reviewStatus === 'approved') {
-            const canonicalDeliveryFee = normalizeDeliveryFee(newItem.deliveryFee);
-            await syncApprovedSellerDeliveryFee({
-                vendorId: newItem.vendor,
-                deliveryFee: canonicalDeliveryFee,
-                sourceItemId: newItem.id
-            });
-            await newItem.reload();
-        }
-
+        // Respond immediately — don't block on delivery-fee sync or cache
         res.status(201).json({ success: true, data: newItem });
+
+        // Background: sync delivery fee across all vendor items + bust cache
+        if (newItem.approved || newItem.reviewStatus === 'approved') {
+            setImmediate(async () => {
+                try {
+                    const canonicalDeliveryFee = normalizeDeliveryFee(newItem.deliveryFee);
+                    await syncApprovedSellerDeliveryFee({
+                        vendorId: newItem.vendor,
+                        deliveryFee: canonicalDeliveryFee,
+                        sourceItemId: newItem.id
+                    });
+                } catch (e) {
+                    console.error('[createFastFood] Background delivery-fee sync failed:', e.message);
+                }
+                try {
+                    const cacheService = require('../scripts/services/cacheService');
+                    await cacheService.delPattern('homepage:*');
+                } catch (e) {
+                    console.error('[createFastFood] Background cache invalidation failed:', e.message);
+                }
+            });
+        }
     } catch (error) {
         next(error);
     }
@@ -901,37 +914,41 @@ exports.updateFastFood = async (req, res, next) => {
 
         const filesToDelete = oldFiles.filter(oldFile => !newFiles.includes(oldFile));
 
-        await fastFood.update(updateData);
-
-        // Physically delete orphaned files
-        if (filesToDelete.length > 0) {
-            deleteFiles(filesToDelete);
-        }
-
+        // Determine if vendor-wide delivery fee sync is needed (compute before update for closure)
         const shouldSyncSellerDeliveryFee =
             (updateData.approved === true || updateData.reviewStatus === 'approved' || fastFood.approved === true || fastFood.reviewStatus === 'approved')
             && updateData.deliveryFee !== undefined;
 
-        if (shouldSyncSellerDeliveryFee) {
-            await syncApprovedSellerDeliveryFee({
-                vendorId: fastFood.vendor,
-                deliveryFee: normalizeDeliveryFee(updateData.deliveryFee),
-                sourceItemId: fastFood.id
-            });
+        await fastFood.update(updateData);
+
+        // Delete orphaned files in background (non-blocking)
+        if (filesToDelete.length > 0) {
+            deleteFiles(filesToDelete);
         }
 
-        // --- CACHE INVALIDATION ---
-        // Clear homepage and fastfood list caches to ensure immediate visibility updates
-        try {
-            const cacheService = require('../scripts/services/cacheService');
-            await cacheService.delPattern('homepage:*');
-            console.log('🧹 [updateFastFood] Invalidated homepage cache');
-        } catch (e) {
-            console.error('⚠️ [updateFastFood] Failed to invalidate cache:', e.message);
-        }
-        await fastFood.reload(); // Force reload from DB to confirm changes
-
+        // Respond immediately — don't wait for vendor-wide sync or cache
         res.status(200).json({ success: true, data: fastFood });
+
+        // Background: heavy vendor-wide delivery-fee sync + cache invalidation
+        setImmediate(async () => {
+            try {
+                if (shouldSyncSellerDeliveryFee) {
+                    await syncApprovedSellerDeliveryFee({
+                        vendorId: fastFood.vendor,
+                        deliveryFee: normalizeDeliveryFee(updateData.deliveryFee),
+                        sourceItemId: fastFood.id
+                    });
+                }
+            } catch (e) {
+                console.error('[updateFastFood] Background delivery-fee sync failed:', e.message);
+            }
+            try {
+                const cacheService = require('../scripts/services/cacheService');
+                await cacheService.delPattern('homepage:*');
+            } catch (e) {
+                console.error('[updateFastFood] Background cache invalidation failed:', e.message);
+            }
+        });
     } catch (error) {
         next(error);
     }

@@ -11,6 +11,17 @@ module.exports = {
 
     // 1. Change userId to be nullable (Crucial for Marketing Orders)
     try {
+      // For MySQL, we might need to drop the FK before changing nullability
+      if (dialect === 'mysql' || dialect === 'mariadb') {
+        try {
+          // Attempt to drop the specific constraint mentioned in the error
+          await queryInterface.sequelize.query('ALTER TABLE `' + tableName + '` DROP FOREIGN KEY `Order_ibfk_61`');
+          console.log('✅ Dropped foreign key Order_ibfk_61');
+        } catch (fkErr) {
+          console.log('ℹ️ Order_ibfk_61 not found or already dropped');
+        }
+      }
+
       await queryInterface.changeColumn(tableName, 'userId', {
         type: Sequelize.INTEGER,
         allowNull: true,

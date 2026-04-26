@@ -220,7 +220,8 @@ const register = async (req, res, next) => {
 
 const login = async (req, res, next) => {
   // Support both 'identifier' (new) and 'email' (backward compatibility)
-  const { identifier, email, password } = req.body;
+  const { identifier, email, password: rawPassword } = req.body;
+  const password = typeof rawPassword === 'string' ? rawPassword.trim() : rawPassword;
   const loginIdentifier = identifier || email;
 
   console.log(`[authController] Login attempt for identifier: ${loginIdentifier}`);

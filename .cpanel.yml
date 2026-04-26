@@ -3,11 +3,15 @@ deployment:
   tasks:
     - /bin/mkdir -p /home/vdranjxy/public_html
     - /bin/mkdir -p /home/vdranjxy/comrades-master
-    # Sync frontend: rsync is faster and cleaner than cp
+    
+    # 1. Sync Frontend to public_html
     - /usr/bin/rsync -avz --delete frontend/dist/ /home/vdranjxy/public_html/
-    # Copy .htaccess to public_html for SPA routing
     - /bin/cp .htaccess /home/vdranjxy/public_html/.htaccess
-    # Sync backend: Exclude node_modules and uploads to prevent hanging
-    - /usr/bin/rsync -avz --exclude 'node_modules' --exclude 'uploads' backend/ /home/vdranjxy/comrades-master/
+    
+    # 2. Sync Backend to comrades-master (the runtime root)
+    # We copy the CONTENTS of the backend folder into comrades-master
+    - /usr/bin/rsync -avz --exclude 'node_modules' --exclude 'uploads' --exclude 'error.log' backend/ /home/vdranjxy/comrades-master/
+    
+    # 3. Touch restart file for Phusion Passenger
     - /bin/mkdir -p /home/vdranjxy/comrades-master/tmp
     - /bin/touch /home/vdranjxy/comrades-master/tmp/restart.txt

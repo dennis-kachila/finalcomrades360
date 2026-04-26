@@ -87,6 +87,11 @@ for (const testPath of possiblePaths) {
   if (fs.existsSync(testIndex)) {
     GLOBAL_STATIC_PATH = testPath;
     console.error(`[Static] Found valid frontend at: ${testPath}`);
+    // EXCEPTION: If we found it in the 'production' folder but we are in 'comrades-master', 
+    // we should log a warning as it might mean a misconfiguration.
+    if (testPath.includes('/production/') && __dirname.includes('/comrades-master/')) {
+       console.error('⚠️ WARNING: App is in comrades-master but serving frontend from production folder!');
+    }
     break;
   }
 }
@@ -598,10 +603,12 @@ async function startServer() {
   console.error('✅ Step 1: Socket.IO handlers registered.');
 
   // Unified startup: Passenger intercepts the listen call. 
-  // We ALWAYS call listen but handle address-in-use gracefully.
   try {
-    server.listen(DEFAULT_PORT, () => {
-      console.error(`🚀 Step 2: Server bound to port ${DEFAULT_PORT} - SUCCESS`);
+    // Determine if we should listen on 'passenger' or a port
+    const listenTarget = process.env.PASSENGER_APP_ENV ? 'passenger' : DEFAULT_PORT;
+    
+    server.listen(listenTarget, () => {
+      console.error(`🚀 Step 2: Server bound to ${listenTarget === 'passenger' ? 'Passenger socket' : 'port ' + DEFAULT_PORT} - SUCCESS`);
       
       // DEFERRED INITIALIZATION: Start heavy services after the port is open
       setImmediate(() => initializeServices(io));
@@ -644,42 +651,10 @@ if (global.__serverStarted) {
 } else {
   global.__serverStarted = true;
   
-  // 1. ALWAYS initialize the app logic (routes, middleware, database)
-  // This must happen even for Passenger!
-  const bootPromise = startServer();
-
-  // -----------------------------------------------------------------
-  // 4. SERVER BINDING (Environment Aware)
-  // -----------------------------------------------------------------
-  const isPassenger = true;
-
-  if (isPassenger) {
-    // In Passenger mode, we listen on the 'passenger' string or the provided PORT socket
-    console.log('📦 PASSENGER MODE: Detected. Binding to Passenger socket...');
-    server.listen('passenger');
-  } else if (require.main === module) {
-    // Standalone/Development mode
-    const DEFAULT_PORT = process.env.PORT || 5000;
-    server.listen(DEFAULT_PORT, () => {
-      console.log(`🚀 Step 2: Server bound to port ${DEFAULT_PORT} - SUCCESS`);
-      console.log(`🚀 STANDALONE MODE: Server logic ready and listening.`);
-      
-      // Begin background initialization only after successful bind
-      initBackgroundServices();
-    });
-  } else {
-    console.log('📦 MODULE MODE: Logic initialized, awaiting external bind.');
-  }
-
-  async function initBackgroundServices() {
-    console.log('[BOOT-STEP] 1/4: Beginning background service initialization...');
-    try {
-      const { sequelize } = require('./models');
-      await sequelize.authenticate();
-    } catch (e) {
-      console.error(e);
-    }
-  }
+  // Start the server (handles both Passenger and Standalone)
+  startServer().catch(err => {
+    console.error('❌ CRITICAL: startServer failed:', err);
+  });
 }
 
 // Export for cPanel/Passenger

@@ -5,16 +5,22 @@ module.exports = {
     // For SQLite, we must recreate the table to properly drop Foreign Key constraints
     // since ALTER TABLE DROP CONSTRAINT is not supported.
 
+    const dialect = queryInterface.sequelize.getDialect();
+    const isSQLite = dialect === 'sqlite';
     const transaction = await queryInterface.sequelize.transaction();
+
     try {
       // 1. Disable FK checks for this session
-      await queryInterface.sequelize.query('PRAGMA foreign_keys = OFF', { transaction });
+      if (isSQLite) {
+        await queryInterface.sequelize.query('PRAGMA foreign_keys = OFF', { transaction });
+      } else {
+        await queryInterface.sequelize.query('SET FOREIGN_KEY_CHECKS = 0', { transaction });
+      }
 
-      // 2. Describe the current table to get a template (optional, we have the original migration)
-      // 3. Rename the current table
+      // 2. Rename the current table
       await queryInterface.renameTable('HandoverCode', 'HandoverCode_old', { transaction });
 
-      // 4. Create the new table without the FK constraints on IDs
+      // 3. Create the new table without the FK constraints on IDs
       await queryInterface.createTable('HandoverCode', {
         id: {
             allowNull: false,
@@ -45,11 +51,11 @@ module.exports = {
             allowNull: false
         },
         initiatorId: {
-            type: Sequelize.STRING, // CHANGED: INTEGER -> STRING, removed references
+            type: Sequelize.STRING, 
             allowNull: false
         },
         confirmerId: {
-            type: Sequelize.STRING, // CHANGED: INTEGER -> STRING, removed references
+            type: Sequelize.STRING, 
             allowNull: true
         },
         status: {
@@ -79,27 +85,32 @@ module.exports = {
         }
       }, { transaction });
 
-      // 5. Copy data (Sequelize will handle type casting if they look like numbers)
+      // 4. Copy data with dialect-specific cast
+      const castType = isSQLite ? 'TEXT' : 'CHAR';
       await queryInterface.sequelize.query(`
         INSERT INTO HandoverCode (id, code, orderId, taskId, handoverType, initiatorId, confirmerId, status, expiresAt, confirmedAt, notes, createdAt, updatedAt)
-        SELECT id, code, orderId, taskId, handoverType, CAST(initiatorId AS TEXT), CAST(confirmerId AS TEXT), status, expiresAt, confirmedAt, notes, createdAt, updatedAt
+        SELECT id, code, orderId, taskId, handoverType, CAST(initiatorId AS ${castType}), CAST(confirmerId AS ${castType}), status, expiresAt, confirmedAt, notes, createdAt, updatedAt
         FROM HandoverCode_old
       `, { transaction });
 
-      // 6. Drop the old table
+      // 5. Drop the old table
       await queryInterface.dropTable('HandoverCode_old', { transaction });
 
-      // 7. Re-add indexes
+      // 6. Re-add indexes
       await queryInterface.addIndex('HandoverCode', ['code', 'orderId', 'handoverType', 'status'], { transaction });
       await queryInterface.addIndex('HandoverCode', ['orderId', 'handoverType', 'status'], { transaction });
       await queryInterface.addIndex('HandoverCode', ['initiatorId'], { transaction });
       await queryInterface.addIndex('HandoverCode', ['expiresAt'], { transaction });
 
-      // 8. Re-enable FK checks
-      await queryInterface.sequelize.query('PRAGMA foreign_keys = ON', { transaction });
+      // 7. Re-enable FK checks
+      if (isSQLite) {
+        await queryInterface.sequelize.query('PRAGMA foreign_keys = ON', { transaction });
+      } else {
+        await queryInterface.sequelize.query('SET FOREIGN_KEY_CHECKS = 1', { transaction });
+      }
 
       await transaction.commit();
-      console.log('[Migration] HandoverCode table successfully recreated with STRING IDs and without FK constraints.');
+      console.log('[Migration] HandoverCode table successfully recreated and dialect-aware.');
     } catch (err) {
       await transaction.rollback();
       console.error('[Migration Error] Failed to recreate HandoverCode table:', err.message);

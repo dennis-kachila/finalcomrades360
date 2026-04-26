@@ -16,12 +16,15 @@ const {
   DeletedProduct,
   ReturnRequest,
   ProductView,
+  Wallet,
+  Transaction: WalletTransaction,
   sequelize
 } = require('../models');
 const { getIO } = require('../realtime/socket');
 const { Op, fn, col, literal } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const { normalizeKenyanPhone, validateKenyanPhone } = require('../middleware/validators');
+const { moveToSuccess } = require('../utils/walletHelpers');
 
 // =====================
 // Advanced Inventory Management
@@ -1514,9 +1517,6 @@ const listCommissionsAdmin = async (req, res) => {
     });
   }
 };
-
-const { moveToSuccess } = require('../utils/walletHelpers');
-const { Wallet, Transaction: WalletTransaction } = require('../models');
 
 const bulkPayCommissions = async (req, res) => {
   const t = await sequelize.transaction();

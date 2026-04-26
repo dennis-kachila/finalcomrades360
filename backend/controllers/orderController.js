@@ -1,5 +1,12 @@
 const { sequelize } = require('../database/database');
-const cacheService = require('../scripts/services/cacheService');
+// Safe cache import — falls back to no-op stub if Redis/cache service unavailable
+let cacheService;
+try {
+  cacheService = require('../scripts/services/cacheService');
+} catch (e) {
+  cacheService = { delPattern: async () => {}, get: async () => null, set: async () => {}, del: async () => {} };
+  console.warn('[orderController] cacheService not found, cache invalidation disabled:', e.message);
+}
 const { Product, User, Wallet, Transaction, Order, OrderItem, Commission, DeliveryAgentProfile, Cart, FastFood, Service, DeliveryTask, DeliveryCharge, Warehouse, PickupStation, FastFoodPickupPoint, PlatformConfig, Notification, HandoverCode, Batch, Payment, Otp } = require('../models');
 
 const { calculateCommission: createCommissionRecords } = require('./commissionController');

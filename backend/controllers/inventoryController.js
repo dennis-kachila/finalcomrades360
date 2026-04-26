@@ -1,5 +1,12 @@
 const { sequelize } = require('../database/database');
-const cacheService = require('../scripts/services/cacheService');
+// Safe cache import — falls back to no-op stub if module path differs on production
+let cacheService;
+try {
+  cacheService = require('../scripts/services/cacheService');
+} catch (e) {
+  cacheService = { delPattern: async () => {}, get: async () => null, set: async () => {}, del: async () => {} };
+  console.warn('[inventoryController] cacheService not found, cache invalidation disabled:', e.message);
+}
 const { Product, StockReservation, StockAuditLog, WarehouseStock, Warehouse, User, Notification } = require('../models');
 const { Op } = require('sequelize');
 const { emitRealtimeUpdate, emitToUser, emitToAdmins } = require('../utils/realtimeEmitter');

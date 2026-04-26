@@ -309,7 +309,8 @@ export const AuthProvider = ({ children }) => {
     retryAuth,
     setSession,
     googleLogin,
-  }), [user, loading, error, verificationRequired, verificationMessage, login, logout, updateUser, retryAuth, setSession, googleLogin]);
+    loginWithGoogle,
+  }), [user, loading, error, verificationRequired, verificationMessage, login, logout, updateUser, retryAuth, setSession, googleLogin, loginWithGoogle]);
 
   return (
     <AuthContext.Provider value={value}>

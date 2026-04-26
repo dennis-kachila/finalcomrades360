@@ -596,38 +596,36 @@ async function initializeServices(io) {
 }
 
 async function startServer() {
-  console.error(`🚀 BOOT: Starting server bind sequence for port ${DEFAULT_PORT}...`);
+  console.error(`🚀 BOOT: Starting server bind sequence...`);
 
   // MANDATORY: Register Socket.IO handlers BEFORE anything else
   setupSocketHandlers(io);
   console.error('✅ Step 1: Socket.IO handlers registered.');
 
-  // Unified startup: Passenger intercepts the listen call. 
-  try {
-    // Determine if we should listen on 'passenger' or a port
-    const listenTarget = process.env.PASSENGER_APP_ENV ? 'passenger' : DEFAULT_PORT;
-    
-    server.listen(listenTarget, () => {
-      console.error(`🚀 Step 2: Server bound to ${listenTarget === 'passenger' ? 'Passenger socket' : 'port ' + DEFAULT_PORT} - SUCCESS`);
-      
-      // DEFERRED INITIALIZATION: Start heavy services after the port is open
+  // Official Phusion Passenger detection pattern
+  // When running under Passenger, PhusionPassenger global is injected automatically
+  // When running standalone (local dev / manual node), it is undefined
+  if (typeof PhusionPassenger !== 'undefined') {
+    // PASSENGER MODE: Listen on Passenger's unix socket
+    console.error('🚀 Step 2: Passenger detected — listening on Passenger socket...');
+    PhusionPassenger.configure({ autoInstall: false });
+    server.listen('passenger', () => {
+      console.error('🚀 Step 2: Server bound to Passenger socket - SUCCESS');
       setImmediate(() => initializeServices(io));
     });
-  } catch (listenError) {
-    if (listenError.code === 'EADDRINUSE') {
-      console.error('ℹ️ Server already bound (Managed environment), starting background services...');
+  } else {
+    // STANDALONE MODE: Listen on TCP port (local dev or manual node server.js)
+    server.listen(DEFAULT_PORT, () => {
+      console.error(`🚀 Step 2: Server bound to port ${DEFAULT_PORT} - SUCCESS`);
+      console.log('🚀 STANDALONE MODE: Server logic ready and listening.');
       setImmediate(() => initializeServices(io));
-    } else {
-      console.error('❌ FATAL: Server failed to start:', listenError);
-      throw listenError;
-    }
+    });
   }
 
   // Handle server errors
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-       // Handled in try/catch for initial listen, but keep here for runtime errors
-       console.error(`[Runtime] Port ${DEFAULT_PORT} is in use.`);
+       console.error(`[Runtime] Port ${DEFAULT_PORT} is already in use.`);
     } else {
        console.error('❌ Server runtime error:', err);
     }

@@ -23,9 +23,7 @@ export default function Navbar() {
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [isDashboardsOpen, setIsDashboardsOpen] = useState(false);
   const [activeMobileCategory, setActiveMobileCategory] = useState(null);
-  const [notifications, setNotifications] = useState([
-    { id: 1, message: "Welcome to Comrades360!", read: false, date: new Date().toISOString() },
-  ]);
+  const [notifications, setNotifications] = useState([]);
 
   const { cart } = useCart();
   const [searchQuery, setSearchQuery] = useState("");

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Backend API base URL - using port 5000
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 // Base API client
 const api = axios.create({

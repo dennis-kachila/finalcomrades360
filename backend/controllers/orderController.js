@@ -1,4 +1,5 @@
 const { sequelize } = require('../database/database');
+const cacheService = require('../scripts/services/cacheService');
 const { Product, User, Wallet, Transaction, Order, OrderItem, Commission, DeliveryAgentProfile, Cart, FastFood, Service, DeliveryTask, DeliveryCharge, Warehouse, PickupStation, FastFoodPickupPoint, PlatformConfig, Notification, HandoverCode, Batch, Payment, Otp } = require('../models');
 
 const { calculateCommission: createCommissionRecords } = require('./commissionController');
@@ -1005,6 +1006,15 @@ const createOrderFromCart = async (req, res) => {
     // Commit the transaction
     await t.commit();
     console.log('✅ Backend: Order creation completed successfully');
+    
+    // Step 11.5: Invalidate product and homepage caches so out-of-stock items disappear immediately
+    try {
+      await cacheService.delPattern('products:*');
+      await cacheService.delPattern('homepage:*');
+      console.log('✅ Backend: Caches invalidated after checkout');
+    } catch (cacheErr) {
+      console.error('⚠️ Failed to invalidate cache after checkout:', cacheErr.message);
+    }
 
     // Step 12: Background Notifications (Real-time and External)
     // We send the response to the user immediately and process notifications in the background

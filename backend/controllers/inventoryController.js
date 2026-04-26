@@ -1,4 +1,5 @@
 const { sequelize } = require('../database/database');
+const cacheService = require('../scripts/services/cacheService');
 const { Product, StockReservation, StockAuditLog, WarehouseStock, Warehouse, User, Notification } = require('../models');
 const { Op } = require('sequelize');
 const { emitRealtimeUpdate, emitToUser, emitToAdmins } = require('../utils/realtimeEmitter');
@@ -363,6 +364,13 @@ const adjustStock = async (req, res) => {
     }, { transaction });
 
     await transaction.commit();
+    
+    // Invalidate product caches to reflect new stock immediately
+    try {
+      await cacheService.delPattern('products:*');
+      await cacheService.delPattern('homepage:*');
+    } catch (err) {}
+
     emitToAdmins('inventory:stock:adjusted', { productId, warehouseId: warehouseId || null, quantityBefore, quantityAfter });
     emitRealtimeUpdate('inventory', {
       adminOnly: true,
@@ -452,6 +460,13 @@ const bulkStockImport = async (req, res) => {
     }
 
     await transaction.commit();
+    
+    // Invalidate product caches to reflect new bulk stock immediately
+    try {
+      await cacheService.delPattern('products:*');
+      await cacheService.delPattern('homepage:*');
+    } catch (err) {}
+
     emitToAdmins('inventory:bulk:import', {
       successCount: results.success.length,
       failedCount: results.failed.length

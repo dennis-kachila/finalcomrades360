@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { FaBell, FaShoppingCart, FaUser, FaSignOutAlt, FaCog, FaStore, FaBullhorn, FaTimes, FaChevronRight, FaTruck, FaDollarSign, FaTools, FaCogs, FaHeart } from "react-icons/fa";
+import { FaBell, FaShoppingCart, FaUser, FaSignOutAlt, FaCog, FaStore, FaBullhorn, FaTimes, FaChevronRight, FaTruck, FaDollarSign, FaTools, FaCogs, FaHeart, FaSearch } from "react-icons/fa";
 import { useCart } from "../contexts/CartContext";
 import { useCategories } from "../contexts/CategoriesContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -51,6 +51,7 @@ export default function Navbar() {
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigate(`${searchPath}?${searchQueryParam}=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery(''); // Clear bar after navigating so it resets cleanly
     }
   };
   const { categories, getCategoriesWithSubcategories } = useCategories();
@@ -620,7 +621,7 @@ export default function Navbar() {
             {!isStationUser && !isDashboardRoute && !isDetailRoute && (
             <div className="pb-3 px-1.5">
               <div className="relative flex items-center bg-gray-100 rounded-xl px-2 py-1.5 border border-gray-200/50">
-                <svg className="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <svg className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 <input
                   type="text"
                   value={searchQuery}
@@ -629,6 +630,14 @@ export default function Navbar() {
                   placeholder={searchPlaceholder}
                   className="bg-transparent border-none focus:ring-0 text-sm w-full p-0 py-0.5 text-gray-700 placeholder-gray-400 font-medium"
                 />
+                {/* Tap-able search button for mobile users */}
+                <button
+                  onClick={handleSearch}
+                  aria-label="Search"
+                  className="ml-1 p-1.5 rounded-lg bg-blue-600 text-white flex-shrink-0 active:bg-blue-700 transition-colors"
+                >
+                  <FaSearch size={11} />
+                </button>
               </div>
             </div>
             )}

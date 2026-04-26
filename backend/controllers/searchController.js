@@ -25,7 +25,8 @@ exports.search = async (req, res) => {
                                 { keywords: { [Op.like]: query } }
                             ]
                         },
-                        { status: 'active' }
+                        { status: 'active' },
+                        { stock: { [Op.gt]: 0 } } // Hide out-of-stock products from search
                     ]
                 },
                 include: [

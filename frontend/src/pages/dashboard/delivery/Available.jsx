@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FaMapMarkedAlt, FaClock, FaCheckCircle, FaDollarSign, FaSpinner, FaChevronDown, FaChevronUp, FaBox, FaStore, FaTruck, FaClipboardCheck } from 'react-icons/fa';
+import { FaMapMarkedAlt, FaClock, FaCheckCircle, FaDollarSign, FaSpinner, FaChevronDown, FaChevronUp, FaBox, FaStore, FaTruck, FaClipboardCheck, FaSearch } from 'react-icons/fa';
 import api from '../../../services/api';
 import { formatPrice } from '../../../utils/currency';
 import { resolveImageUrl } from '../../../utils/imageUtils';
@@ -19,6 +19,7 @@ const DeliveryAgentAvailable = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [coords, setCoords] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchConfig = async () => {
     try {
@@ -74,6 +75,8 @@ const DeliveryAgentAvailable = () => {
         page: currentPage,
         pageSize: 20
       });
+
+      if (searchQuery) params.append('q', searchQuery);
 
       if (currentCoords && !currentCoords.denied) {
         params.append('lat', currentCoords.lat);
@@ -156,7 +159,15 @@ const DeliveryAgentAvailable = () => {
     }, 30000); // Increased to 30s to reduce server load
 
     return () => clearInterval(interval);
-  }, [page]); // Removed coords from dependencies to avoid interval spam
+  }, [page, searchQuery, coords]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchAvailableOrders(false, false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const [requestedOrders, setRequestedOrders] = useState([]);
   const [requestingIds, setRequestingIds] = useState([]); // Track loading state per order
@@ -319,6 +330,17 @@ const DeliveryAgentAvailable = () => {
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Available Orders</h2>
           <p className="text-gray-600">Request assignment for orders in your area</p>
+          
+          <div className="mt-4 relative">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter by Order #, Customer Name, Town, Estate, or House Number..."
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
 
           <div className="p-6">

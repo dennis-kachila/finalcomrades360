@@ -44,37 +44,50 @@ const syncApprovedSellerDeliveryFee = async ({ vendorId, deliveryFee, sourceItem
         return;
     }
 
-    const where = {
-        vendor: vendorId,
-        [Op.or]: [
-            { approved: true },
-            { reviewStatus: 'approved' },
-            { hasBeenApproved: true }
-        ]
-    };
-
-    if (sourceItemId) {
-        where.id = { [Op.ne]: sourceItemId };
-    }
-
-    await FastFood.update(
-        { deliveryFee },
-        { where }
-    );
-
-    // Also update all items in Carts for this vendor to ensure live data consistency
-    // This handles users who already have these items in their cart
-    await Cart.update(
-        { deliveryFee },
-        { 
-            where: { 
-                itemType: 'fastfood',
+    try {
+        // 1. Get IDs of approved fast foods for this vendor first
+        // This avoids the correlated subquery in the Cart update which is slow in MySQL/MariaDB
+        const approvedItems = await FastFood.findAll({
+            where: {
+                vendor: vendorId,
                 [Op.or]: [
-                    { fastFoodId: { [Op.in]: sequelize.literal(`(SELECT id FROM FastFoods WHERE vendor = ${vendorId})`) } }
+                    { approved: true },
+                    { reviewStatus: 'approved' },
+                    { hasBeenApproved: true }
                 ]
-            } 
+            },
+            attributes: ['id'],
+            raw: true
+        });
+
+        const approvedIds = approvedItems.map(item => item.id);
+        if (approvedIds.length === 0) return;
+
+        // 2. Update FastFood delivery fees in one go
+        // Skip sourceItemId if provided (it was already updated by the caller)
+        const updateWhere = { id: { [Op.in]: approvedIds } };
+        if (sourceItemId) {
+            updateWhere.id = { [Op.in]: approvedIds.filter(id => id !== sourceItemId) };
         }
-    );
+        
+        if (updateWhere.id[Op.in].length > 0) {
+            await FastFood.update({ deliveryFee }, { where: updateWhere });
+        }
+
+        // 3. Update Cart items using the pre-fetched IDs
+        // This is much faster than a subquery in MySQL and prevents long-running locks
+        await Cart.update(
+            { deliveryFee },
+            { 
+                where: { 
+                    itemType: 'fastfood',
+                    fastFoodId: { [Op.in]: approvedIds }
+                } 
+            }
+        );
+    } catch (error) {
+        console.error('[syncApprovedSellerDeliveryFee] Background sync failed:', error.message);
+    }
 };
 
 // Get all fast food items
@@ -360,7 +373,7 @@ exports.createFastFood = async (req, res, next) => {
 
         // 2. Handle Gallery Images
         if (req.files && req.files.galleryImages) {
-            createData.galleryImages = req.files.galleryImages.map(file => `/uploads/products/${file.filename}`);
+            createData.galleryImages = req.files.galleryImages.map(file => `/uploads/products/${file.filename}`).slice(0, 3);
         } else if (createData.galleryImages && typeof createData.galleryImages === 'string') {
             try {
                 createData.galleryImages = JSON.parse(createData.galleryImages);
@@ -564,13 +577,17 @@ exports.updateFastFood = async (req, res, next) => {
         // Handle file uploads if they exist (processed by multer middleware)
         const updateData = { ...req.body };
 
-        // Never allow direct vendor/owner changes via this route for security.
-        // It must be done via a dedicated transfer endpoint.
-        if (updateData.vendorId) {
-            delete updateData.vendorId;
-        }
-        if (updateData.vendor) {
-            delete updateData.vendor;
+        // CRITICAL: Protect vendor ownership
+        if (updateData.vendorId || updateData.vendor) {
+            if (isPrivileged) {
+                console.log(`👤 [updateFastFood] Admin modifying vendor (current: ${fastFood.vendor}, new: ${updateData.vendor || updateData.vendorId})`);
+                if (updateData.vendorId) updateData.vendor = parseInt(updateData.vendorId, 10);
+                if (updateData.vendor) updateData.vendor = parseInt(updateData.vendor, 10);
+            } else {
+                console.warn(`⚠️ [updateFastFood] Unauthorized attempt to modify vendor detected! Ignoring.`);
+                delete updateData.vendorId;
+                delete updateData.vendor;
+            }
         }
 
         if (updateData.name) {
@@ -656,6 +673,11 @@ exports.updateFastFood = async (req, res, next) => {
 
         // Assign to galleryImages only if there was an update attempt
         if (galleryUpdated) {
+            // ENFORCE LIMIT: Max 3 gallery images total
+            if (finalGalleryImages.length > 3) {
+                console.log(`⚠️ [updateFastFood] Truncating gallery from ${finalGalleryImages.length} to 3 images`);
+                finalGalleryImages = finalGalleryImages.slice(0, 3);
+            }
             updateData.galleryImages = finalGalleryImages;
         }
 

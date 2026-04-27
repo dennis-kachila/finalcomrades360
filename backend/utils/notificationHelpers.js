@@ -12,10 +12,12 @@ function logNotify(message) {
     const timestamp = new Date().toISOString();
     const logLine = `[${timestamp}] ${message}\n`;
     try {
-        fs.appendFileSync(path.join(__dirname, '../notification_debug.log'), logLine);
+        // Use non-blocking async write to avoid event loop lag
+        fs.promises.appendFile(path.join(__dirname, '../notification_debug.log'), logLine)
+            .catch(err => console.warn('Deferred notification log write failed:', err.message));
         console.log(`🔔 ${message}`);
     } catch (e) {
-        console.warn('Failed to write to notification_debug.log', e.message);
+        console.warn('Failed to initiate notification log write', e.message);
     }
 }
 
@@ -350,20 +352,32 @@ async function notifyCustomerOrderCancelled(order, reason) {
 /**
  * Notify customer about delivery status update (Legacy generic fallback)
  */
-async function notifyCustomerDeliveryUpdate(customerId, orderNumber, status, message) {
+/**
+ * Notify customer about delivery status update across all channels
+ */
+async function notifyCustomerDeliveryUpdate(customerId, orderNumber, status, message, order = null) {
     const statusTitles = {
         'accepted': 'Delivery Accepted',
+        'collected': 'Order Collected 📦',
         'in_progress': 'Delivery In Progress',
-        'completed': 'Delivery Completed',
-        'failed': 'Delivery Failed'
+        'in_transit': 'Order In Transit 🚚',
+        'completed': 'Delivery Completed ✅',
+        'delivered': 'Order Delivered ✅',
+        'failed': 'Delivery Failed ❌'
     };
 
-    return await createNotification(
-        customerId,
-        statusTitles[status] || 'Delivery Update',
-        message || `Your order #${orderNumber} status has been updated to: ${status}`,
-        status === 'completed' ? 'success' : status === 'failed' ? 'alert' : 'info'
-    );
+    const title = statusTitles[status] || 'Delivery Update';
+    const defaultTemplate = message || `Hello, your order #{orderNumber} status has been updated to: {status}.`;
+
+    // Attempt to send across all channels
+    await sendCustomerNotificationAcrossChannels('deliveryUpdate', {
+        orderNumber,
+        status: status.replace(/_/g, ' '),
+        message: defaultTemplate,
+        title,
+        type: status === 'completed' || status === 'delivered' ? 'success' : status === 'failed' ? 'alert' : 'info',
+        defaultTemplate
+    }, { id: customerId }, order);
 }
 
 /**
@@ -431,6 +445,42 @@ async function notifyMarketerOrderPlaced(order, marketer, customerName) {
     }, marketer, null); // We pass null as order here because we want to notify the MARKETER directly using their details
 }
 
+/**
+ * Notify seller about stock events (low stock or out of stock)
+ */
+async function notifySellerStockEvent(product, type) {
+    if (!product) return;
+
+    // Resolve seller
+    let seller = product.seller;
+    if (!seller && product.sellerId) {
+        seller = await User.findByPk(product.sellerId);
+    }
+    
+    if (!seller) {
+        logNotify(`ABORT: No seller found for product ${product.id} stock event.`);
+        return;
+    }
+
+    const isOutOfStock = type === 'out_of_stock';
+    const templateKey = isOutOfStock ? 'productOutOfStock' : 'productLowStock';
+    const title = isOutOfStock ? '🚫 Product Out of Stock' : '⚠️ Low Stock Warning';
+    const defaultTemplate = isOutOfStock 
+        ? `🚨 Alert! Your product "{name}" is now OUT OF STOCK.\n\nIt has been automatically hidden from public listings to prevent overselling.\n\nPlease restock as soon as possible to resume sales.`
+        : `⚠️ Warning: Your product "{name}" is running low on stock.\n\nCurrent stock: {stock}\nThreshold: {threshold}\n\nConsider restocking soon to avoid service interruption.`;
+
+    await sendCustomerNotificationAcrossChannels(templateKey, {
+        name: product.name,
+        stock: product.stock,
+        threshold: product.lowStockThreshold || 5,
+        title,
+        type: isOutOfStock ? 'warning' : 'info',
+        defaultTemplate
+    }, seller);
+    
+    logNotify(`NOTIFIED: Seller ${seller.id} about ${type} for product ${product.id}`);
+}
+
 module.exports = { 
     createNotification,
     notifyDeliveryAgentAssignment,
@@ -444,6 +494,7 @@ module.exports = {
     notifyCustomerMarketerCreated,
     notifyCustomerGoogleSignup,
     notifyMarketerOrderPlaced,
+    notifySellerStockEvent,
     logNotify,
     sendCustomerNotificationAcrossChannels
 };

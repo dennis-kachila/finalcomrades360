@@ -154,9 +154,14 @@ const getSellerPerformanceScores = async (req, res) => {
   try {
     const { limit = 50 } = req.query;
 
+    const isSqlite = sequelize.getDialect() === 'sqlite';
+
     const sellers = await User.findAll({
       where: {
-        [Op.or]: [
+        [Op.or]: isSqlite ? [
+          { role: 'seller' },
+          { roles: { [Op.like]: '%"seller"%' } }
+        ] : [
           { role: 'seller' },
           sequelize.where(
             sequelize.fn('JSON_CONTAINS', sequelize.col('roles'), sequelize.fn('JSON_QUOTE', 'seller')),
@@ -352,10 +357,15 @@ const getMarketingCampaignROI = async (req, res) => {
     const start = startDate ? new Date(startDate) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
     const end = endDate ? new Date(endDate) : new Date();
 
+    const isSqlite = sequelize.getDialect() === 'sqlite';
+
     // Get all marketers with their referral codes
     const marketers = await User.findAll({
       where: {
-        [Op.or]: [
+        [Op.or]: isSqlite ? [
+          { role: 'marketer' },
+          { roles: { [Op.like]: '%"marketer"%' } }
+        ] : [
           { role: 'marketer' },
           sequelize.where(
             sequelize.fn('JSON_CONTAINS', sequelize.col('roles'), sequelize.fn('JSON_QUOTE', 'marketer')),
@@ -496,11 +506,107 @@ const getGeneralOverview = async (req, res) => {
   }
 };
 
+// Growth Poster Data
+const getGrowthPosterData = async (req, res) => {
+  try {
+    const { period = 'day', date } = req.query;
+    
+    let start, end;
+    const selectedDate = date ? new Date(date) : new Date();
+
+    if (period === 'day') {
+      start = new Date(selectedDate);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(selectedDate);
+      end.setHours(23, 59, 59, 999);
+    } else if (period === 'month') {
+      start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else if (period === 'year') {
+      start = new Date(selectedDate.getFullYear(), 0, 1);
+      end = new Date(selectedDate.getFullYear(), 11, 31, 23, 59, 59, 999);
+    }
+
+    const isSqlite = sequelize.getDialect() === 'sqlite';
+
+    const getRoleCount = (roleName) => {
+      const whereClause = {
+        createdAt: { [Op.between]: [start, end] }
+      };
+
+      if (roleName === 'customer') {
+        whereClause.role = 'customer';
+      } else {
+        whereClause[Op.or] = isSqlite ? [
+          { role: roleName },
+          { roles: { [Op.like]: `%"${roleName}"%` } }
+        ] : [
+          { role: roleName },
+          sequelize.where(sequelize.fn('JSON_CONTAINS', sequelize.col('roles'), sequelize.fn('JSON_QUOTE', roleName)), 1)
+        ];
+      }
+
+      return User.count({ where: whereClause });
+    };
+
+    const [
+      totalUsers,
+      marketers,
+      deliveryAgents,
+      sellers,
+      serviceProviders,
+      customers,
+      totalOrders,
+      successfulOrders
+    ] = await Promise.all([
+      User.count({ where: { createdAt: { [Op.between]: [start, end] } } }),
+      getRoleCount('marketer'),
+      getRoleCount('delivery_agent'),
+      getRoleCount('seller'),
+      getRoleCount('service_provider'),
+      getRoleCount('customer'),
+      Order.count({ where: { createdAt: { [Op.between]: [start, end] } } }),
+      Order.count({ 
+        where: { 
+          createdAt: { [Op.between]: [start, end] },
+          status: { [Op.in]: ['completed', 'delivered'] }
+        } 
+      })
+    ]);
+
+    res.json({
+      success: true,
+      period,
+      date,
+      range: { start, end },
+      data: {
+        newUsers: totalUsers,
+        roles: {
+          marketers,
+          deliveryAgents,
+          sellers,
+          serviceProviders,
+          customers
+        },
+        orders: {
+          total: totalOrders,
+          successful: successfulOrders,
+          successRate: totalOrders > 0 ? parseFloat(((successfulOrders / totalOrders) * 100).toFixed(2)) : 0
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching growth poster data:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch growth data', error: error.message });
+  }
+};
+
 module.exports = {
   getGeneralOverview,
   getHistoricalTrends,
   getRevenueForecast,
   getSellerPerformanceScores,
   getDeliveryEfficiencyMetrics,
-  getMarketingCampaignROI
+  getMarketingCampaignROI,
+  getGrowthPosterData
 };

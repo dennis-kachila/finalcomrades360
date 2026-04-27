@@ -32,6 +32,33 @@ function toRad(degrees) {
 function matchAgentsToOrder(agents, order, requiredCapacity = 0) {
     const matches = [];
 
+    // Pre-calculate order coordinates if available
+    let orderLat = null;
+    let orderLng = null;
+    
+    // Try explicit lat/lng first (if provided in some cases)
+    if (order.deliveryLat && order.deliveryLng) {
+        orderLat = parseFloat(order.deliveryLat);
+        orderLng = parseFloat(order.deliveryLng);
+    } 
+    else if (order.lat && order.lng) {
+        orderLat = parseFloat(order.lat);
+        orderLng = parseFloat(order.lng);
+    } 
+    // Then try seller address for pickup proximity (if it's a first-mile leg)
+    else if (order.seller && order.seller.businessLat && order.seller.businessLng) {
+        orderLat = parseFloat(order.seller.businessLat);
+        orderLng = parseFloat(order.seller.businessLng);
+    }
+    // Fallback to town coordinates
+    else if (order.deliveryAddress) {
+        const coords = getTownCoordinates(order.deliveryAddress);
+        if (coords) {
+            orderLat = coords.lat;
+            orderLng = coords.lng;
+        }
+    }
+
     for (const agent of agents) {
         const profile = agent.deliveryProfile;
         if (!profile || !profile.isActive) continue;
@@ -45,36 +72,63 @@ function matchAgentsToOrder(agents, order, requiredCapacity = 0) {
             reasons: []
         };
 
-        // Check availability
+        // 1. Availability Score (Base: 30)
         if (isAgentAvailableNow(profile)) {
             match.score += 30;
             match.reasons.push('Available now');
         }
 
-        // Check capacity
+        // 2. Capacity Score (Base: 20)
         if (requiredCapacity > 0 && profile.maxLoadCapacity) {
             if (profile.maxLoadCapacity >= requiredCapacity) {
                 match.score += 20;
                 match.reasons.push('Sufficient capacity');
             }
         } else {
-            match.score += 10; // Default score if capacity not specified
+            match.score += 10;
         }
 
-        // Check rating
-        if (profile.rating > 4) {
-            match.score += 25;
-            match.reasons.push('High rating');
-        } else if (profile.rating > 3) {
-            match.score += 15;
+        // 3. Performance Score (Base: 25)
+        const rating = parseFloat(profile.rating) || 0;
+        if (rating > 4.5) {
+            match.score += 30;
+            match.reasons.push('Excellent rating');
+        } else if (rating > 4) {
+            match.score += 20;
+            match.reasons.push('Good rating');
+        } else if (rating > 3) {
+            match.score += 10;
         }
 
-        // Check location proximity (simple string matching for now)
-        if (order.deliveryAddress && profile.location) {
-            if (order.deliveryAddress.toLowerCase().includes(profile.location.toLowerCase()) ||
-                profile.location.toLowerCase().includes(order.deliveryAddress.toLowerCase())) {
+        // 4. Proximity Score (Base: 40)
+        let proximityFound = false;
+
+        // Try coordinate-based distance first
+        const agentLoc = parseLocation(profile.currentLocation);
+        if (orderLat && orderLng && agentLoc && agentLoc.lat && agentLoc.lng) {
+            const distance = calculateDistance(orderLat, orderLng, parseFloat(agentLoc.lat), parseFloat(agentLoc.lng));
+            if (distance < 2) { // Within 2km
+                match.score += 40;
+                match.reasons.push(`Very close (${distance.toFixed(1)}km)`);
+                proximityFound = true;
+            } else if (distance < 5) { // Within 5km
                 match.score += 25;
-                match.reasons.push('Close to delivery location');
+                match.reasons.push(`Relatively close (${distance.toFixed(1)}km)`);
+                proximityFound = true;
+            } else if (distance < 10) { // Within 10km
+                match.score += 10;
+                match.reasons.push(`In vicinity (${distance.toFixed(1)}km)`);
+                proximityFound = true;
+            }
+        }
+
+        // Fallback to string matching for location
+        if (!proximityFound && order.deliveryAddress && profile.location) {
+            const orderAddr = order.deliveryAddress.toLowerCase();
+            const agentLoc = profile.location.toLowerCase();
+            if (orderAddr.includes(agentLoc) || agentLoc.includes(orderAddr)) {
+                match.score += 20;
+                match.reasons.push('Same location area');
             }
         }
 

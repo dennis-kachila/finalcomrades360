@@ -22,6 +22,7 @@ exports.getConfig = async (req, res) => {
                     orderInTransit: `Your order #{orderNumber} is on its way! 🚚\n\nHello {name}, your package has been collected by {agentName} ({agentPhone}) and is in transit.\n\nDelivery Information:\nMethod: {deliveryMethod}\nLocation: {deliveryAddress}\n\nPlease stay reachable for a smooth delivery!`,
                     orderReadyPickup: `Your order #{orderNumber} is ready for collection! 📦\n\nHello {name}, your items have arrived at the pickup location and are ready for you.\n\nPickup Details:\nStation: {stationName}\nLocation: {stationLocation}\nContact: {stationPhone}\n\nSee you soon at Comrades360!`,
                     orderDelivered: 'Hi {name}, your order #{orderNumber} has been delivered. Thank you!',
+                    deliveryUpdate: 'Hello, your order #{orderNumber} status has been updated to: {status}. {message}',
                     agentArrived: 'Your delivery agent {agentName} has arrived at your location! 📍 Please meet them to collect order #{orderNumber}.',
                     agentTaskAssigned: 'You have been assigned a new delivery task for order #{orderNumber}. Type: {deliveryType}',
                     agentTaskReassigned: 'A delivery task for order #{orderNumber} has been reassigned to you.',
@@ -46,7 +47,7 @@ exports.getConfig = async (req, res) => {
                     { min: 10001, max: 1000000, fee: 150 }
                 ]
             },
-            logistic_settings: { warehouseHours: { open: '08:00', close: '20:00' }, autoCancelUnpaidHours: 24, deliveryFeeBuffer: 0, autoApproveRequests: false },
+            logistic_settings: { warehouseHours: { open: '08:00', close: '20:00' }, autoCancelUnpaidHours: 24, deliveryFeeBuffer: 0, autoApproveRequests: false, autoDispatchOrders: false },
             security_settings: { sessionTimeout: 30, passwordMinLength: 8, twoFactorEnabled: false, loginAttempts: 5, ipWhitelist: [] },
             notification_settings: { emailNotifications: true, smsNotifications: true, pushNotifications: false, orderConfirmations: true, deliveryUpdates: true },
             seo_settings: { title: 'Comrades360', description: 'Student Marketplace', keywords: 'university, marketplace', socialLinks: { facebook: '', instagram: '', twitter: '' } },

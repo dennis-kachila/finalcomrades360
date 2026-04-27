@@ -8,6 +8,7 @@ const {
 } = require('../utils/notificationHelpers');
 const { upsertDeliveryChargeForTask } = require('../utils/deliveryChargeHelpers');
 const { Op } = require('sequelize');
+const autoDispatchService = require('../services/autoDispatchService');
 
 const DELIVERY_TASK_CREATION_STATUSES = new Set([
   'seller_confirmed',
@@ -340,6 +341,18 @@ const transitionOrderStatus = async (req, res) => {
     let createdTask = null;
     if (newStatus === 'awaiting_delivery_assignment') {
       createdTask = await autoCreateDeliveryTask(order, order.status, newStatus);
+      
+      // NEW: Trigger Smart Auto-Dispatch if enabled
+      try {
+        const configRecord = await PlatformConfig.findOne({ where: { key: 'logistic_settings' } });
+        const settings = configRecord ? (typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value) : {};
+        if (settings.autoDispatchOrders) {
+          // Fire and forget auto-dispatch to avoid blocking the transition response
+          autoDispatchService.runAutoDispatch(order.id).catch(err => console.error('[AutoDispatch] Failed:', err));
+        }
+      } catch (e) {
+        console.error('[AutoDispatch] Config check failed:', e);
+      }
     }
 
     const fromStatus = order.status;

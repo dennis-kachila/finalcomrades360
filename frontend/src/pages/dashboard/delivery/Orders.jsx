@@ -171,14 +171,17 @@ const DeliveryAgentOrders = () => {
     try {
       if (showLoading) setLoading(true);
       
-      let endpoint = '/delivery/orders';
+      let endpoint = `/delivery/orders?tab=${tab}`;
       if (tab === 'completed') {
         endpoint = '/delivery/orders?history=true';
       } else if (tab === 'cancelled') {
         endpoint = '/delivery/orders?cancelled=true';
       }
 
-      const res = await api.get(endpoint);
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('q', searchQuery);
+      
+      const res = await api.get(`${endpoint}${params.toString() ? (endpoint.includes('?') ? '&' : '?') + params.toString() : ''}`);
       setOrders(res.data.data || []);
       setBlockingReason(res.data.blockingReason || null);
       setMissingFields(res.data.missingFields || []);
@@ -189,7 +192,15 @@ const DeliveryAgentOrders = () => {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, searchQuery]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadMyDeliveries(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -614,10 +625,21 @@ const DeliveryAgentOrders = () => {
           ) : (
             <div className="grid gap-8">
               {(() => {
-                const filtered = orders.filter(o => !searchQuery || 
-                  (o.orderNumber && o.orderNumber.toLowerCase().includes(searchQuery.toLowerCase())) || 
-                  (o.trackingNumber && o.trackingNumber.toLowerCase().includes(searchQuery.toLowerCase()))
-                );
+                const filtered = orders.filter(o => {
+                  if (!searchQuery) return true;
+                  const q = searchQuery.toLowerCase();
+                  return (
+                    (o.orderNumber && o.orderNumber.toLowerCase().includes(q)) ||
+                    (o.trackingNumber && o.trackingNumber.toLowerCase().includes(q)) ||
+                    (o.user?.name && o.user.name.toLowerCase().includes(q)) ||
+                    (o.user?.county && o.user.county.toLowerCase().includes(q)) ||
+                    (o.user?.town && o.user.town.toLowerCase().includes(q)) ||
+                    (o.user?.estate && o.user.estate.toLowerCase().includes(q)) ||
+                    (o.user?.houseNumber && o.user.houseNumber.toLowerCase().includes(q)) ||
+                    (o.deliveryAddress && o.deliveryAddress.toLowerCase().includes(q)) ||
+                    (o.addressDetails && o.addressDetails.toLowerCase().includes(q))
+                  );
+                });
 
                 // Group by Route
                 const groups = {};

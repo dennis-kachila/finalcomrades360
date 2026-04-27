@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import api from '../../services/api';
 import { QRCodeSVG } from 'qrcode.react';
 import useRealtimeSync from '../../hooks/useRealtimeSync';
@@ -39,7 +39,7 @@ export default function SystemSettings() {
       minPayout: { seller: 1000, marketer: 500, delivery_agent: 200, station_manager: 500, warehouse_manager: 1000, service_provider: 500 },
       withdrawalTiers: [] 
     },
-    logistic_settings: { warehouseHours: { open: '08:00', close: '20:00' }, autoCancelUnpaidHours: 24, deliveryFeeBuffer: 0, fastfoodTaskExpiryMinutes: 5, productTaskExpiryMinutes: 30, stuckDeliveryHours: 3 },
+    logistic_settings: { warehouseHours: { open: '08:00', close: '20:00' }, autoCancelUnpaidHours: 24, deliveryFeeBuffer: 0, fastfoodTaskExpiryMinutes: 5, productTaskExpiryMinutes: 30, stuckDeliveryHours: 3, autoDispatchOrders: false, autoApproveRequests: false },
     seo_settings: { title: 'Comrades360', description: 'Student Marketplace', keywords: 'university, marketplace', socialLinks: { facebook: '', instagram: '', twitter: '' } },
     maintenance_settings: { 
       enabled: false, 
@@ -73,7 +73,7 @@ export default function SystemSettings() {
     fetchWhatsAppStatus();
     const interval = setInterval(() => {
       fetchWhatsAppStatus();
-    }, 5000); // Poll every 5 seconds
+    }, 30000); // Poll every 30 seconds — no need for real-time precision
     return () => clearInterval(interval);
   }, []);
 
@@ -124,7 +124,7 @@ export default function SystemSettings() {
 
   const resetAlerts = () => { setError(''); setSuccess(''); };
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     setFetching(true);
     try {
       const keys = [
@@ -177,7 +177,6 @@ export default function SystemSettings() {
             }
           }
         });
-        console.log('[SystemSettings] Final Merged Config (Stringified):', JSON.stringify(next, null, 2));
         return next;
       });
     } catch (e) {
@@ -186,11 +185,11 @@ export default function SystemSettings() {
     } finally {
       setFetching(false);
     }
-  };
+  }, []); // No dependencies — reads from API, not from state
 
   useEffect(() => {
     loadSettings();
-  }, []);
+  }, [loadSettings]);
 
   // Real-time synchronization: listen for config updates from the server
   useRealtimeSync(['platform_settings', 'maintenance_settings', 'whatsapp_config', 'finance_settings', 'notification_settings'], loadSettings);
@@ -923,6 +922,54 @@ export default function SystemSettings() {
               <hr className="border-gray-100" />
 
               <section>
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">🤖 Smart Logistics & Automation</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-blue-50/30 p-6 rounded-2xl border border-blue-100/50">
+                  <div className="flex items-start gap-4">
+                    <div className="pt-1">
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={settings.logistic_settings.autoDispatchOrders} 
+                          onChange={(e) => setSettings(p => ({...p, logistic_settings: {...p.logistic_settings, autoDispatchOrders: e.target.checked}}))} 
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-800">Auto Dispatch Orders (Smart Mode)</h4>
+                      <p className="text-xs text-gray-500 mt-1">Automatically assigns orders to the best available delivery agent based on proximity, rating, and current workload. Handles re-assignment if agent rejects or times out.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="pt-1">
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer" 
+                          checked={settings.logistic_settings.autoApproveRequests} 
+                          onChange={(e) => setSettings(p => ({...p, logistic_settings: {...p.logistic_settings, autoApproveRequests: e.target.checked}}))} 
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-800">Auto-Approve Agent Requests</h4>
+                      <p className="text-xs text-gray-500 mt-1">If an agent manually requests an available order, the system will approve it immediately without admin intervention.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg inline-flex">
+                   <span className="text-sm">💡</span>
+                   <p className="text-[10px] font-bold text-blue-700 uppercase tracking-widest">Tip: Use Smart Mode for faster campus fulfillment.</p>
+                </div>
+                <SaveButton onClick={() => updateSettings('logistic_settings', settings.logistic_settings)} loading={loading} />
+              </section>
+
+              <hr className="border-gray-100" />
+
+              <section>
                 <h4 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">💬 Delivery Notifications</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -930,6 +977,7 @@ export default function SystemSettings() {
                     <div className="space-y-4">
                       <TemplateInput label="Seller Confirmed" value={settings.whatsapp_config.templates?.sellerConfirmed} onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, sellerConfirmed: v}} }))} templateKey="sellerConfirmed" channels={settings.whatsapp_config.channels?.sellerConfirmed || { whatsapp: true, sms: true, email: true, in_app: true }} onChannelChange={(ch) => updateTemplateChannels('sellerConfirmed', ch)} />
                       <TemplateInput label="Out for Delivery" value={settings.whatsapp_config.templates?.orderInTransit} onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, orderInTransit: v}} }))} templateKey="orderInTransit" channels={settings.whatsapp_config.channels?.orderInTransit || { whatsapp: true, sms: true, email: true, in_app: true }} onChannelChange={(ch) => updateTemplateChannels('orderInTransit', ch)} />
+                      <TemplateInput label="Delivery Update (Generic)" value={settings.whatsapp_config.templates?.deliveryUpdate} onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, deliveryUpdate: v}} }))} templateKey="deliveryUpdate" channels={settings.whatsapp_config.channels?.deliveryUpdate || { whatsapp: true, sms: true, email: true, in_app: true }} onChannelChange={(ch) => updateTemplateChannels('deliveryUpdate', ch)} />
                       <TemplateInput label="Ready for Pickup" value={settings.whatsapp_config.templates?.orderReadyPickup} onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, orderReadyPickup: v}} }))} templateKey="orderReadyPickup" channels={settings.whatsapp_config.channels?.orderReadyPickup || { whatsapp: true, sms: true, email: true, in_app: true }} onChannelChange={(ch) => updateTemplateChannels('orderReadyPickup', ch)} />
                       <TemplateInput label="Delivery Success" value={settings.whatsapp_config.templates?.orderDelivered} onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, orderDelivered: v}} }))} templateKey="orderDelivered" channels={settings.whatsapp_config.channels?.orderDelivered || { whatsapp: true, sms: true, email: true, in_app: true }} onChannelChange={(ch) => updateTemplateChannels('orderDelivered', ch)} />
                       <TemplateInput label="Order Cancelled" value={settings.whatsapp_config.templates?.orderCancelled} onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, orderCancelled: v}} }))} templateKey="orderCancelled" channels={settings.whatsapp_config.channels?.orderCancelled || { whatsapp: true, sms: true, email: true, in_app: true }} onChannelChange={(ch) => updateTemplateChannels('orderCancelled', ch)} />
@@ -1062,6 +1110,7 @@ const TemplateInput = ({ label, value, onChange, templateKey, channels, onChanne
     orderInTransit: `Your order #{orderNumber} is on its way! 🚚\n\nHello {name}, your package has been collected by {agentName} ({agentPhone}) and is in transit.\n\nDelivery Information:\nMethod: {deliveryMethod}\nLocation: {deliveryAddress}\n\nPlease stay reachable for a smooth delivery!`,
     orderReadyPickup: `Your order #{orderNumber} is ready for collection! 📦\n\nHello {name}, your items have arrived at the pickup location and are ready for you.\n\nPickup Details:\nStation: {stationName}\nLocation: {stationLocation}\nContact: {stationPhone}\n\nSee you soon at Comrades360!`,
     orderDelivered: `Order Delivered Successfully! ✅\n\nHello {name}, your order #{orderNumber} has been delivered. Enjoy your purchase!\n\nThank you for choosing Comrades360!`,
+    deliveryUpdate: 'Hello, your order #{orderNumber} status has been updated to: {status}. {message}',
     orderCancelled: `Order Notification: Cancellation ❌\n\nHello {name}, we regret to inform you that order #{orderNumber} has been cancelled.\n\nCancellation Details:\nReason: {reason}\n\nWe apologize for the inconvenience and hope to serve you again soon.`,
     agentArrived: 'Your delivery agent {agentName} has arrived at your location! 📍 Please meet them to collect order #{orderNumber}.\nAgent Phone: {phone}',
     agentTaskAssigned: 'You have been assigned a new delivery task for order #{orderNumber}. Type: {deliveryType}',

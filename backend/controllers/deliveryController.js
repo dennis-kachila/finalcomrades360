@@ -15,6 +15,7 @@ const { creditPending, moveToSuccess, revertPending } = require('../utils/wallet
 const { SELLER_PAID_ROUTE_TYPES, calculateSellerMerchandisePayout, settleDeliveryChargeForTask, upsertDeliveryChargeForTask } = require('../utils/deliveryChargeHelpers');
 const { creditAgentForTask } = require('../services/earningsService');
 const { appendOrderTrackingUpdate } = require('../utils/trackingUpdates');
+const autoDispatchService = require('../services/autoDispatchService');
 
 const DELIVERY_AVAILABLE_ORDER_STATUSES = [
   'seller_confirmed',
@@ -243,11 +244,22 @@ const listMyAssignedOrders = async (req, res, next) => {
     } else {
       // In Progress tab: tasks in active states
       taskWhereClause.status = { [Op.in]: ['assigned', 'accepted', 'arrived_at_pickup', 'in_progress'] };
-      // Also match the order-level deliveryAgentId as the primary filter
-      where.deliveryAgentId = req.user.id;
     }
 
-    if (q) where.orderNumber = { [Op.like]: `%${q}%` };
+    if (q) {
+      where[Op.or] = [
+        { orderNumber: { [Op.like]: `%${q}%` } },
+        { trackingNumber: { [Op.like]: `%${q}%` } },
+        { '$user.name$': { [Op.like]: `%${q}%` } },
+        { '$user.phone$': { [Op.like]: `%${q}%` } },
+        { '$user.county$': { [Op.like]: `%${q}%` } },
+        { '$user.town$': { [Op.like]: `%${q}%` } },
+        { '$user.estate$': { [Op.like]: `%${q}%` } },
+        { '$user.houseNumber$': { [Op.like]: `%${q}%` } },
+        { deliveryAddress: { [Op.like]: `%${q}%` } },
+        { addressDetails: { [Op.like]: `%${q}%` } }
+      ];
+    }
     if (deliveryType) where.deliveryType = deliveryType;
 
     if (from || to) {
@@ -270,7 +282,7 @@ const listMyAssignedOrders = async (req, res, next) => {
             { model: Service, attributes: ['id', 'title'], required: false }
           ]
         },
-        { model: User, as: 'user', attributes: ['id', 'name', 'email', 'role', 'phone', 'businessName'] },
+        { model: User, as: 'user', attributes: ['id', 'name', 'email', 'role', 'phone', 'businessName', 'county', 'town', 'estate', 'houseNumber'] },
         { model: User, as: 'seller', attributes: ['id', 'name', 'businessAddress', 'businessCounty', 'businessTown', 'phone', 'email', 'businessLandmark', 'businessPhone', 'businessLat', 'businessLng', 'businessName'] },
         { model: Warehouse, as: 'Warehouse', attributes: ['id', 'name', 'address', 'landmark', 'contactPhone', 'lat', 'lng'] },
         { model: PickupStation, as: 'PickupStation', attributes: ['id', 'name', 'location', 'contactPhone', 'lat', 'lng'] },
@@ -327,10 +339,26 @@ const listAvailableOrders = async (req, res, next) => {
     // Find orders that are ready for delivery.
     // We used to filter by deliveryAgentId: null, but now we show any order 
     // that isn't already "locked" (accepted/in-progress) by another agent.
+    const { q } = req.query;
     const where = {
       status: { [Op.in]: DELIVERY_AVAILABLE_ORDER_STATUSES },
       sellerConfirmed: true
     };
+
+    if (q) {
+      where[Op.or] = [
+        { orderNumber: { [Op.like]: `%${q}%` } },
+        { trackingNumber: { [Op.like]: `%${q}%` } },
+        { '$user.name$': { [Op.like]: `%${q}%` } },
+        { '$user.phone$': { [Op.like]: `%${q}%` } },
+        { '$user.county$': { [Op.like]: `%${q}%` } },
+        { '$user.town$': { [Op.like]: `%${q}%` } },
+        { '$user.estate$': { [Op.like]: `%${q}%` } },
+        { '$user.houseNumber$': { [Op.like]: `%${q}%` } },
+        { deliveryAddress: { [Op.like]: `%${q}%` } },
+        { addressDetails: { [Op.like]: `%${q}%` } }
+      ];
+    }
 
     const rows = await Order.findAll({
       where,
@@ -344,7 +372,7 @@ const listAvailableOrders = async (req, res, next) => {
             { model: Service, attributes: ['id', 'title'], required: false }
           ]
         },
-        { model: User, as: 'user', attributes: ['id', 'name', 'phone', 'businessName'] }, // Customer details
+        { model: User, as: 'user', attributes: ['id', 'name', 'phone', 'businessName', 'county', 'town', 'estate', 'houseNumber'] }, // Customer details
         { model: User, as: 'seller', attributes: ['id', 'name', 'businessAddress', 'businessCounty', 'businessTown', 'phone', 'businessLandmark', 'businessPhone', 'businessLat', 'businessLng', 'businessName'] },
         { model: Warehouse, as: 'Warehouse', attributes: ['id', 'name', 'address', 'landmark', 'contactPhone', 'lat', 'lng'] },
         { model: PickupStation, as: 'PickupStation', attributes: ['id', 'name', 'location', 'contactPhone', 'lat', 'lng'] },
@@ -850,6 +878,18 @@ const rejectDeliveryTask = async (req, res) => {
 
         // Notify admins
         await notifyAdminTaskRejection(task.orderId, task.order.orderNumber, req.user.name, reason);
+
+        // NEW: Trigger Smart Auto-Dispatch if enabled
+        try {
+          const configRecord = await PlatformConfig.findOne({ where: { key: 'logistic_settings' }, transaction: t });
+          const settings = configRecord ? (typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value) : {};
+          if (settings.autoDispatchOrders) {
+            // We exclude the current agent who just rejected it
+            autoDispatchService.runAutoDispatch(task.orderId, { excludeAgentIds: [req.user.id] }).catch(err => console.error('[AutoDispatch] Failed:', err));
+          }
+        } catch (e) {
+          console.error('[AutoDispatch] Config check failed:', e);
+        }
       }
 
       await t.commit();
@@ -2137,7 +2177,8 @@ const confirmCollection = async (req, res) => {
         task.order.userId,
         task.order.orderNumber,
         'collected',
-        `Your order has been collected and is ${newOrderStatus === 'in_transit' ? 'in transit' : 'in transit to warehouse'}.`
+        `Your order has been collected and is ${newOrderStatus === 'in_transit' ? 'in transit' : 'in transit to warehouse'}.`,
+        task.order
       );
 
       // Notify parties via Socket.IO
@@ -2523,6 +2564,7 @@ const toggleAgentActiveStatus = async (req, res) => {
 };
 
 module.exports = {
+  getProvisionalDeliveryType,
   listMyAssignedOrders,
   getMyProfile,
   upsertMyProfile,

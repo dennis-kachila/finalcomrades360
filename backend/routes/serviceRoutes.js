@@ -542,9 +542,15 @@ router.put('/:id', authenticateToken, uploadServiceImages.array('images', 5), co
 
     // CRITICAL: Protect ownership fields
     if (req.body.userId || req.body.addedBy) {
-      console.warn(`⚠️ [updateService] Attempt to modify ownership fields (userId/addedBy) detected! Ignoring.`);
-      delete req.body.userId;
-      delete req.body.addedBy;
+      if (isAdmin) {
+        console.log(`👤 [updateService] Admin modifying ownership (userId: ${req.body.userId}, addedBy: ${req.body.addedBy})`);
+        if (req.body.userId) service.userId = parseInt(req.body.userId, 10);
+        if (req.body.addedBy) service.addedBy = parseInt(req.body.addedBy, 10);
+      } else {
+        console.warn(`⚠️ [updateService] Unauthorized attempt to modify ownership fields (userId/addedBy) detected! Ignoring.`);
+        delete req.body.userId;
+        delete req.body.addedBy;
+      }
     }
 
     // Update service

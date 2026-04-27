@@ -75,7 +75,7 @@ const DeliveryChat = ({ orderId, receiverId, receiverName }) => {
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!newMessage.trim() || sending) return;
+        if (!newMessage.trim() || sending || !receiverId) return;
 
         const messageData = {
             orderId,
@@ -99,6 +99,8 @@ const DeliveryChat = ({ orderId, receiverId, receiverName }) => {
             setNewMessage('');
         } catch (error) {
             console.error('Failed to send message:', error);
+            const errorMsg = error.response?.data?.error || 'Failed to send message';
+            toast.error(errorMsg);
         } finally {
             setSending(false);
         }
@@ -193,23 +195,31 @@ const DeliveryChat = ({ orderId, receiverId, receiverName }) => {
             </div>
 
             {/* Input */}
-            <form onSubmit={handleSendMessage} className="p-3 bg-white border-t flex gap-2">
-                <input
-                    type="text"
-                    value={newMessage}
-                    onChange={handleInputChange}
-                    placeholder="Type a follow-up message..."
-                    className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    disabled={sending}
-                />
-                <button
-                    type="submit"
-                    disabled={!newMessage.trim() || sending}
-                    className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition disabled:opacity-50 shadow-md transform active:scale-95"
-                >
-                    {sending ? <FaSpinner className="animate-spin" /> : <FaPaperPlane className="ml-0.5" />}
-                </button>
-            </form>
+            {!receiverId ? (
+                <div className="p-3 bg-amber-50 border-t border-amber-100">
+                    <p className="text-[10px] text-amber-700 font-bold text-center italic">
+                        ⚠️ Cannot send messages: No recipient identified for this order.
+                    </p>
+                </div>
+            ) : (
+                <form onSubmit={handleSendMessage} className="p-3 bg-white border-t flex gap-2">
+                    <input
+                        type="text"
+                        value={newMessage}
+                        onChange={handleInputChange}
+                        placeholder="Type a follow-up message..."
+                        className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        disabled={sending}
+                    />
+                    <button
+                        type="submit"
+                        disabled={!newMessage.trim() || sending}
+                        className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition disabled:opacity-50 shadow-md transform active:scale-95"
+                    >
+                        {sending ? <FaSpinner className="animate-spin" /> : <FaPaperPlane className="ml-0.5" />}
+                    </button>
+                </form>
+            )}
         </div>
     );
 };

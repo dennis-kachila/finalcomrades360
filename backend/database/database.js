@@ -75,7 +75,7 @@ const config = {
     dialect: 'mysql', // Explicitly force mysql for production config
     logging: process.env.SEQUELIZE_LOGGING === 'true' ? console.log : false,
     pool: {
-      max: 10,
+      max: 25, // Increased from 10 to 25 to prevent pool exhaustion in production
       min: 2,
       acquire: 60000,
       idle: 20000,
@@ -232,6 +232,7 @@ const testConnection = async () => {
               orderInTransit: 'Good news! Your order #{orderNumber} has been collected by {agentName} and is in transit. 🚚',
               orderReadyPickup: 'Your order #{orderNumber} is ready for collection at {stationName}! 📦',
               orderDelivered: 'Hi {name}, your order #{orderNumber} has been delivered. Thank you!',
+              deliveryUpdate: 'Hello, your order #{orderNumber} status has been updated to: {status}. {message}',
               agentArrived: 'Your delivery agent {agentName} has arrived at your location! 📍 Please meet them to collect order #{orderNumber}.',
               agentTaskAssigned: 'You have been assigned a new delivery task for order #{orderNumber}. Type: {deliveryType}',
               agentTaskReassigned: 'A delivery task for order #{orderNumber} has been reassigned to you.',
@@ -265,7 +266,9 @@ const testConnection = async () => {
           value: JSON.stringify({
             warehouseHours: { open: '08:00', close: '20:00' },
             autoCancelUnpaidHours: 24,
-            deliveryFeeBuffer: 0 
+            deliveryFeeBuffer: 0,
+            autoApproveRequests: false,
+            autoDispatchOrders: false
           })
         },
         {

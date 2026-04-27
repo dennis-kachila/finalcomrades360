@@ -6,10 +6,10 @@ import { Label } from '../../../components/ui/label';
 import { Textarea } from '../../../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { useToast } from '../../../components/ui/use-toast';
-import { productApi } from '../../../services/api';
+import { productApi, adminApi } from '../../../services/api';
 import { useCategories } from '../../../contexts/CategoriesContext';
 import { useAuth } from '../../../contexts/AuthContext';
-import { Loader2, ArrowLeft, Upload, Video, Save, Check, Edit, X, AlertCircle, Info, Cloud } from 'lucide-react';
+import { Loader2, ArrowLeft, Upload, Video, Save, Check, Edit, X, AlertCircle, Info, Cloud, Store } from 'lucide-react';
 import { productExists, getProductEditUrl } from '../../../utils/productUtils';
 import { resolveImageUrl } from '../../../utils/imageUtils';
 import { recursiveParse, ensureArray, ensureObject } from '../../../utils/parsingUtils';
@@ -119,10 +119,11 @@ const getInitialFormData = () => ({
   warranty: '', returnPolicy: '', deliveryFeeType: 'flat', deliveryFee: '',
   deliveryCoverageZones: '', marketingEnabled: false, marketingCommissionType: 'flat',
   marketingCommission: '', marketingStartDate: '', marketingEndDate: '',
-  visibilityStatus: 'active', reviewNotes: '', sku: '', barcode: '',
+  visibilityStatus: 'visible', reviewNotes: '', sku: '', barcode: '',
   lowStockThreshold: '', compareAtPrice: '', cost: '', metaTitle: '',
   metaDescription: '', metaKeywords: '', isFlashSale: false, flashSalePrice: '',
-  flashSaleStart: '', flashSaleEnd: '', isDigital: false, downloadUrl: ''
+  flashSaleStart: '', flashSaleEnd: '', isDigital: false, downloadUrl: '',
+  sellerId: ''
 });
 
 // Helper for generating consistent draft keys
@@ -170,6 +171,25 @@ const ComradesProductForm = ({
 
   const { user: currentUser } = useAuth();
   const { categories: allCategories, getSubcategoriesByCategory } = useCategories();
+  const [sellers, setSellers] = useState([]);
+
+  const isAdmin = useMemo(() => {
+    const adminRoles = ['admin', 'super_admin', 'superadmin'];
+    return currentUser?.role && adminRoles.includes(currentUser.role);
+  }, [currentUser]);
+
+  useEffect(() => {
+    const fetchSellers = async () => {
+      if (!isAdmin) return;
+      try {
+        const { data } = await adminApi.getAllUsers({ role: 'seller', limit: 100 });
+        setSellers(data.users || []);
+      } catch (err) {
+        console.error('Failed to fetch sellers:', err);
+      }
+    };
+    fetchSellers();
+  }, [isAdmin]);
 
   // Filter categories based on taxonomyType
   const filteredCategories = useMemo(() => {
@@ -348,8 +368,11 @@ const ComradesProductForm = ({
         }
       });
       
-      const existingGallery = galleryImages.filter(img => typeof img === 'string');
-      if (existingGallery.length > 0) {
+      // FIX: Always send existingGalleryImages if in Edit/Update mode, even if empty
+      // This prevents the backend from falling back to old data when user deletes everything.
+      const isUpdating = id || data.id;
+      if (isUpdating) {
+        const existingGallery = galleryImages.filter(img => typeof img === 'string');
         formDataToSend.append('existingGalleryImages', JSON.stringify(existingGallery));
       }
 
@@ -1362,8 +1385,21 @@ const ComradesProductForm = ({
   const handleGalleryImagesChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
-      // Limit to 5 images max
-      const newImages = files.slice(0, 5 - galleryImages.length);
+      // Limit to 3 images max total
+      const totalAllowed = 3;
+      const currentCount = galleryImages.length;
+      const availableSlots = Math.max(0, totalAllowed - currentCount);
+      
+      if (availableSlots <= 0) {
+        toast({
+          title: "Gallery Limit Reached",
+          description: "You can only have up to 3 gallery images.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const newImages = files.slice(0, availableSlots);
       setGalleryImages(prev => [...prev, ...newImages]);
 
       // Create previews
@@ -1373,9 +1409,24 @@ const ComradesProductForm = ({
   };
 
   // Remove a gallery image
-  const removeGalleryImage = (index) => {
+  const removeGalleryImage = async (index) => {
+    const imageToRemove = galleryImages[index];
+    
+    // PERMANENT DELETION: If it's an existing image (string/URL), delete from server
+    if (typeof imageToRemove === 'string' && imageToRemove.startsWith('/uploads')) {
+      try {
+        console.log('[ComradesProductForm] Permanently deleting image:', imageToRemove);
+        await axios.delete('/api/upload/file', { data: { url: imageToRemove } });
+      } catch (err) {
+        console.warn('[ComradesProductForm] Permanent deletion failed (might be already gone):', err.message);
+      }
+    }
+
     setGalleryImages(prev => prev.filter((_, i) => i !== index));
     setGalleryPreviews(prev => prev.filter((_, i) => i !== index));
+    
+    // Trigger an immediate cloud sync to update the DB record
+    setTimeout(() => syncWithCloud(), 500);
   };
 
   // Handle video change
@@ -1821,7 +1872,8 @@ const ComradesProductForm = ({
 
         // Additional fields
         condition: formData.condition || 'Brand New',
-        visibilityStatus: formData.visibilityStatus || 'active',
+        visibilityStatus: formData.visibilityStatus || 'visible',
+        sellerId: formData.sellerId || undefined,
 
         // Inventory fields
         sku: formData.sku?.trim() || '',
@@ -2117,7 +2169,7 @@ const ComradesProductForm = ({
   return (
     <div className="w-full overflow-x-hidden mx-2 sm:mx-0">
       <div className="sm:rounded-lg rounded-none shadow-md sm:shadow-lg bg-white overflow-hidden">
-        <div className="px-3 py-4 sm:p-5 md:p-8">
+        <div className="px-2 py-3 sm:p-3 md:p-4">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-4">
               <Button
@@ -2228,17 +2280,17 @@ const ComradesProductForm = ({
             )}
 
             {currentComponent === 'comrades' && (
-              <form id="product-form" onSubmit={handleSubmit} className="space-y-8 pb-24">
+              <form id="product-form" onSubmit={handleSubmit} className="space-y-4 pb-24">
 
                 {isFieldDisabled('vendorInfo') && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pb-2">
                     {/* Vendor Information Card */}
-                    <div className="bg-blue-50 rounded-lg p-6 border border-blue-100 shadow-sm">
-                      <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+                    <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100 shadow-sm">
+                      <h3 className="text-sm font-bold text-blue-900 mb-2 flex items-center">
                         <span className="mr-2">👤</span>
                         Vendor Information
                       </h3>
-                      <div className="space-y-3">
+                      <div className="space-y-1">
                         <div className="flex justify-between items-center py-1 border-b border-blue-100">
                           <span className="text-sm font-medium text-blue-800">Owner Name:</span>
                           <span className="text-sm text-gray-700">{formData.seller?.name || 'N/A'}</span>
@@ -2255,12 +2307,12 @@ const ComradesProductForm = ({
                     </div>
 
                     {/* Inventory Status Card */}
-                    <div className="bg-green-50 rounded-lg p-6 border border-green-100 shadow-sm">
-                      <h3 className="text-lg font-semibold text-green-900 mb-4 flex items-center">
+                    <div className="bg-green-50 rounded-lg p-3 sm:p-4 border border-green-100 shadow-sm">
+                      <h3 className="text-sm font-bold text-green-900 mb-2 flex items-center">
                         <span className="mr-2">📦</span>
                         Inventory Status
                       </h3>
-                      <div className="space-y-3">
+                      <div className="space-y-1">
                         <div className="flex justify-between items-center py-1 border-b border-green-100">
                           <span className="text-sm font-medium text-green-800">Status:</span>
                           <span className={`text-sm font-bold ${formData.status === 'active' || formData.status === 'approved' ? 'text-green-600' : 'text-orange-600'}`}>
@@ -2277,6 +2329,30 @@ const ComradesProductForm = ({
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* Admin-only Seller Selection */}
+                {isAdmin && (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+                    <Label htmlFor="sellerId" className="text-blue-800 font-semibold flex items-center gap-2">
+                      <Store className="h-4 w-4" />
+                      Assign to Seller (Admin Only)
+                    </Label>
+                    <select
+                      id="sellerId"
+                      value={formData.sellerId || ''}
+                      onChange={(e) => handleFieldChange('sellerId', e.target.value)}
+                      className="w-full h-10 rounded-md border border-blue-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    >
+                      <option value="">Select Seller (Current: {initialProduct?.sellerId || 'Self'})</option>
+                      {sellers.map((seller) => (
+                        <option key={seller.id} value={seller.id}>
+                          {seller.name} ({seller.email})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-blue-600 italic">Leave as "Select Seller" to keep current owner or assign to yourself.</p>
                   </div>
                 )}
 
@@ -3094,11 +3170,11 @@ const ComradesProductForm = ({
                   {/* Gallery Images */}
                   <div className="space-y-2 border p-4 rounded-lg">
                     <Label>Gallery Images (Required)</Label>
-                    <p className="text-sm text-gray-500">Add exactly 2 high-quality images to showcase your product from different angles</p>
-                    {showMediaError && galleryImages.length !== 2 && (
+                    <p className="text-sm text-gray-500">Add exactly 3 high-quality images to showcase your product from different angles</p>
+                    {showMediaError && galleryImages.length !== 3 && (
                       <div className="border-2 border-red-500 p-2 rounded mb-2 animate-pulse bg-red-50">
                         <p className="text-red-600 text-sm font-bold flex items-center">
-                          <span className="mr-2">⚠️</span> {galleryImages.length === 0 ? 'Please upload at least 2 gallery images' : `Required: 2 gallery images (currently have ${galleryImages.length})`}
+                          <span className="mr-2">⚠️</span> {galleryImages.length === 0 ? 'Please upload at least 3 gallery images' : `Required: 3 gallery images (currently have ${galleryImages.length})`}
                         </p>
                       </div>
                     )}
@@ -3151,7 +3227,7 @@ const ComradesProductForm = ({
                         </div>
                       )}
 
-                      {galleryImages.length < 2 && (
+                      {galleryImages.length < 3 && (
                         <div className="border-2 border-dashed rounded-md p-6 text-center">
                           <input
                             type="file"
@@ -3168,10 +3244,10 @@ const ComradesProductForm = ({
                             <Upload className="h-8 w-8 text-gray-400" />
                             <p className="text-sm text-gray-600 font-medium">
                               {galleryImages.length === 0
-                                ? 'Click to upload 2 gallery images'
-                                : `Add ${2 - galleryImages.length} more image${2 - galleryImages.length === 1 ? '' : 's'}`}
+                                ? 'Click to upload 3 gallery images'
+                                : `Add ${3 - galleryImages.length} more image${3 - galleryImages.length === 1 ? '' : 's'}`}
                             </p>
-                            <p className="text-xs text-gray-500">PNG, JPG, JPEG (exactly 2 images required, max 5MB each)</p>
+                            <p className="text-xs text-gray-500">PNG, JPG, JPEG (exactly 3 images required, max 5MB each)</p>
                           </label>
                         </div>
                       )}

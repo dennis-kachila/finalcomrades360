@@ -25,6 +25,11 @@ const sendMessage = async (req, res) => {
         const { orderId, receiverId, message, type = 'text' } = req.body;
         const senderId = req.user.id;
 
+        // Validation
+        if (!orderId) return res.status(400).json({ error: 'Missing orderId' });
+        if (!receiverId) return res.status(400).json({ error: 'Missing receiverId' });
+        if (!message) return res.status(400).json({ error: 'Missing message content' });
+
         const newMessage = await DeliveryMessage.create({
             orderId,
             senderId,
@@ -40,13 +45,18 @@ const sendMessage = async (req, res) => {
         // Broadcast via Socket
         const io = getIO();
         if (io) {
+            // We use user_${id} rooms for private messages
             io.to(`user_${receiverId}`).emit('delivery_message_receive', fullMessage);
         }
 
         res.status(201).json(fullMessage);
     } catch (error) {
         console.error('Error sending delivery message:', error);
-        res.status(500).json({ error: 'Failed to send message' });
+        res.status(500).json({ 
+            error: 'Failed to send message', 
+            details: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 

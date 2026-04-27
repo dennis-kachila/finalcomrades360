@@ -13,6 +13,8 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
+import html2canvas from 'html2canvas';
+import { toast } from 'react-toastify';
 
 ChartJS.register(
   CategoryScale,
@@ -36,6 +38,12 @@ export default function AdvancedReports() {
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
+
+  // Growth Poster State
+  const [posterData, setPosterData] = useState(null);
+  const [posterLoading, setPosterLoading] = useState(false);
+  const [posterPeriod, setPosterPeriod] = useState('day');
+  const [posterDate, setPosterDate] = useState(new Date().toISOString().split('T')[0]);
 
   const resetAlerts = () => { setError(''); setSuccess(''); };
 
@@ -107,10 +115,56 @@ export default function AdvancedReports() {
     }
   };
 
+  const loadPosterData = async () => {
+    setPosterLoading(true);
+    try {
+      const res = await api.get('/analytics/growth-poster', { 
+        params: { period: posterPeriod, date: posterDate } 
+      });
+      setPosterData(res.data.data);
+    } catch (err) {
+      console.error('Failed to load poster data:', err);
+      toast.error('Failed to load growth data');
+    } finally {
+      setPosterLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'growth') {
+      loadPosterData();
+    }
+  }, [activeTab, posterPeriod, posterDate]);
+
+  const downloadPoster = async () => {
+    const element = document.getElementById('growth-poster-content');
+    if (!element) return;
+
+    try {
+      toast.info('Generating high-quality image...');
+      const canvas = await html2canvas(element, {
+        scale: 3, // Very high quality for "poster" feel
+        useCORS: true,
+        backgroundColor: '#f8fafc', // match gray-50
+        logging: false
+      });
+      const dataUrl = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.download = `comrades-growth-${posterDate}-${posterPeriod}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success('Poster downloaded successfully!');
+    } catch (err) {
+      console.error('Download error:', err);
+      toast.error('Failed to generate image');
+    }
+  };
+
   const tabs = [
     { id: 'overview', name: 'Overview', icon: '📊' },
     { id: 'sales', name: 'Sales', icon: '💰' },
     { id: 'users', name: 'Users', icon: '👥' },
+    { id: 'growth', name: 'Growth Poster', icon: '🎨' },
     { id: 'custom', name: 'Custom Reports', icon: '🔧' }
   ];
 
@@ -407,6 +461,142 @@ export default function AdvancedReports() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Growth Poster Tab */}
+          {activeTab === 'growth' && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex bg-white p-1 rounded-lg border border-gray-200">
+                    {['day', 'month', 'year'].map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setPosterPeriod(p)}
+                        className={`px-4 py-1.5 rounded-md text-sm font-medium capitalize transition-all ${
+                          posterPeriod === p ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type={posterPeriod === 'year' ? 'number' : posterPeriod === 'month' ? 'month' : 'date'}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    value={posterDate}
+                    onChange={(e) => setPosterDate(e.target.value)}
+                  />
+                  <button 
+                    onClick={loadPosterData} 
+                    className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    title="Refresh Data"
+                  >
+                    🔄
+                  </button>
+                </div>
+                <button 
+                  onClick={downloadPoster}
+                  className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg font-semibold shadow-md hover:shadow-lg transition-all active:scale-95"
+                >
+                  <span>📥</span> Download Poster (PNG)
+                </button>
+              </div>
+
+              <div className="flex justify-center py-8 bg-gray-100 rounded-2xl border-2 border-dashed border-gray-300">
+                {posterLoading ? (
+                  <div className="py-20 text-center space-y-3">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-gray-500 font-medium italic">Preparing your growth data...</p>
+                  </div>
+                ) : posterData ? (
+                  <div 
+                    id="growth-poster-content" 
+                    className="w-full max-w-md bg-white shadow-2xl rounded-[2rem] overflow-hidden border border-gray-100 relative"
+                    style={{ minHeight: '600px' }}
+                  >
+                    {/* Decorative Header Background */}
+                    <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800 -skew-y-3 origin-top-left"></div>
+                    
+                    <div className="relative p-8 space-y-8">
+                      {/* Logo & Title */}
+                      <div className="text-center space-y-1 pt-2">
+                        <div className="text-3xl font-black text-white tracking-tighter drop-shadow-md">COMRADES 360</div>
+                        <div className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-bold text-white uppercase tracking-widest border border-white/30">
+                          Performance Report
+                        </div>
+                      </div>
+
+                      {/* Period Indicator */}
+                      <div className="bg-white rounded-3xl p-5 shadow-xl border border-gray-50 text-center relative z-10">
+                        <div className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">Growth Summary for</div>
+                        <div className="text-xl font-extrabold text-gray-800 capitalize">
+                          {posterPeriod === 'day' ? new Date(posterDate).toLocaleDateString('en-US', { dateStyle: 'long' }) : 
+                           posterPeriod === 'month' ? new Date(posterDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) :
+                           posterDate}
+                        </div>
+                      </div>
+
+                      {/* Main Metrics */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-blue-50/50 rounded-3xl p-5 border border-blue-100/50 text-center group hover:bg-blue-50 transition-colors">
+                          <div className="text-3xl font-black text-blue-700">{posterData.newUsers}</div>
+                          <div className="text-[10px] font-bold text-blue-600 uppercase mt-1">New Members</div>
+                        </div>
+                        <div className="bg-indigo-50/50 rounded-3xl p-5 border border-indigo-100/50 text-center group hover:bg-indigo-50 transition-colors">
+                          <div className="text-3xl font-black text-indigo-700">{posterData.orders.successful}</div>
+                          <div className="text-[10px] font-bold text-indigo-600 uppercase mt-1">Successful Orders</div>
+                        </div>
+                      </div>
+
+                      {/* User Breakdown */}
+                      <div className="bg-gray-50/80 rounded-[2rem] p-6 space-y-4 border border-gray-100">
+                        <div className="text-center text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Growth by Role</div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { label: 'Marketers', val: posterData.roles.marketers, icon: '📣', color: 'text-orange-600' },
+                            { label: 'Delivery', val: posterData.roles.deliveryAgents, icon: '🛵', color: 'text-green-600' },
+                            { label: 'Sellers', val: posterData.roles.sellers, icon: '🏪', color: 'text-purple-600' },
+                            { label: 'Services', val: posterData.roles.serviceProviders, icon: '🛠️', color: 'text-cyan-600' },
+                          ].map((role, idx) => (
+                            <div key={idx} className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{role.icon}</span>
+                                <span className="text-[10px] font-bold text-gray-600">{role.label}</span>
+                              </div>
+                              <span className={`text-sm font-black ${role.color}`}>{role.val}</span>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">👤</span>
+                            <span className="text-[10px] font-bold text-gray-600">Customers</span>
+                          </div>
+                          <span className="text-sm font-black text-blue-600">{posterData.roles.customers}</span>
+                        </div>
+                      </div>
+
+                      {/* Success Rate Footer */}
+                      <div className="pt-4 text-center space-y-4">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-full text-xs font-black">
+                          <span>✅</span> Order Success Rate: {posterData.orders.successRate}%
+                        </div>
+                        
+                        <div className="pt-6 border-t border-gray-100">
+                          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em]">Generated by Comrades 360 Admin</div>
+                          <div className="text-[8px] text-gray-300 mt-1 italic">Performance Analytics Engine v1.0</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-20 text-center text-gray-400 italic">Select a date and period to generate poster</div>
+                )}
               </div>
             </div>
           )}

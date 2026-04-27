@@ -6,6 +6,8 @@ const { logPaymentActivity } = require('../middleware/paymentSecurity');
 const { calculateCommission: createCommissionRecords } = require('./commissionController');
 const { creditAgentByOrder } = require('../services/earningsService');
 const { normalizeKenyanPhone } = require('../middleware/validators');
+const autoDispatchService = require('../services/autoDispatchService');
+const { getOrderRoutePolicy } = require('../controllers/orderController');
 
 // Create payment record for an order
 const createPayment = async (req, res) => {
@@ -646,10 +648,31 @@ const handleMpesaCallback = async (req, res) => {
           });
 
           for (const ord of groupOrders) {
+            const routePolicy = await getOrderRoutePolicy(ord.id, t);
+            const nextStatus = (routePolicy.isFastFoodOnlyOrder && ['order_placed', 'super_admin_confirmed'].includes(ord.status)) 
+              ? 'awaiting_delivery_assignment' 
+              : (['order_placed', 'super_admin_confirmed'].includes(ord.status) ? 'paid' : ord.status);
+
             await ord.update({
               paymentConfirmed: true,
-              status: ['order_placed', 'super_admin_confirmed'].includes(ord.status) ? 'paid' : ord.status
+              status: nextStatus
             }, { transaction: t });
+
+            // Trigger Auto-Dispatch if it's fast food and we moved to assignment
+            if (nextStatus === 'awaiting_delivery_assignment') {
+              try {
+                const { autoCreateDeliveryTask } = require('./orderTransitionController');
+                await autoCreateDeliveryTask(ord, ord.status, nextStatus); // Note: ord.status might still be old in memory, but update was done
+                
+                const configRecord = await PlatformConfig.findOne({ where: { key: 'logistic_settings' }, transaction: t });
+                const settings = configRecord ? (typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value) : {};
+                if (settings.autoDispatchOrders) {
+                  autoDispatchService.runAutoDispatch(ord.id).catch(err => console.error('[AutoDispatch] Failed:', err));
+                }
+              } catch (e) {
+                console.error('[AutoDispatch] Trigger failed in payment callback:', e);
+              }
+            }
 
             // Create commission records for each order
             try {
@@ -660,10 +683,31 @@ const handleMpesaCallback = async (req, res) => {
           }
           console.log(`✅ Group orders (${groupOrders.length}) updated for group ${payment.checkoutGroupId}`);
         } else if (payment.order) {
+          const routePolicy = await getOrderRoutePolicy(payment.order.id, t);
+          const nextStatus = (routePolicy.isFastFoodOnlyOrder && ['order_placed', 'super_admin_confirmed'].includes(payment.order.status)) 
+            ? 'awaiting_delivery_assignment' 
+            : (['order_placed', 'super_admin_confirmed'].includes(payment.order.status) ? 'paid' : payment.order.status);
+
           await payment.order.update({
             paymentConfirmed: true,
-            status: ['order_placed', 'super_admin_confirmed'].includes(payment.order.status) ? 'paid' : payment.order.status
+            status: nextStatus
           }, { transaction: t });
+
+          // Trigger Auto-Dispatch if it's fast food and we moved to assignment
+          if (nextStatus === 'awaiting_delivery_assignment') {
+            try {
+              const { autoCreateDeliveryTask } = require('./orderTransitionController');
+              await autoCreateDeliveryTask(payment.order, payment.order.status, nextStatus);
+              
+              const configRecord = await PlatformConfig.findOne({ where: { key: 'logistic_settings' }, transaction: t });
+              const settings = configRecord ? (typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value) : {};
+              if (settings.autoDispatchOrders) {
+                autoDispatchService.runAutoDispatch(payment.order.id).catch(err => console.error('[AutoDispatch] Failed:', err));
+              }
+            } catch (e) {
+              console.error('[AutoDispatch] Trigger failed in payment callback:', e);
+            }
+          }
 
           // Create commission records
           try {

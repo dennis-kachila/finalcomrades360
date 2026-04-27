@@ -1109,27 +1109,27 @@ const Products = () => {
 
       return (
         <div className="bg-white rounded-lg shadow-lg h-full w-full flex flex-col overflow-hidden border">
-          <div className="flex items-center justify-between p-6 border-b bg-gray-50/50">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between p-3 md:p-4 border-b bg-gray-50/50">
+            <div className="flex items-center gap-3">
               <button
                 onClick={handleBack}
-                className="p-2 rounded-full hover:bg-gray-200 transition-colors"
+                className="p-1.5 rounded-full hover:bg-gray-200 transition-colors"
                 aria-label="Go back"
               >
-                <FaArrowLeft className="text-lg text-gray-600" />
+                <FaArrowLeft className="text-base text-gray-600" />
               </button>
               <div>
-                <h3 className="text-xl font-bold text-gray-800">
+                <h3 className="text-lg font-bold text-gray-800 leading-tight">
                   {formTitle}
                 </h3>
-                <p className="text-xs text-gray-500 font-medium">
+                <p className="text-[10px] text-gray-500 font-medium">
                   {activeView === 'view' ? 'View comprehensive item information' : 'Manage your product details and settings'}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 min-w-0 overflow-auto p-2 md:p-4 scrollbar-thin scrollbar-thumb-gray-200">
+          <div className="flex-1 min-w-0 overflow-auto p-1 md:p-2 scrollbar-thin scrollbar-thumb-gray-200">
             <div className="w-full">
               {itemType === 'service' ? (
                 <ServiceForm

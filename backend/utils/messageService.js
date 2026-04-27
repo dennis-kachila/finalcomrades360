@@ -126,15 +126,17 @@ const initWhatsApp = async () => {
             }
 
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                logWhatsApp(`EVENT: Closed (shouldReconnect=${shouldReconnect})`);
+                const errorCode = (lastDisconnect.error)?.output?.statusCode;
+                const errorMsg = (lastDisconnect.error)?.message || 'Unknown error';
+                const shouldReconnect = errorCode !== DisconnectReason.loggedOut;
+                
+                logWhatsApp(`EVENT: Closed | Reason: ${errorCode} (${errorMsg}) | shouldReconnect=${shouldReconnect}`);
                 isWhatsAppReady = false;
                 whatsappStatus = 'disconnected';
                 isInitializing = false;
                 
-                // Use a more conservative backoff for reconnection to avoid pool exhaustion
                 if (shouldReconnect) {
-                    const delay = 30000; // Increase to 30s
+                    const delay = 30000; 
                     logWhatsApp(`RETRY: Reconnecting in ${delay/1000}s...`);
                     setTimeout(() => {
                         if (!isWhatsAppReady && !isInitializing) {

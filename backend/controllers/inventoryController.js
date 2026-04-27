@@ -343,6 +343,18 @@ const adjustStock = async (req, res) => {
     // Update main product stock
     await product.update({ stock: quantityAfter }, { transaction });
 
+    // Real-time Stock Alerts for manual adjustments
+    try {
+      const { notifySellerStockEvent } = require('../utils/notificationHelpers');
+      if (quantityAfter === 0) {
+        notifySellerStockEvent(product, 'out_of_stock').catch(e => console.warn('Out of stock alert failed:', e.message));
+      } else if (quantityAfter <= (parseInt(product.lowStockThreshold) || 5)) {
+        notifySellerStockEvent(product, 'low_stock').catch(e => console.warn('Low stock alert failed:', e.message));
+      }
+    } catch (alertErr) {
+      console.warn('Failed to initiate stock alert from inventory controller:', alertErr.message);
+    }
+
     // Update warehouse stock if specified
     if (warehouseId) {
       const [warehouseStock] = await WarehouseStock.findOrCreate({

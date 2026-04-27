@@ -7,6 +7,7 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCategories } from '../../contexts/CategoriesContext';
 import serviceApi from '../../services/serviceApi';
+import { adminApi } from '../../services/api';
 import { ArrowLeft, Clock, Store, Plus, X, Shield } from 'lucide-react';
 import Dialog from '../Dialog';
 import {
@@ -49,9 +50,9 @@ const serviceSchema = yup.object().shape({
   vendorLng: yup.number().nullable().transform((value, originalValue) => originalValue === '' ? null : value),
   isOnline: yup.string().oneOf(['online', 'offline', 'both']).required('Please specify the service type'),
   images: yup.mixed()
-    .test('fileCount', 'You can upload up to 5 images', (value) => {
+    .test('fileCount', 'You can upload up to 3 images', (value) => {
       if (!value || value.length === 0) return true;
-      return value.length <= 5;
+      return value.length <= 3;
     })
     .test('fileType', 'Only image files are allowed', (value) => {
       if (!value || value.length === 0) return true;
@@ -76,7 +77,8 @@ const serviceSchema = yup.object().shape({
   qualifications: yup.string().nullable().max(1000, 'Qualifications cannot exceed 1000 characters'),
   experienceYears: yup.number().nullable().min(0, 'Experience cannot be negative'),
   bookingNotice: yup.number().nullable().min(0, 'Notice period cannot be negative'),
-  cancellationPolicy: yup.string().nullable().max(500, 'Policy cannot exceed 500 characters')
+  cancellationPolicy: yup.string().nullable().max(500, 'Policy cannot exceed 500 characters'),
+  userId: yup.number().nullable()
 });
 
 
@@ -98,6 +100,21 @@ const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, m
   const [imagePreviews, setImagePreviews] = useState([]);
   const [existingImages, setExistingImages] = useState(initialData?.images || []);
   const [savedService, setSavedService] = useState(null);
+  const [sellers, setSellers] = useState([]);
+  const isAdmin = ['admin', 'superadmin', 'super_admin'].includes(user?.role);
+
+  useEffect(() => {
+    const fetchSellers = async () => {
+      if (!isAdmin) return;
+      try {
+        const { data } = await adminApi.getAllUsers({ role: 'seller', limit: 100 });
+        setSellers(data.users || []);
+      } catch (err) {
+        console.error('Failed to fetch sellers:', err);
+      }
+    };
+    fetchSellers();
+  }, [isAdmin, user]);
   const [showModal, setShowModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({ type: 'success', title: '', message: '' });
 
@@ -144,6 +161,7 @@ const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, m
       marketingCommissionType: initialData?.marketingCommissionType || 'flat',
       marketingCommission: initialData?.marketingCommissionType === 'percentage' ? (initialData?.marketingCommissionPercentage || 0) : (initialData?.marketingCommission || 0),
       marketingDuration: initialData?.marketingDuration || 0,
+      userId: initialData?.userId || '',
       // Initial calculation if dates exist
       ...(() => {
         if (initialData?.marketingStartDate && initialData?.marketingEndDate) {
@@ -328,17 +346,30 @@ const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, m
   };
 
   // Remove an existing image
-  const removeExistingImage = async (imageId) => {
-    if (!isEditing) return;
+  const removeExistingImage = async (image) => {
+    if (!isEditing || isViewMode) return;
+    
+    // image can be an object with an id or just a path string
+    const imagePath = typeof image === 'string' ? image : (image.url || image.path || image.filePath);
+    if (!imagePath) return;
 
     try {
-      await serviceApi.deleteServiceImage(initialData.id, imageId);
+      // 1. Permanent deletion from server
+      if (imagePath.startsWith('/uploads')) {
+        console.log('[ServiceForm] Permanently deleting image:', imagePath);
+        await axios.delete('/api/upload/file', { data: { url: imagePath } });
+      }
 
-      setExistingImages(prev => prev.filter(img => img.id !== imageId));
-      toast.success('Image removed successfully');
+      // 2. Remove from local state
+      setExistingImages(prev => prev.filter(img => {
+        const path = typeof img === 'string' ? img : (img.url || img.path || img.filePath);
+        return path !== imagePath;
+      }));
+      
+      toast.success('Image removed permanently');
     } catch (error) {
       console.error('Error removing image:', error);
-      toast.error('Failed to remove image');
+      toast.error('Failed to remove image permanently');
     }
   };
 
@@ -469,7 +500,7 @@ const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, m
   };
 
   return (
-    <div className="w-full p-6 bg-white rounded-lg shadow-md">
+    <div className="bg-white rounded-lg shadow-lg p-3 md:p-4 overflow-hidden">
       <div className="flex items-center mb-6">
         <button
           type="button"
@@ -484,16 +515,38 @@ const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, m
         </h2>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* Admin-only Provider Selection */}
+        {isAdmin && (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+            <Label htmlFor="userId" className="text-blue-800 font-semibold flex items-center gap-2">
+              <span className="mr-1">👤</span>
+              Assign to Provider (Admin Only)
+            </Label>
+            <select
+              id="userId"
+              {...register('userId')}
+              className="w-full h-10 rounded-md border border-blue-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <option value="">Select Provider (Current: {initialData?.userId || 'Self'})</option>
+              {sellers.map((seller) => (
+                <option key={seller.id} value={seller.id}>
+                  {seller.name} ({seller.email})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-blue-600 italic">Leave as "Select Provider" to keep current owner or assign to yourself.</p>
+          </div>
+        )}
         {isViewMode && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             {/* Vendor Information Card */}
-            <div className="bg-blue-50 rounded-lg p-6 border border-blue-100 shadow-sm">
-              <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+            <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100 shadow-sm">
+              <h3 className="text-sm font-bold text-blue-900 mb-2 flex items-center">
                 <span className="mr-2">👤</span>
                 Provider Information
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-1">
                 <div className="flex justify-between items-center py-1 border-b border-blue-100">
                   <span className="text-sm font-medium text-blue-800">Owner Name:</span>
                   <span className="text-sm text-gray-700">{initialData?.provider?.name || 'N/A'}</span>
@@ -510,12 +563,12 @@ const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, m
             </div>
 
             {/* Inventory Status Card */}
-            <div className="bg-green-50 rounded-lg p-6 border border-green-100 shadow-sm">
-              <h3 className="text-lg font-semibold text-green-900 mb-4 flex items-center">
+            <div className="bg-green-50 rounded-lg p-3 sm:p-4 border border-green-100 shadow-sm">
+              <h3 className="text-sm font-bold text-green-900 mb-2 flex items-center">
                 <span className="mr-2">📅</span>
                 Service Status
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-1">
                 <div className="flex justify-between items-center py-1 border-b border-green-100">
                   <span className="text-sm font-medium text-green-800">Current Status:</span>
                   <span className={`text-sm font-bold ${initialData?.status === 'active' || initialData?.status === 'approved' ? 'text-green-600' : 'text-orange-600'}`}>

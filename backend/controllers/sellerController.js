@@ -324,7 +324,7 @@ const getSellersItemOrderIds = async (userId) => {
       where: {
         [Op.or]: [
           { sellerId: userId },
-          { productId: { [Op.in]: sequelize.literal(`(SELECT id FROM Products WHERE sellerId = ${userId})`) } },
+          { productId: { [Op.in]: sequelize.literal(`(SELECT id FROM Product WHERE sellerId = ${userId})`) } },
           { fastFoodId: { [Op.in]: sequelize.literal(`(SELECT id FROM FastFoods WHERE vendor = ${userId})`) } }
         ]
       },

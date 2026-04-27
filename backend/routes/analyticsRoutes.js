@@ -5,7 +5,8 @@ const {
   getRevenueForecast,
   getSellerPerformanceScores,
   getDeliveryEfficiencyMetrics,
-  getMarketingCampaignROI
+  getMarketingCampaignROI,
+  getGrowthPosterData
 } = require('../controllers/analyticsController');
 const { auth, adminOnly, adminOrFinance } = require('../middleware/auth');
 
@@ -31,5 +32,8 @@ router.get('/delivery/efficiency', adminOnly, getDeliveryEfficiencyMetrics);
 
 // Marketing campaign ROI - admin/finance only
 router.get('/marketing/roi', adminOrFinance, getMarketingCampaignROI);
+
+// Growth poster data - admin/finance only
+router.get('/growth-poster', adminOrFinance, getGrowthPosterData);
 
 module.exports = router;

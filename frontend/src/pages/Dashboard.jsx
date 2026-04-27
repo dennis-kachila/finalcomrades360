@@ -70,7 +70,7 @@ const Dashboard = () => {
 
         {/* Dynamic Content */}
         <main className="flex-1 flex flex-col bg-gray-50 relative custom-scrollbar pb-24 lg:pb-12 overflow-y-auto min-h-0">
-          <div className="w-full p-0 lg:p-4 min-h-0">
+          <div className="w-full p-0 lg:p-2 min-h-0">
             <Outlet />
           </div>
         </main>

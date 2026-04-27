@@ -336,7 +336,7 @@ const createProduct = async (req, res, next) => {
     // Handle images: use paths instead of Base64 to prevent DB bloat and crashes
     // Compression middleware has already optimized these to JPEG on disk
     const finalCoverImage = coverFiles.length > 0 ? `/uploads/products/${coverFiles[0].filename}` : null;
-    const finalGalleryImages = galleryFiles.map(f => `/uploads/products/${f.filename}`);
+    const finalGalleryImages = galleryFiles.map(f => `/uploads/products/${f.filename}`).slice(0, 3);
 
 
 
@@ -881,6 +881,7 @@ const getRecentlyApprovedProducts = async (req, res) => {
         suspended: false,
         isActive: true,
         status: 'active',
+        stock: { [Op.gt]: 0 }, // Hide out of stock items
         updatedAt: { [Op.gte]: thirtyDaysAgo }
       },
       include: [
@@ -929,6 +930,7 @@ const getSuperAdminProducts = async (req, res) => {
           suspended: false,
           isActive: true,
           status: 'active',
+          stock: { [Op.gt]: 0 }, // Hide out of stock items
           createdAt: {
             [Op.gte]: thirtyDaysAgo
           }
@@ -1447,9 +1449,15 @@ const updateProduct = async (req, res, next) => {
 
     // CRITICAL: Protect ownership fields
     if (req.body.sellerId || req.body.addedBy) {
-      console.warn(`⚠️ [updateProduct] Attempt to modify ownership fields (sellerId/addedBy) detected! Ignoring.`);
-      delete req.body.sellerId;
-      delete req.body.addedBy;
+      if (isAdmin) {
+        console.log(`👤 [updateProduct] Admin/SuperAdmin modifying ownership fields (sellerId: ${req.body.sellerId}, addedBy: ${req.body.addedBy})`);
+        if (req.body.sellerId) updateData.sellerId = parseInt(req.body.sellerId, 10);
+        if (req.body.addedBy) updateData.addedBy = parseInt(req.body.addedBy, 10);
+      } else {
+        console.warn(`⚠️ [updateProduct] Unauthorized attempt to modify ownership fields (sellerId/addedBy) detected! Ignoring.`);
+        delete req.body.sellerId;
+        delete req.body.addedBy;
+      }
     }
 
     // Parse form data - now includes new fields
@@ -1589,8 +1597,11 @@ const updateProduct = async (req, res, next) => {
 
     // Handle gallery images
     let existingGalleryUrls = [];
-    if (existingGalleryImages) {
-      existingGalleryUrls = Array.isArray(existingGalleryImages) ? existingGalleryImages : [existingGalleryImages];
+    
+    // FIX: Explicitly check if existingGalleryImages was provided in the request body
+    // Even an empty array should be respected, not fall back to previous state.
+    if (req.body.existingGalleryImages !== undefined) {
+      existingGalleryUrls = Array.isArray(existingGalleryImages) ? existingGalleryImages : (existingGalleryImages ? [existingGalleryImages] : []);
     } else if (product.galleryImages) {
       existingGalleryUrls = product.galleryImages;
     }
@@ -1615,6 +1626,13 @@ const updateProduct = async (req, res, next) => {
         imageUrls.push(`/uploads/products/${f.filename}`);
       });
     }
+
+    // ENFORCE LIMIT: Max 3 gallery images total (plus 1 cover = 4 images total)
+    // The user specifically requested: "in no cercumstances should gallery image exceed 3 images"
+    const cover = imageUrls[0];
+    const gallery = imageUrls.slice(1).slice(0, 3);
+    imageUrls = [cover, ...gallery];
+
 
     console.log('[updateProduct] Final imageUrls before validation:', imageUrls);
 
@@ -1879,6 +1897,13 @@ const updateProduct = async (req, res, next) => {
       updateData.status = 'draft';
       updateData.approved = false;
       updateData.reviewStatus = 'pending';
+    }
+
+    // Normalize visibilityStatus to prevent homepage disappearance ('active' -> 'visible')
+    if (req.body.visibilityStatus === 'active' || !product.visibilityStatus) {
+      updateData.visibilityStatus = 'visible';
+    } else if (req.body.visibilityStatus) {
+      updateData.visibilityStatus = req.body.visibilityStatus;
     }
 
     // Check if category/brand/price changed - if so, recalculate related products

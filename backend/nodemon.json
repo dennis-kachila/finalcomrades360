@@ -2,7 +2,13 @@
   "restartable": "rs",
   "ignore": [
     ".git",
-    "node_modules/"
+    "node_modules/",
+    "*.log",
+    "database.sqlite*",
+    "whatsapp_engine.log",
+    "error.log",
+    "notification_debug.log",
+    ".wwebjs_auth/"
   ],
   "watch": [
     "./",

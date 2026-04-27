@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const { Product, Notification, User, DeletedProduct, DeletedFastFood, Order, OrderItem, HandoverCode, DeliveryTask, Payment, DeliveryCharge, PlatformConfig, SupportMessage, sequelize } = require('../models');
 const { revertPending } = require('../utils/walletHelpers');
 const { Op } = require('sequelize');
+const autoDispatchService = require('../services/autoDispatchService');
 
 const initScheduledTasks = () => {
     console.log('⏰ Initializing scheduled tasks...');
@@ -152,17 +153,17 @@ const initScheduledTasks = () => {
         try {
             const { backupSQLite, backupMySQL, backupUploads, rotateBackups } = require('../scripts/backup-database');
             const { sequelize } = require('../database/database');
-            
+
             const dialect = sequelize.options.dialect;
             if (dialect === 'sqlite') {
                 await backupSQLite();
             } else if (dialect === 'mysql') {
                 await backupMySQL();
             }
-            
+
             await backupUploads();
             await rotateBackups();
-            
+
             console.log('✅ Daily backup completed successfully');
         } catch (error) {
             console.error('❌ Error in daily backup:', error);
@@ -228,16 +229,17 @@ const initScheduledTasks = () => {
     // Run every 5 minutes - Auto-expire unaccepted delivery task assignments + Auto-Reassignment broadcast
     cron.schedule('*/5 * * * *', async () => {
         try {
-            const { DeliveryTask, PlatformConfig, DeliveryAgentProfile, Notification } = require('../models');
+            const { Order, DeliveryTask, PlatformConfig, DeliveryAgentProfile, Notification } = require('../models');
             const { getIO } = require('../realtime/socket');
 
             // Get per-type expiry times from config
             const config = await PlatformConfig.findOne({ where: { key: 'logistic_settings' } });
             let fastfoodExpiryMinutes = 5;
             let productExpiryMinutes = 30;
+            let settings = {};
             if (config) {
                 try {
-                    const settings = typeof config.value === 'string' ? JSON.parse(config.value) : config.value;
+                    settings = typeof config.value === 'string' ? JSON.parse(config.value) : config.value;
                     if (settings.fastfoodTaskExpiryMinutes) fastfoodExpiryMinutes = parseInt(settings.fastfoodTaskExpiryMinutes, 10);
                     if (settings.productTaskExpiryMinutes) productExpiryMinutes = parseInt(settings.productTaskExpiryMinutes, 10);
                 } catch (e) {
@@ -295,6 +297,12 @@ const initScheduledTasks = () => {
                     });
                     console.log(`↩️  Order #${task.order.orderNumber} reverted to '${revertStatus}' — agent did not accept in time.`);
 
+                    // NEW: Trigger Smart Auto-Dispatch if enabled
+                    if (settings.autoDispatchOrders) {
+                        // Exclude the agent who just timed out
+                        autoDispatchService.runAutoDispatch(task.order.id, { excludeAgentIds: [task.deliveryAgentId] }).catch(err => console.error('[AutoDispatch] Failed:', err));
+                    }
+
                     // --- AUTO-REASSIGNMENT: Broadcast to all online agents ---
                     if (io && onlineAgentUserIds.length > 0) {
                         const broadcastPayload = {
@@ -323,6 +331,59 @@ const initScheduledTasks = () => {
             }
         } catch (error) {
             console.error('❌ Error in delivery task expiry cleanup:', error);
+        }
+    });
+
+    // Run every 2 minutes - Catch orders stuck in 'awaiting_delivery_assignment'
+    // and trigger auto-dispatch if Smart Mode is enabled.
+    cron.schedule('*/2 * * * *', async () => {
+        try {
+            const config = await PlatformConfig.findOne({ where: { key: 'logistic_settings' } });
+            if (!config) return;
+
+            const settings = typeof config.value === 'string' ? JSON.parse(config.value) : config.value;
+            if (!settings.autoDispatchOrders) return;
+
+            // Find orders in 'awaiting_delivery_assignment' or 'seller_confirmed' status
+            // For seller_confirmed, we only want those that DO NOT have an active delivery task.
+            const stuckOrders = await Order.findAll({
+                where: {
+                    status: { [Op.in]: ['awaiting_delivery_assignment', 'seller_confirmed'] }
+                },
+                include: [{
+                    model: DeliveryTask,
+                    as: 'deliveryTasks',
+                    required: false
+                }],
+                attributes: ['id', 'orderNumber', 'status']
+            });
+
+            // Filter out seller_confirmed orders that already have an active task
+            const validStuckOrders = stuckOrders.filter(order => {
+                if (order.status === 'awaiting_delivery_assignment') return true;
+                // If it's seller_confirmed, it's only stuck if there are no delivery tasks or only failed/cancelled ones
+                const hasActiveTask = order.deliveryTasks && order.deliveryTasks.some(t => !['completed', 'failed', 'cancelled', 'rejected'].includes(t.status));
+                return !hasActiveTask;
+            });
+
+            if (validStuckOrders.length > 0) {
+                console.log(`🔄 [AutoDispatch-Cron] Found ${validStuckOrders.length} orders awaiting assignment. Triggering Smart Mode...`);
+                for (const order of validStuckOrders) {
+                    // First, try to auto-create task if it doesn't exist
+                    try {
+                        const { autoCreateDeliveryTask } = require('../controllers/orderTransitionController');
+                        await autoCreateDeliveryTask(order, 'order_placed', order.status);
+                    } catch (e) {
+                        console.error(`[AutoDispatch-Cron] Failed to create task for #${order.orderNumber}:`, e);
+                    }
+
+                    autoDispatchService.runAutoDispatch(order.id).catch(err =>
+                        console.error(`[AutoDispatch-Cron] Failed dispatch for #${order.orderNumber}:`, err)
+                    );
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error in auto-dispatch stuck orders cron:', error);
         }
     });
 
@@ -380,8 +441,8 @@ const initScheduledTasks = () => {
                     // 2. Restore Stock
                     for (const item of order.OrderItems || []) {
                         if ((item.itemType === 'product' || item.productId) && item.Product) {
-                            await item.Product.update({ 
-                                stock: item.Product.stock + (item.quantity || 0) 
+                            await item.Product.update({
+                                stock: item.Product.stock + (item.quantity || 0)
                             }, { transaction: t });
                         }
                     }
@@ -398,9 +459,9 @@ const initScheduledTasks = () => {
                         if (charge.payeeUserId && charge.agentAmount > 0) {
                             await revertPending(charge.payeeUserId, charge.agentAmount, order.id, t);
                         }
-                        await charge.update({ 
-                            fundingStatus: 'reversed', 
-                            note: 'System auto-cancelled: Unpaid order timeout' 
+                        await charge.update({
+                            fundingStatus: 'reversed',
+                            note: 'System auto-cancelled: Unpaid order timeout'
                         }, { transaction: t });
                     }
 
@@ -430,7 +491,7 @@ const initScheduledTasks = () => {
                                 autoCancelled: true
                             });
                         }
-                    } catch (_) {}
+                    } catch (_) { }
 
                     console.log(`✅ [AutoCancel] Order #${order.orderNumber} auto-cancelled successfully.`);
 
@@ -460,7 +521,7 @@ const initScheduledTasks = () => {
                     if (settings.stuckDeliveryHours) {
                         stuckHours = parseInt(settings.stuckDeliveryHours, 10);
                     }
-                } catch (e) {}
+                } catch (e) { }
             }
 
             const stuckThreshold = new Date(Date.now() - stuckHours * 60 * 60 * 1000);
@@ -559,7 +620,7 @@ const initScheduledTasks = () => {
     // ─── DISABLED: Auto-confirm agent→customer delivery after 5 min ──
     // This was causing the handover section to disappear prematurely for customers
     // if there was any slight time desync or if the delivery took longer than 5 mins.
-    
+
     // cron.schedule('*/2 * * * *', async () => {
     //     try {
     //         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);

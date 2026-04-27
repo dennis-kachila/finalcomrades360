@@ -10,7 +10,7 @@ import { useToast } from '../../components/ui/use-toast';
 import ChangesDialog from '../../components/ui/changes-dialog';
 import { resolveImageUrl } from '../../utils/imageUtils';
 import { fastFoodService } from '../../services/fastFoodService';
-import api, { productApi } from '../../services/api';
+import api, { productApi, adminApi } from '../../services/api';
 import { useCategories } from '../../contexts/CategoriesContext';
 import { FaArrowLeft, FaSave, FaSpinner, FaUpload, FaTimes, FaCheck, FaCloudUploadAlt } from 'react-icons/fa';
 import { Utensils, Clock } from 'lucide-react';
@@ -178,6 +178,22 @@ const FastFoodForm = ({
   const [foodSubcategories, setFoodSubcategories] = useState([]);
   const { user: currentUser } = useAuth();
   const { categories: allCategories } = useCategories();
+  const [sellers, setSellers] = useState([]);
+
+  const isAdmin = ['admin', 'superadmin', 'super_admin'].includes(currentUser?.role);
+
+  useEffect(() => {
+    const fetchSellers = async () => {
+      if (!isAdmin) return;
+      try {
+        const { data } = await adminApi.getAllUsers({ role: 'seller', limit: 100 });
+        setSellers(data.users || []);
+      } catch (err) {
+        console.error('Failed to fetch sellers:', err);
+      }
+    };
+    fetchSellers();
+  }, [isAdmin]);
 
   // Derived seller context for hiding admin fields
   const isSellerContext = isSellerContextProp || (currentUser?.role === 'seller' && !['admin', 'superadmin', 'super_admin'].includes(currentUser?.role));
@@ -236,6 +252,7 @@ const FastFoodForm = ({
     isComboOption: false,
     comboOptions: [],
     kitchenVendor: '',
+    vendor: '',
     vendorLocation: '',
     // Delivery Configuration
     deliveryFeeType: 'fixed',
@@ -1380,8 +1397,8 @@ const FastFoodForm = ({
           dietaryTags: formData.dietaryTags || [],
           kitchenVendor: formData.kitchenVendor || 'Main Kitchen',
           vendorLocation: formData.vendorLocation,
-          [apiType === 'product' ? 'sellerId' : 'vendor']: currentUser?.id || 1,
-          vendor: currentUser?.id || 1, // Keep vendor for safety if backend expects it
+          [apiType === 'product' ? 'sellerId' : 'vendor']: formData.vendor || currentUser?.id || 1,
+          vendor: formData.vendor || currentUser?.id || 1, // Keep vendor for safety if backend expects it
           allergens: ['none'],
           isAvailable: true, // Force true to avoid legacy locks since we now use availabilityMode
           isActive: listMode ? true : formData.isActive,
@@ -1462,9 +1479,9 @@ const FastFoodForm = ({
         submitData.append('kitchenVendor', formData.kitchenVendor || 'Main Kitchen');
         submitData.append('vendorLocation', formData.vendorLocation || '');
         if (apiType === 'product') {
-          submitData.append('sellerId', String(currentUser?.id || '1'));
+          submitData.append('sellerId', String(formData.vendor || currentUser?.id || '1'));
         }
-        submitData.append('vendor', currentUser?.id || '1');
+        submitData.append('vendor', String(formData.vendor || currentUser?.id || '1'));
         submitData.append('allergens', JSON.stringify(formData.allergens || []));
         submitData.append('isAvailable', 'true'); // Force true to avoid legacy locks
         submitData.append('availabilityMode', formData.availabilityMode || 'AUTO');
@@ -1712,16 +1729,41 @@ const FastFoodForm = ({
         </h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Admin-only Vendor Selection */}
+        {isAdmin && (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+            <Label htmlFor="vendor" className="text-blue-800 font-semibold flex items-center gap-2">
+              <span className="mr-1">🏪</span>
+              Assign to Vendor (Admin Only)
+            </Label>
+            <select
+              id="vendor"
+              name="vendor"
+              value={formData.vendor || ''}
+              onChange={handleInputChange}
+              className="w-full h-10 rounded-md border border-blue-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <option value="">Select Vendor (Current: {initialProduct?.vendor || 'Self'})</option>
+              {sellers.map((seller) => (
+                <option key={seller.id} value={seller.id}>
+                  {seller.name} ({seller.email})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-blue-600 italic">Leave as "Select Vendor" to keep current owner or assign to yourself.</p>
+          </div>
+        )}
+
         {isViewMode && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Vendor Information Card */}
-            <div className="bg-blue-50 rounded-lg p-6 border border-blue-100 shadow-sm">
-              <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+            <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100 shadow-sm">
+              <h3 className="text-sm font-bold text-blue-900 mb-2 flex items-center">
                 <span className="mr-2">👤</span>
                 Vendor Information
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-1">
                 <div className="flex justify-between items-center py-1 border-b border-blue-100">
                   <span className="text-sm font-medium text-blue-800">Owner Name:</span>
                   <span className="text-sm text-gray-700">{vendorInfo?.name || 'N/A'}</span>
@@ -1738,12 +1780,12 @@ const FastFoodForm = ({
             </div>
 
             {/* Inventory Status Card */}
-            <div className="bg-green-50 rounded-lg p-6 border border-green-100 shadow-sm">
-              <h3 className="text-lg font-semibold text-green-900 mb-4 flex items-center">
+            <div className="bg-green-50 rounded-lg p-3 sm:p-4 border border-green-100 shadow-sm">
+              <h3 className="text-sm font-bold text-green-900 mb-2 flex items-center">
                 <span className="mr-2">📦</span>
                 Inventory Status
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-1">
                 <div className="flex justify-between items-center py-1 border-b border-green-100">
                   <span className="text-sm font-medium text-green-800">Current Status:</span>
                   <span className={`text - sm font - bold ${formData.isActive ? 'text-green-600' : 'text-red-600'} `}>
@@ -2262,18 +2304,30 @@ const FastFoodForm = ({
                       {!isViewMode && (
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
+                            const previewToRemove = galleryPreviews[index];
+
+                            // PERMANENT DELETION: If it's an existing image (not a new file), delete from server
+                            if (!previewToRemove.isFile && previewToRemove.original && previewToRemove.original.startsWith('/uploads')) {
+                              try {
+                                console.log('[FastFoodForm] Permanently deleting image:', previewToRemove.original);
+                                await axios.delete('/api/upload/file', { data: { url: previewToRemove.original } });
+                              } catch (err) {
+                                console.warn('[FastFoodForm] Permanent deletion failed:', err.message);
+                              }
+                            }
+
                             // Remove from previews
                             const newPreviews = galleryPreviews.filter((_, i) => i !== index);
                             setGalleryPreviews(newPreviews);
 
-                            if (preview.isFile) {
+                            if (previewToRemove.isFile) {
                               // Remove from new files list
-                              const newFiles = formData.newGalleryFiles.filter(f => f !== preview.original);
+                              const newFiles = formData.newGalleryFiles.filter(f => f !== previewToRemove.original);
                               setFormData(prev => ({ ...prev, newGalleryFiles: newFiles }));
                             } else {
                               // Remove from existing images list
-                              const newExisting = formData.galleryImages.filter(img => img !== preview.original);
+                              const newExisting = formData.galleryImages.filter(img => img !== previewToRemove.original);
                               setFormData(prev => ({ ...prev, galleryImages: newExisting }));
                             }
                           }}

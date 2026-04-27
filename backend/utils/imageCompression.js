@@ -48,7 +48,7 @@ async function compressImage(inputPath, outputPath, options = {}) {
 
     let buffer = await sharp(inputPath)
       .resize(newWidth, newHeight, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: startQuality, progressive: true, mozjpeg: true })
+      .jpeg({ quality: startQuality, progressive: true, mozjpeg: false }) // Disabled mozjpeg for faster processing in shared hosting
       .toBuffer();
 
     // PASS 2: Emergency shrink (Only if Pass 1 failed 1MB limit)
@@ -117,17 +117,18 @@ async function compressUploadedImages(req, res, next) {
       return next();
     }
 
-    const compressionPromises = filesToProcess.map(async (file) => {
+    // Use a serial loop instead of Promise.all to prevent CPU spikes in shared hosting environments
+    for (const file of filesToProcess) {
       // Robust check for image mimetype
       if (!file?.mimetype || !file.mimetype.startsWith('image/')) {
         console.log(`[Compression] Skipping non-image file: ${file?.fieldname}`);
-        return { skipped: true, reason: 'non-image' };
+        continue;
       }
 
       const inputPath = file.path;
       if (!inputPath || !fs.existsSync(inputPath)) {
         console.warn(`[Compression] Input path missing for ${file.originalname}`);
-        return { skipped: true, reason: 'path-missing' };
+        continue;
       }
 
       const parsed = path.parse(file.filename || path.basename(inputPath));
@@ -152,7 +153,7 @@ async function compressUploadedImages(req, res, next) {
           }
           // LOG instead of throwing to prevent global 500 if one secondary image fails
           console.error(`[Compression] Failed to compress ${file.originalname}: ${result.error}`);
-          return { skipped: true, reason: 'compression-failed', detail: result.error };
+          continue;
         }
 
         // SWAP FILES
@@ -175,16 +176,12 @@ async function compressUploadedImages(req, res, next) {
         file.originalname = `${path.parse(file.originalname).name}.jpg`;
 
         console.log(`[Compression] Converted ${file.filename} to JPEG: ${result.compressionRatio} reduction`);
-        return result;
       } catch (innerErr) {
         console.error(`[Compression] Fatal error processing ${file.originalname}:`, innerErr);
         // Clean up temp file if it exists
         if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-        return { skipped: true, reason: 'fatal-error', detail: innerErr.message };
       }
-    });
-
-    await Promise.all(compressionPromises);
+    }
     next();
   } catch (error) {
     console.error('Image compression middleware error:', error);

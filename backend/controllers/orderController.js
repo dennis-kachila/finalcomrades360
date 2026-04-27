@@ -894,6 +894,19 @@ const createOrderFromCart = async (req, res) => {
         }
 
         await product.save({ transaction: t });
+
+        // Real-time Stock Alerts
+        try {
+          const { notifySellerStockEvent } = require('../utils/notificationHelpers');
+          const currentStock = parseInt(product.stock) || 0;
+          if (currentStock === 0) {
+            notifySellerStockEvent(product, 'out_of_stock').catch(e => console.warn('Out of stock alert failed:', e.message));
+          } else if (currentStock <= (parseInt(product.lowStockThreshold) || 5)) {
+            notifySellerStockEvent(product, 'low_stock').catch(e => console.warn('Low stock alert failed:', e.message));
+          }
+        } catch (alertErr) {
+          console.warn('Failed to initiate stock alert:', alertErr.message);
+        }
       }
     }
 
@@ -3195,7 +3208,6 @@ const sellerConfirmOrder = async (req, res) => {
       return res.status(400).json({ success: false, error: `Cannot confirm order in status: ${order.status}` });
     }
 
-    updates.status = 'seller_confirmed';
     updates.sellerConfirmed = true;
     updates.sellerConfirmedAt = new Date();
     updates.sellerConfirmedBy = req.user.id;
@@ -3203,9 +3215,11 @@ const sellerConfirmOrder = async (req, res) => {
     if (routePolicy.isFastFoodOnlyOrder) {
       // Fast-food seller confirmation is direct seller -> customer.
       // Do not require or persist warehouse/pickup destination on seller confirm.
+      updates.status = 'awaiting_delivery_assignment';
       updates.warehouseId = null;
       updates.pickupStationId = null;
     } else {
+      updates.status = 'seller_confirmed';
       if (warehouseId) {
         updates.warehouseId = warehouseId;
         updates.pickupStationId = null; // Mutually exclusive
@@ -3217,14 +3231,31 @@ const sellerConfirmOrder = async (req, res) => {
       if (submissionDeadline) updates.submissionDeadline = submissionDeadline;
       if (shippingType) {
         updates.shippingType = shippingType;
-        // NOTE: We intentionally do NOT set deliveryType here.
-        // The shippingType (shipped_from_seller / collected_from_seller) is a seller logistics preference.
-        // The actual delivery route leg (seller_to_warehouse, seller_to_customer, etc.) is determined
-        // by the admin when they assign the delivery agent via the DeliveryAssignmentModal.
       }
     }
 
+    const oldStatus = order.status;
     await order.update(updates);
+
+    // Trigger Auto-Dispatch / Task Creation for applicable statuses
+    if (['awaiting_delivery_assignment', 'seller_confirmed'].includes(updates.status)) {
+      try {
+        const { autoCreateDeliveryTask } = require('./orderTransitionController');
+        await autoCreateDeliveryTask(order, oldStatus, updates.status);
+        
+        const autoDispatchService = require('../services/autoDispatchService');
+        const configRecord = await PlatformConfig.findOne({ where: { key: 'logistic_settings' } });
+        const settings = configRecord ? (typeof configRecord.value === 'string' ? JSON.parse(configRecord.value) : configRecord.value) : {};
+        if (settings.autoDispatchOrders) {
+          // If direct_delivery, maybe it needs to be pushed to awaiting_delivery_assignment first?
+          // The autoCreateDeliveryTask creates a task, but the order status is still seller_confirmed.
+          // Let's run auto-dispatch anyway; it might find the task and assign it.
+          autoDispatchService.runAutoDispatch(order.id).catch(err => console.error('[AutoDispatch] Failed:', err));
+        }
+      } catch (e) {
+        console.error('[AutoDispatch] Trigger failed in sellerConfirmOrder:', e);
+      }
+    }
 
     // Notify customer
     try {

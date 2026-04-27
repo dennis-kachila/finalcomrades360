@@ -57,7 +57,8 @@ const getCategoriesWithProductCounts = async (req, res) => {
           where: {
             categoryId: category.id,
             approved: true,
-            visibilityStatus: { [Op.ne]: 'hidden' }
+            visibilityStatus: { [Op.ne]: 'hidden' },
+            stock: { [Op.gt]: 0 }
           }
         });
 
@@ -74,7 +75,8 @@ const getCategoriesWithProductCounts = async (req, res) => {
               where: {
                 subcategoryId: subcategory.id,
                 approved: true,
-                visibilityStatus: { [Op.ne]: 'hidden' }
+                visibilityStatus: { [Op.ne]: 'hidden' },
+                stock: { [Op.gt]: 0 }
               }
             });
 
@@ -133,7 +135,8 @@ const getCategoryByIdWithProducts = async (req, res) => {
       where: {
         categoryId: id,
         approved: true,
-        visibilityStatus: { [Op.ne]: 'hidden' }
+        visibilityStatus: { [Op.ne]: 'hidden' },
+        stock: { [Op.gt]: 0 }
       },
       include: [{
         model: models.User,
@@ -208,7 +211,8 @@ const getSubcategoryByIdWithProducts = async (req, res) => {
       where: {
         subcategoryId: id,
         approved: true,
-        visibilityStatus: { [Op.ne]: 'hidden' }
+        visibilityStatus: { [Op.ne]: 'hidden' },
+        stock: { [Op.gt]: 0 }
       },
       include: [{
         model: models.User,

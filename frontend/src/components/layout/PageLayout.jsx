@@ -1,7 +1,16 @@
 import React, { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { usePlatform } from '../../contexts/PlatformContext';
 
-const PageLayout = ({ children, title = 'Comrades360', description = 'Your one-stop e-commerce destination', fluid = false }) => {
+const PageLayout = ({ children, title, description, fluid = false }) => {
+  const { settings } = usePlatform();
+  
+  const siteName = settings.platform?.siteName || 'Comrades360';
+  const defaultDescription = settings.seo?.description || 'Your one-stop e-commerce destination';
+  
+  const pageTitle = title ? `${title} | ${siteName}` : siteName;
+  const pageDescription = description || defaultDescription;
+
   // Preload critical assets
   useEffect(() => {
     // Preload web fonts if any
@@ -18,8 +27,8 @@ const PageLayout = ({ children, title = 'Comrades360', description = 'Your one-s
   return (
     <div className="page-container">
       <Helmet>
-        <title>{title} | Comrades360</title>
-        <meta name="description" content={description} />
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
 
 
         {/* Preconnect to external domains */}

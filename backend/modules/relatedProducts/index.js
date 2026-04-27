@@ -226,7 +226,8 @@ class RelatedProductsModule {
           visibilityStatus: 'visible',
           suspended: false,
           isActive: true,
-          status: 'active'
+          status: 'active',
+          stock: { [Op.gt]: 0 }
         },
         attributes: [
           'id', 'name', 'shortDescription', 'basePrice', 'displayPrice',

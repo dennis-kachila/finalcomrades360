@@ -6,6 +6,7 @@ import { CategoriesProvider } from './contexts/CategoriesContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import { WishlistProvider } from './contexts/WishlistContext';
+import { PlatformProvider, usePlatform } from './contexts/PlatformContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -220,18 +221,20 @@ const DeliveryWallet = lazy(() => import('./pages/dashboard/delivery/Wallet'));
 const AppWithProviders = () => (
   <ErrorBoundary>
     <HelmetProvider>
-      <AuthProvider>
-        <RealtimeSync />
-        <CategoriesProvider>
-          <CartProvider>
-            <WishlistProvider>
-              <Suspense fallback={<PageLoading />}>
-                <AppContent />
-              </Suspense>
-            </WishlistProvider>
-          </CartProvider>
-        </CategoriesProvider>
-      </AuthProvider>
+      <PlatformProvider>
+        <AuthProvider>
+          <RealtimeSync />
+          <CategoriesProvider>
+            <CartProvider>
+              <WishlistProvider>
+                <Suspense fallback={<PageLoading />}>
+                  <AppContent />
+                </Suspense>
+              </WishlistProvider>
+            </CartProvider>
+          </CategoriesProvider>
+        </AuthProvider>
+      </PlatformProvider>
     </HelmetProvider>
   </ErrorBoundary>
 );
@@ -246,44 +249,25 @@ const AppContent = () => {
   const [referrerName, setReferrerName] = useState(localStorage.getItem('referrerName') || '');
   const [bannerDismissed, setBannerDismissed] = useState(localStorage.getItem('referrerBannerDismissed') === 'true');
 
+  const { settings, loading: settingsLoading } = usePlatform();
+
   // On app load, fire one quick API call; if we get 503+maintenance redirect immediately
   useEffect(() => {
     // Never redirect away from admin, maintenance, or login paths
     const adminRoles = ['admin', 'super_admin', 'superadmin'];
     const adminPaths = ['/dashboard', '/dashboard-login', '/maintenance', '/login'];
     const isAdminPath = adminPaths.some(p => window.location.pathname.startsWith(p));
+    
     if (isAdminPath) return;
-    try {
-      const stored = localStorage.getItem('user');
-      if (stored) {
-        const u = JSON.parse(stored);
-        if (adminRoles.includes(u?.role) || u?.roles?.some(r => adminRoles.includes(r))) return;
+
+    if (settings.maintenance?.enabled) {
+      const isAdmin = adminRoles.includes(user?.role) || user?.roles?.some(r => adminRoles.includes(r));
+      if (!isAdmin) {
+        if (settings.maintenance?.message) sessionStorage.setItem('maintenance_message', settings.maintenance.message);
+        window.location.href = '/maintenance';
       }
-    } catch (_) {}
-
-    const fetchPlatformStatus = () => {
-      api.get('/platform/status').then(res => {
-        if (res.data.success) {
-          localStorage.setItem('maintenance_settings', JSON.stringify({
-            dashboards: res.data.dashboards || {},
-            sections: res.data.sections || {}
-          }));
-        }
-      }).catch(err => {
-        if (err.response?.status === 503 && err.response?.data?.maintenance) {
-          const msg = err.response.data?.message;
-          if (msg) sessionStorage.setItem('maintenance_message', msg);
-          window.location.href = '/maintenance';
-        }
-      });
-    };
-
-    fetchPlatformStatus();
-
-    // Listen for real-time maintenance updates to re-sync global state
-    window.addEventListener('maintenance-settings-updated', fetchPlatformStatus);
-    return () => window.removeEventListener('maintenance-settings-updated', fetchPlatformStatus);
-  }, []);
+    }
+  }, [settings.maintenance, user]);
 
   // Handle referral links and marketing mode from URL
   useEffect(() => {

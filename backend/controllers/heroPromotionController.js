@@ -240,14 +240,14 @@ const listActiveHeroPromotions = async (req, res) => {
       if (p.promoType === 'fastfood') {
         const ids = p.fastFoodIds || []
         const fastfoods = ids.length > 0 ? await FastFood.findAll({
-          where: { id: { [Op.in]: ids } },
+          where: { id: { [Op.in]: ids }, isAvailable: true },
           attributes: ['id', 'name', 'mainImage', 'galleryImages', 'basePrice', 'displayPrice', 'discountPrice', 'discountPercentage']
         }) : []
         result.push({ ...p.toJSON(), fastfoods })
       } else {
         const ids = p.productIds || []
         const prods = ids.length > 0 ? await Product.findAll({
-          where: { id: { [Op.in]: ids } },
+          where: { id: { [Op.in]: ids }, stock: { [Op.gt]: 0 } },
           attributes: ['id', 'name', 'coverImage', 'galleryImages', 'price', 'displayPrice', 'discountPrice', 'discountPercentage']
         }) : []
         result.push({ ...p.toJSON(), products: prods })

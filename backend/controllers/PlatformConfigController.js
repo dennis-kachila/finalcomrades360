@@ -174,15 +174,13 @@ exports.updateConfig = async (req, res) => {
             await config.save();
         }
 
-        // Broadcast maintenance updates via WebSockets
-        if (key === 'maintenance_settings') {
-            console.log('[PlatformConfigController] Broadcasting maintenance update...');
-            emitRealtimeUpdate('maintenance', { 
-                action: 'update',
-                key: 'maintenance_settings',
-                settings: value 
-            });
-        }
+        // Broadcast all configuration updates via WebSockets for real-time UI synchronization
+        console.log(`[PlatformConfigController] Broadcasting update for ${key}...`);
+        emitRealtimeUpdate('platform_settings', { 
+            action: 'update',
+            key: key,
+            settings: value 
+        });
 
         // Trigger WhatsApp re-initialization if config changes
         if (key === 'whatsapp_config') {

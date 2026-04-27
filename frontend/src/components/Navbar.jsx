@@ -4,10 +4,12 @@ import { FaBell, FaShoppingCart, FaUser, FaSignOutAlt, FaCog, FaStore, FaBullhor
 import { useCart } from "../contexts/CartContext";
 import { useCategories } from "../contexts/CategoriesContext";
 import { useAuth } from "../contexts/AuthContext";
+import { usePlatform } from "../contexts/PlatformContext";
 import api from '../services/api';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { settings: platformSettings } = usePlatform();
   const isLoggedIn = !!user;
   const isStationUser = user?.role === 'station_manager' || user?.roles?.includes('station_manager') || user?.roles?.includes('warehouse_manager') || user?.roles?.includes('pickup_station_manager');
   const userRoles = Array.isArray(user?.roles) ? user.roles : (user?.role ? [user.role] : []);
@@ -100,27 +102,9 @@ export default function Navbar() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   
-  // Maintenance Visibility Logic
-  const [maintenance, setMaintenance] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('maintenance_settings') || '{}');
-    } catch {
-      return {};
-    }
-  });
-
-  useEffect(() => {
-    const handleUpdate = (e) => {
-      const data = e.detail || (e.key === 'maintenance_settings' ? JSON.parse(e.newValue || '{}') : null);
-      if (data) setMaintenance(data);
-    };
-    window.addEventListener('maintenance-settings-updated', handleUpdate);
-    window.addEventListener('storage', handleUpdate);
-    return () => {
-      window.removeEventListener('maintenance-settings-updated', handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
-    };
-  }, []);
+  // Maintenance Visibility Logic (now using global context)
+  const maintenance = platformSettings.maintenance;
+  const siteName = platformSettings.platform?.siteName || 'Comrades360';
 
   const isAdmin = (userRoles.includes('admin') || userRoles.includes('super_admin') || userRoles.includes('superadmin'));
   
@@ -261,7 +245,7 @@ export default function Navbar() {
             {/* Left side: Logo + Categories */}
             <div className="flex items-center space-x-6">
               <div className="text-2xl font-bold">
-                <Link to={isStationUser ? "/station" : "/"} className="text-blue-600 hover:text-blue-800 cursor-pointer">Comrades360</Link>
+                <Link to={isStationUser ? "/station" : "/"} className="text-blue-600 hover:text-blue-800 cursor-pointer">{siteName}</Link>
               </div>
 
               {!isStationUser && (
@@ -579,7 +563,7 @@ export default function Navbar() {
                 >
                   <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>
-                <Link to={isStationUser ? "/station" : "/"} className="flex items-center text-base font-bold text-blue-600 tracking-tight leading-none">Comrades360</Link>
+                <Link to={isStationUser ? "/station" : "/"} className="flex items-center text-base font-bold text-blue-600 tracking-tight leading-none">{siteName}</Link>
               </div>
 
               {/* Right: cart + notifications + user */}
@@ -674,7 +658,7 @@ export default function Navbar() {
               ) : (
                 <div className="p-4 bg-blue-600 text-white">
                   <div className="flex justify-between items-center mb-6">
-                    <span className="text-xl font-black italic tracking-tighter">Comrades360</span>
+                    <span className="text-xl font-black italic tracking-tighter">{siteName}</span>
                     <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 hover:bg-white/10 rounded-full">
                       <FaTimes size={20} />
                     </button>

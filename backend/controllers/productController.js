@@ -979,7 +979,8 @@ const getSuperAdminProducts = async (req, res) => {
           visibilityStatus: 'visible',
           suspended: false,
           isActive: true,
-          status: 'active'
+          status: 'active',
+          stock: { [Op.gt]: 0 }
         },
         include: [
           {
@@ -1214,7 +1215,7 @@ const getProductById = async (req, res) => {
     const userRoleStr = String(role || '').toLowerCase();
     const isAdminViewer = ['superadmin', 'super_admin', 'super-admin', 'admin'].includes(userRoleStr);
     const isOwner = req.user && req.user.id === product.sellerId;
-    const isLive = product.approved && product.visibilityStatus === 'visible' && !product.suspended && product.isActive && product.status === 'active';
+    const isLive = product.approved && product.visibilityStatus === 'visible' && !product.suspended && product.isActive && product.status === 'active' && product.stock > 0;
 
     if (!isLive && !isAdminViewer && !isOwner) {
       console.log('[getProductById] Visibility check failed. Product not live and user is not owner/admin.');

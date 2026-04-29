@@ -231,7 +231,7 @@ async function notifyAdminTaskRejection(orderId, orderNumber, agentName, reason)
 /**
  * Notify customer that the order has been placed (Structured receipt format)
  */
-async function notifyCustomerOrderPlaced(order, customer, itemsCount, itemNames) {
+async function notifyCustomerOrderPlaced(order, customer, itemsCount, itemNames, referralCode = null) {
     const deliveryMethod = order.deliveryMethod === 'pick_station' ? 'Pickup Station' : 'Home Delivery';
     const name = customer?.name || order.customerName || 'Customer';
     const phone = customer?.phone || order.customerPhone;
@@ -243,7 +243,7 @@ async function notifyCustomerOrderPlaced(order, customer, itemsCount, itemNames)
     const paymentMethod = order.paymentType === 'cash_on_delivery' ? 'Cash on Delivery' : 'Paid';
 
     const siteUrl = process.env.FRONTEND_URL || 'https://comrades360.shop';
-    const trackUrl = `${siteUrl}/track/${order.orderNumber}`;
+    const trackUrl = `${siteUrl}/track/${order.orderNumber}${referralCode ? `?ref=${referralCode}` : ''}`;
 
     const defaultTemplate = `Hello {name}, your order #{orderNumber} has been placed successfully! 🛍️\n\nItems:\n{itemsList}\n\nTotal: KES {total}\nPayment: {paymentMethod}\n\nDelivery Information:\nMethod: {deliveryMethod}\nLocation: {deliveryLocation}\n\nTrack your order here: {trackUrl}`;
 
@@ -256,6 +256,8 @@ async function notifyCustomerOrderPlaced(order, customer, itemsCount, itemNames)
         deliveryMethod,
         deliveryLocation,
         trackUrl,
+        phone: phone,
+        email: customer?.email || order.customerEmail,
         title: 'Order Placed 🛍️',
         type: 'success',
         defaultTemplate
@@ -310,10 +312,11 @@ async function notifyCustomerReadyForPickupStation(order, station) {
         stationName: station.name,
         stationLocation: station.location || station.address || 'N/A',
         stationPhone: station.phone || 'N/A',
-        title: 'Ready for Collection 📦',
         type: 'success',
-        defaultTemplate
-    }, { id: order.userId }, order);
+        defaultTemplate,
+        phone: order.customerPhone,
+        email: order.customerEmail
+    }, { id: order.userId, name: order.customerName, phone: order.customerPhone, email: order.customerEmail }, order);
 }
 
 /**
@@ -327,10 +330,11 @@ async function notifyCustomerAgentArrived(order, agent) {
         agentName: agent.name,
         orderNumber: order.orderNumber,
         phone: agent.phone || 'N/A',
-        title: 'Agent Arrived 📍',
         type: 'success',
-        defaultTemplate
-    }, { id: order.userId }, order);
+        defaultTemplate,
+        phone: order.customerPhone,
+        email: order.customerEmail
+    }, { id: order.userId, name: order.customerName, phone: order.customerPhone, email: order.customerEmail }, order);
 }
 
 /**
@@ -345,8 +349,33 @@ async function notifyCustomerOrderCancelled(order, reason) {
         reason: reason || 'N/A',
         title: 'Order Cancelled ❌',
         type: 'alert',
-        defaultTemplate
-    }, { id: order.userId }, order);
+        defaultTemplate,
+        phone: order.customerPhone,
+        email: order.customerEmail
+    }, { id: order.userId, name: order.customerName, phone: order.customerPhone, email: order.customerEmail }, order);
+}
+
+/**
+ * Notify customer that the order is out for delivery
+ */
+async function notifyCustomerOutForDelivery(order, agent) {
+    const name = order.User?.name || order.customerName || 'Customer';
+    const agentName = agent?.name || 'our delivery agent';
+    const agentPhone = agent?.phone || 'N/A';
+    
+    const defaultTemplate = `Hello {name}, your order #{orderNumber} is out for delivery! 🚚\n\nAgent {agentName} (${agentPhone}) is on the way to your location.\n\nPlease keep your phone reachable. Thank you!`;
+
+    await sendCustomerNotificationAcrossChannels('orderOutForDelivery', {
+        name: name,
+        agentName: agentName,
+        agentPhone: agentPhone,
+        orderNumber: order.orderNumber,
+        title: 'Out for Delivery 🚚',
+        type: 'info',
+        defaultTemplate,
+        phone: order.customerPhone,
+        email: order.customerEmail
+    }, { id: order.userId, name: order.customerName, phone: order.customerPhone, email: order.customerEmail }, order);
 }
 
 /**
@@ -481,7 +510,61 @@ async function notifySellerStockEvent(product, type) {
     logNotify(`NOTIFIED: Seller ${seller.id} about ${type} for product ${product.id}`);
 }
 
-module.exports = { 
+/**
+ * Notify user about their National ID / Account verification status
+ * Called by adminVerificationController after approve/reject
+ */
+async function notifyUserIdStatusUpdate(user, action, rejectionReason = null) {
+    if (!user) return;
+
+    const isApproved = action === 'approve';
+
+    const title = isApproved
+        ? '✅ Account Verified'
+        : '❌ Verification Rejected';
+
+    const defaultTemplate = isApproved
+        ? `Hello {name},\n\nGreat news! Your identity has been verified and your Comrades360account is now fully activated.\n\nYou can now access all features including applying for seller, delivery, or service provider roles.\n\nWelcome to the verified community!\n\n— Comrades360 Team`
+        : `Hello {name},\n\nWe regret to inform you that your identity verification was not successful.\n\nReason: {rejectionReason}\n\nPlease log in and re-upload a clear, valid National ID document to try again.\n\nIf you believe this is an error, contact our support team.\n\n— Comrades360 Team`;
+
+    const templateKey = isApproved ? 'idVerificationApproved' : 'idVerificationRejected';
+
+    await sendCustomerNotificationAcrossChannels(templateKey, {
+        name: user.name || 'Customer',
+        rejectionReason: rejectionReason || 'Document could not be verified.',
+        title,
+        type: isApproved ? 'success' : 'alert',
+        defaultTemplate
+    }, user);
+}
+
+
+/**
+ * Send a thank you message to customer after delivery
+ */
+async function notifyCustomerOrderThankYou(order, type = 'all') {
+    const name = order.User?.name || order.customerName || 'Customer';
+    const orderNumber = order.orderNumber;
+    
+    let suffix = '';
+    if (type === 'fastfood') suffix = ' Hope you enjoyed your meal! 🍔';
+    if (type === 'product') suffix = ' We hope you love your new purchase! 🛍️';
+
+    const defaultTemplate = `Hello {name}, thank you for shopping with Comrades360! 🌟\n\nYour order #{orderNumber} has been delivered.${suffix}\n\nWe value your support and look forward to serving you again soon!`;
+
+    await sendCustomerNotificationAcrossChannels('orderThankYou', {
+        name,
+        orderNumber,
+        suffix,
+        title: 'Thank You for Your Order! 🌟',
+        type: 'success',
+        defaultTemplate,
+        phone: order.customerPhone,
+        email: order.customerEmail
+    }, { id: order.userId, name, phone: order.customerPhone, email: order.customerEmail }, order);
+}
+
+module.exports = {
     createNotification,
     notifyDeliveryAgentAssignment,
     notifyAdminTaskRejection,
@@ -495,6 +578,8 @@ module.exports = {
     notifyCustomerGoogleSignup,
     notifyMarketerOrderPlaced,
     notifySellerStockEvent,
+    notifyUserIdStatusUpdate,
+    notifyCustomerOrderThankYou,
     logNotify,
     sendCustomerNotificationAcrossChannels
 };

@@ -6,6 +6,7 @@ const { sendEmail } = require("../utils/mailer");
 const { sendMessage } = require("../utils/messageService");
 const { sanitizeUserPayload } = require("../utils/userUtils");
 const { getDynamicMessage } = require("../utils/templateUtils");
+const { mirrorOtpToSocket } = require("../utils/otpUtils");
 
 const { uploadProfileImages } = require("../config/multer");
 const { geocodeAddress } = require("../utils/geocodingUtils");
@@ -103,7 +104,7 @@ const confirmEmailChange = async (req, res, next) => {
 // Request phone change: generate OTP, store pendingPhone
 const requestPhoneOtp = async (req, res, next) => {
   const userId = req.user.id;
-  const { newPhone, method } = req.body || {};
+  const { newPhone, method, socketId } = req.body || {};
   try {
     if (!newPhone) return res.status(400).json({ message: 'New phone number is required.' });
 
@@ -137,10 +138,14 @@ const requestPhoneOtp = async (req, res, next) => {
     try {
       const deliveryMethod = method === 'sms' ? 'sms' : 'whatsapp';
       const message = await getDynamicMessage('phoneVerification', 
-        `Your Comrades360 verification OTP is {otp}. It expires in 10 minutes.`,
+        `Your Comrades360 verification OTP is {otp}. It expires in 10 minutes.\n\n@comrades360.shop #{otp}`,
         { name: user.name || user.username || 'User', otp }
       );
       await sendMessage(norm, message, deliveryMethod);
+      
+      if (socketId) {
+        mirrorOtpToSocket(socketId, otp, 'phoneChange');
+      }
     } catch (err) {
       console.error(`Error sending OTP via ${method || 'WhatsApp'}:`, err.message);
     }
@@ -205,6 +210,7 @@ const changePassword = async (req, res, next) => {
     if (!ok) return res.status(400).json({ message: 'Current password is incorrect.' });
     const hashed = await bcrypt.hash(newPassword, 10);
     user.password = hashed;
+    user.mustChangePassword = false;
     await user.save();
     res.json({ message: 'Password updated successfully.' });
   } catch (e) {

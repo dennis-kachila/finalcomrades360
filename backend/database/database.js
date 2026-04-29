@@ -237,8 +237,11 @@ const testConnection = async () => {
               agentTaskAssigned: 'You have been assigned a new delivery task for order #{orderNumber}. Type: {deliveryType}',
               agentTaskReassigned: 'A delivery task for order #{orderNumber} has been reassigned to you.',
               adminTaskRejected: 'Delivery agent {agentName} rejected task for order #{orderNumber}. Reason: {reason}',
-              phoneVerification: 'Your Comrades360 verification OTP is {otp}. It expires in 10 minutes.',
-              passwordReset: 'Your Comrades360 password reset code is {otp}. It expires in {minutes} minutes.',
+              phoneVerification: 'Your Comrades360 verification OTP is {otp}. It expires in 10 minutes.\n\n@comrades360.shop #{otp}',
+              registrationOtp: 'Your Comrades360 registration code is: {otp}. It expires in {minutes} minutes.\n\n@comrades360.shop #{otp}',
+              guestCheckoutOtp: 'Your Comrades360 guest checkout code is: {otp}. Valid for 10 minutes.\n\n@comrades360.shop #{otp}',
+              passwordReset: 'Your Comrades360 password reset code is {otp}. It expires in {minutes} minutes.\n\n@comrades360.shop #{otp}',
+              securityChangeOtp: 'Your Comrades360 security change OTP is {otp}. It expires in 10 minutes.\n\n@comrades360.shop #{otp}',
               withdrawalStatus: 'Your withdrawal of KES {amount} has been processed successfully! 💰'
             },
             channels: {

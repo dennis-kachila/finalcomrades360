@@ -51,6 +51,7 @@ const adminMenuItems = [
     roles: ['admin', 'superadmin', 'super_admin', 'logistics_manager', 'delivery_agent'],
     children: [
       { name: 'All Orders', path: '/dashboard/orders', icon: <FaShoppingCart className="mr-2" /> },
+      { name: 'Direct Orders', path: '/dashboard/direct-orders', icon: <FaPlus className="mr-2" /> },
       { name: 'Return Requests', path: '/dashboard/orders/returns', icon: <FaUndo className="mr-2" /> },
       { name: 'My Sales Management', path: '/dashboard/orders/my-sales', icon: <FaMoneyBillWave className="mr-2" /> },
       { name: 'Order Analytics', path: '/dashboard/orders/analytics', icon: <FaChartLine className="mr-2" /> }
@@ -75,6 +76,7 @@ const adminMenuItems = [
     roles: ['admin', 'superadmin', 'super_admin'],
     children: [
       { name: 'Management Overview', path: '/dashboard/product-management', icon: <FaTachometerAlt className="mr-2" /> },
+      { name: 'On-Behalf Creation', path: '/dashboard/on-behalf-creation', icon: <FaPlus className="mr-2" /> },
       { name: 'Product Directory', path: '/dashboard/products', icon: <FaBox className="mr-2" /> },
       { name: 'Categories', path: '/dashboard/categories', icon: <FaBoxes className="mr-2" /> },
       { name: 'FastFood', path: '/dashboard/fastfood', icon: <FaUtensils className="mr-2" /> },
@@ -123,6 +125,7 @@ const adminMenuItems = [
       { name: 'Marketers', path: '/dashboard/users/marketers', icon: <FaBullhorn className="mr-2" /> },
       { name: 'Product Promo Requests', path: '/dashboard/marketing/hero-promotions', icon: <FaAward className="mr-2" /> },
       { name: 'FastFood Promo Requests', path: '/dashboard/marketing/fastfood-promotions', icon: <FaUtensils className="mr-2" /> },
+      { name: 'Daily Thank You Messages', path: '/dashboard/marketing/thank-you', icon: <FaComments className="mr-2" /> },
       { name: 'Create Promotion', path: '/dashboard/marketing/hero-promotions/create', icon: <FaPlus className="mr-2" /> },
       { name: 'FastFood Banner Config', path: '/dashboard/fastfood/hero-settings', icon: <FaUtensils className="mr-2" /> }
     ]

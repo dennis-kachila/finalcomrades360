@@ -419,11 +419,50 @@ function Checkout() {
     }
   }, [paymentId, pollingPayment, paymentCompleted]);
 
-  // Redirect if not authenticated (NOW DISABLED for Guest Checkout)
   useEffect(() => {
     // We no longer redirect to login. Guests are welcome!
     console.log('👤 Checkout Auth State:', user ? `Logged in as ${user.name}` : 'Guest User');
   }, [user, cartLoading]);
+
+  // ── Multi-channel OTP monitoring (SMS, WhatsApp, Email) ──────────────────
+  useEffect(() => {
+    if (!otpSent || isGuestVerified) return;
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleOtpReceived = (data) => {
+      console.log('[OTP-Monitor] Received code via socket:', data);
+      if (data.otp && data.type === 'guestCheckout') {
+        setOtpCode(data.otp.toString());
+        // Automatically trigger verification
+        handleVerifyGuestOtpDirect(data.otp.toString());
+      }
+    };
+
+    socket.on('otp:received', handleOtpReceived);
+    return () => socket.off('otp:received', handleOtpReceived);
+  }, [otpSent, isGuestVerified]);
+
+  const handleVerifyGuestOtpDirect = async (code) => {
+    if (!code || code.length < 4) return;
+    setIsVerifyingOtp(true);
+    setOtpError('');
+    try {
+      const res = await api.post('/verification/verify-guest-otp', {
+        phone: formData.customerPhone,
+        otp: code
+      });
+      if (res.data.success) {
+        setIsGuestVerified(true);
+        setOtpSent(false);
+      }
+    } catch (err) {
+      setOtpError(err.response?.data?.message || 'Invalid code');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
 
   const selectedOrderBatch = useMemo(() => {
     if (!selectedOrderBatchId) return null;
@@ -517,7 +556,8 @@ function Checkout() {
     try {
       const res = await api.post('/verification/request-guest-otp', { 
         phone: formData.customerPhone,
-        method: verificationMethod
+        method: verificationMethod,
+        socketId: getSocket()?.id
       });
       if (res.data.success) {
         setOtpSent(true);

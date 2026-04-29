@@ -560,6 +560,11 @@ exports.createFastFood = async (req, res, next) => {
 // Update fast food item
 exports.updateFastFood = async (req, res, next) => {
     try {
+        console.log(`[updateFastFood] Starting update for item ID: ${req.params.id} by user: ${req.user.id}`);
+        
+        // Prepare update data early to avoid TDZ (Temporal Dead Zone) in production
+        const updateData = { ...req.body };
+        
         const fastFood = await FastFood.findByPk(req.params.id);
         if (!fastFood) {
             return res.status(404).json({ success: false, message: 'Fast food item not found' });
@@ -575,7 +580,6 @@ exports.updateFastFood = async (req, res, next) => {
 
 
         // Handle file uploads if they exist (processed by multer middleware)
-        const updateData = { ...req.body };
 
         // CRITICAL: Protect vendor ownership
         if (updateData.vendorId || updateData.vendor) {

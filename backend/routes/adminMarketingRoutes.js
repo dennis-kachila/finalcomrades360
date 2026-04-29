@@ -1,19 +1,20 @@
-﻿const express = require('express');
-const { auth, adminOnly } = require('../middleware/auth');
-const { getSummary, getMarketersLeaderboard, getMarketerProfile } = require('../controllers/adminMarketingController');
-
+const express = require('express');
 const router = express.Router();
+const { getPotentialRecipients, sendBulkThankYouMessages } = require('../controllers/adminMarketingNotificationController');
+const { auth, adminOnly } = require('../middleware/auth');
 
-// All routes require admin
-router.use(auth, adminOnly);
+/**
+ * @route GET /api/admin/marketing/potential-recipients
+ * @desc Get customers who received deliveries today
+ * @access Admin
+ */
+router.get('/potential-recipients', auth, adminOnly, getPotentialRecipients);
 
-// GET /api/admin/marketing/summary
-router.get('/summary', getSummary);
-
-// GET /api/admin/marketing/marketers
-router.get('/marketers', getMarketersLeaderboard);
-
-// GET /api/admin/marketing/marketers/:id
-router.get('/marketers/:id', getMarketerProfile);
+/**
+ * @route POST /api/admin/marketing/send-bulk-thank-you
+ * @desc Send bulk thank you messages to delivered customers
+ * @access Admin
+ */
+router.post('/send-bulk-thank-you', auth, adminOnly, sendBulkThankYouMessages);
 
 module.exports = router;

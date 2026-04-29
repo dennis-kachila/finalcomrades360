@@ -1,4 +1,5 @@
 const { DataTypes, Model } = require('sequelize');
+const { emitRealtimeUpdate } = require('../utils/realtimeEmitter');
 
 module.exports = (sequelize, DataTypes) => {
   class Category extends Model {
@@ -71,6 +72,11 @@ module.exports = (sequelize, DataTypes) => {
         where: {},
         paranoid: false
       }
+    },
+    hooks: {
+      afterSave: async () => { emitRealtimeUpdate('categories'); },
+      afterDestroy: async () => { emitRealtimeUpdate('categories'); },
+      afterBulkUpdate: async () => { emitRealtimeUpdate('categories'); }
     }
   });
   

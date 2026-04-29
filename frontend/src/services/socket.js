@@ -4,16 +4,19 @@ import { io } from 'socket.io-client';
 // socket.io-client handles the WebSocket upgrade handshake internally.
 // Passing wss:// directly skips the required HTTP handshake and causes 400 errors.
 const getSocketUrl = () => {
-  if (import.meta.env.DEV) return 'http://localhost:5001';
-
-  // Derive from VITE_API_URL (e.g. "https://comrades360.shop/api" -> "https://comrades360.shop")
   const apiUrl = import.meta.env?.VITE_API_URL;
-  if (apiUrl) {
-    // Strip /api suffix to get the server root
+
+  // If VITE_API_URL is relative (starts with /), use the current origin
+  if (apiUrl && apiUrl.startsWith('/')) {
+    return window.location.origin;
+  }
+
+  // If VITE_API_URL is an absolute URL, strip the /api suffix
+  if (apiUrl && apiUrl.startsWith('http')) {
     return apiUrl.replace(/\/api\/?$/, '');
   }
 
-  // Final fallback: use current page origin (works when frontend & backend share the same domain)
+  // Fallback to current origin (works for both localhost and IP)
   return window.location.origin;
 };
 

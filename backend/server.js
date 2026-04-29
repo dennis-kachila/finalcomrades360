@@ -286,6 +286,10 @@ apiRouter.use('/commissions', require('./routes/commissionRoutes'));
 // apiRouter.use('/driver', require('./routes/driverRoutes'));
 apiRouter.use('/admin', require('./routes/adminRoutes'));
 apiRouter.use('/verification', require('./routes/verificationRoutes'));
+apiRouter.use('/social-media-accounts', require('./routes/socialMediaAccountRoutes'));
+console.error('🚀 MOUNTING NEW ROUTES...');
+app.use('/api/analytics', require('./routes/analyticsRoutes'));
+app.use('/api/admin/marketing', require('./routes/adminMarketingRoutes'));
 
 // Mount the API router on both prefixes for maximum compatibility
 app.use('/api', apiRouter);
@@ -335,20 +339,19 @@ app.use('/', apiRouter);
   // Final heavy route modules
   app.use('/api/finance', require('./routes/financeRoutes'));
   app.use('/api/payments', require('./routes/paymentRoutes'));
-  app.use('/api/analytics', require('./routes/analyticsRoutes'));
   app.use('/api/inventory', require('./routes/inventoryRoutes'));
   app.use('/api/payment-enhancements', require('./routes/paymentEnhancementsRoutes'));
   app.use('/api/handover', require('./routes/handoverRoutes'));
   app.use('/api/images', require('./routes/imageRoutes'));
 
   // Newly mounted forgotten modules
-  app.use('/api/admin/marketing', require('./routes/adminMarketingRoutes'));
   app.use('/api/commissions', require('./routes/commissionRoutes'));
   app.use('/api/delivery-messages', require('./routes/deliveryMessageRoutes'));
   app.use('/api/returns', require('./routes/returnRoutes'));
   app.use('/api/sharing', require('./routes/sharingRoutes'));
   app.use('/api/superadmin', require('./routes/superAdminSecurityRoutes'));
   app.use('/api/2fa', require('./routes/twoFactorAuthRoutes'));
+  app.use('/api/social-media-accounts', require('./routes/socialMediaAccountRoutes'));
 
   console.error('✅ 35+ Route modules successfully lazy-loaded.');
 
@@ -600,8 +603,10 @@ async function initializeServices(io) {
     initScheduledTasks();
     
     const { startBatchAutomation } = require('./services/batchAutomation');
+    const { startMarketingAutomation } = require('./services/marketingAutomation');
     const { runAutoHandoverWorker } = require('./services/autoHandoverService');
     startBatchAutomation();
+    startMarketingAutomation();
     runAutoHandoverWorker();
     
     step('4/4: ALL BACKGROUND SERVICES INITIALIZED.');

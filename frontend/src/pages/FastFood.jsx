@@ -151,6 +151,11 @@ export default function FastFood() {
             else setLoadingMore(true);
             const limit = activeTab === 'live' ? '100' : '12';
             const params = new URLSearchParams({ limit, page: pageNum.toString(), view: 'public', search: urlSearchQuery });
+            
+            const urlParams = new URLSearchParams(location.search);
+            const vendorId = urlParams.get('vendorId');
+            if (vendorId) params.append('vendor', vendorId);
+
             if (activeTab === 'all') params.append('browseAll', 'true');
             if (activeTab === 'all' && selectedSubcategory) params.append('subcategoryId', selectedSubcategory.id);
             if (userLocation) {

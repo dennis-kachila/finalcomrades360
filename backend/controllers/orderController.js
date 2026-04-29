@@ -232,11 +232,16 @@ const notifyLifecycleStatusChange = async (orderId, status) => {
       ]
     });
 
-    if (!order || !order.user) {
+    if (!order) {
       return;
     }
 
-    const customer = order.user;
+    const customer = order.user || {
+      name: order.customerName || 'Customer',
+      phone: order.customerPhone,
+      email: order.customerEmail,
+      isGuest: true
+    };
     const { getIO } = require('../realtime/socket');
     const io = getIO();
 
@@ -251,13 +256,15 @@ const notifyLifecycleStatusChange = async (orderId, status) => {
       const title = 'Order Ready for Pickup';
       const message = `Your order #${order.orderNumber} is ready for collection at ${pickupDestination.name}. Location: ${pickupLocation}. Contact: ${pickupPhone}.`;
 
-      await Notification.create({
-        userId: customer.id,
-        title,
-        message,
-        type: 'success',
-        read: false,
-      });
+      if (!customer.isGuest) {
+        await Notification.create({
+          userId: customer.id,
+          title,
+          message,
+          type: 'success',
+          read: false,
+        });
+      }
 
       if (customer.email) {
         await sendEmail(customer.email, title, message);
@@ -267,7 +274,7 @@ const notifyLifecycleStatusChange = async (orderId, status) => {
         // WhatsApp Notification
         await notifyCustomerReadyForPickupStation(order, pickupDestination);
       }
-      if (io) {
+      if (io && !customer.isGuest) {
         io.to(`user:${customer.id}`).emit('orderLifecycleNotification', {
           orderId: order.id,
           orderNumber: order.orderNumber,
@@ -287,13 +294,15 @@ const notifyLifecycleStatusChange = async (orderId, status) => {
       const title = 'Order In Transit';
       const message = `Your order #${order.orderNumber} is now in transit with ${driverName}. Driver contact: ${driverPhone}. ${paymentNote}`;
 
-      await Notification.create({
-        userId: customer.id,
-        title,
-        message,
-        type: 'info',
-        read: false,
-      });
+      if (!customer.isGuest) {
+        await Notification.create({
+          userId: customer.id,
+          title,
+          message,
+          type: 'info',
+          read: false,
+        });
+      }
 
       if (customer.email) {
         await sendEmail(customer.email, title, message);
@@ -303,7 +312,7 @@ const notifyLifecycleStatusChange = async (orderId, status) => {
         // WhatsApp Notification
         await notifyCustomerOutForDelivery(order, order.deliveryAgent);
       }
-      if (io) {
+      if (io && !customer.isGuest) {
         io.to(`user:${customer.id}`).emit('orderLifecycleNotification', {
           orderId: order.id,
           orderNumber: order.orderNumber,

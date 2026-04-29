@@ -2461,6 +2461,66 @@ const withdrawPlatformFunds = async (req, res) => {
   }
 };
 
+const getAdminCreatedItems = async (req, res) => {
+  try {
+    const products = await Product.findAll({
+      where: {
+        addedBy: { [Op.not]: null }
+      },
+      include: [
+        { model: User, as: 'seller', attributes: ['id', 'name', 'email', 'businessName'] },
+        { model: User, as: 'addedByUser', attributes: ['id', 'name', 'email', 'role'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const fastFoods = await FastFood.findAll({
+      where: {
+        addedBy: { [Op.not]: null }
+      },
+      include: [
+        { model: User, as: 'vendorDetail', attributes: ['id', 'name', 'email', 'businessName'] },
+        { model: User, as: 'creator', attributes: ['id', 'name', 'email', 'role'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const formattedProducts = products.map(p => ({
+      id: p.id,
+      itemType: 'product',
+      name: p.name,
+      status: p.status,
+      isActive: p.isActive,
+      createdAt: p.createdAt,
+      owner: p.seller ? (p.seller.businessName || p.seller.name || p.seller.email) : 'Unknown Seller',
+      ownerId: p.sellerId,
+      createdBy: p.addedByUser ? (p.addedByUser.name || p.addedByUser.email) : 'Unknown Admin',
+      creatorRole: p.addedByUser ? p.addedByUser.role : 'N/A'
+    }));
+
+    const formattedFastFoods = fastFoods.map(f => ({
+      id: f.id,
+      itemType: 'fastfood',
+      name: f.name,
+      status: f.status,
+      isActive: f.isActive,
+      createdAt: f.createdAt,
+      owner: f.vendorDetail ? (f.vendorDetail.businessName || f.vendorDetail.name || f.vendorDetail.email) : 'Unknown Vendor',
+      ownerId: f.vendor,
+      createdBy: f.creator ? (f.creator.name || f.creator.email) : 'Unknown Admin',
+      creatorRole: f.creator ? f.creator.role : 'N/A'
+    }));
+
+    const combinedItems = [...formattedProducts, ...formattedFastFoods]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({ success: true, data: combinedItems });
+  } catch (error) {
+    console.error('Error fetching admin created items:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch items', error: error.message });
+  }
+};
+
 module.exports = {
   getAllUsers,
   listDeletionRequests,
@@ -2529,6 +2589,7 @@ module.exports = {
   verifyAdminPassword,
   getRevenueAnalytics,
   getPlatformWalletDetails,
-  withdrawPlatformFunds
+  withdrawPlatformFunds,
+  getAdminCreatedItems
 };
 

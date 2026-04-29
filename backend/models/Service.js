@@ -1,4 +1,5 @@
 const { normalizeItemName } = require('../utils/itemNamePolicy');
+const { emitRealtimeUpdate } = require('../utils/realtimeEmitter');
 
 module.exports = (sequelize, DataTypes) => {
   const Service = sequelize.define('Service', {
@@ -290,6 +291,15 @@ module.exports = (sequelize, DataTypes) => {
           const flatValue = parseFloat(service.marketingCommissionPercentage || service.marketingCommission || 0);
           service.marketingCommission = flatValue;
         }
+      },
+      afterSave: async (service) => {
+        emitRealtimeUpdate('services', { id: service.id });
+      },
+      afterDestroy: async (service) => {
+        emitRealtimeUpdate('services', { id: service.id, deleted: true });
+      },
+      afterBulkUpdate: async (options) => {
+        emitRealtimeUpdate('services');
       }
     },
     indexes: [

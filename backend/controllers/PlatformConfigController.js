@@ -1,9 +1,37 @@
 const { PlatformConfig } = require('../models');
 const { emitRealtimeUpdate } = require('../utils/realtimeEmitter');
 
+const PUBLIC_KEYS = [
+    'platform_settings',
+    'maintenance_settings',
+    'seo_settings',
+    'finance_settings',
+    'logistic_settings',
+    'content_page_about',
+    'content_page_contact',
+    'content_page_terms',
+    'content_page_privacy',
+    'content_page_faq',
+    'content_page_shipping',
+    'content_page_payments',
+    'content_page_size_guide',
+    'content_page_help'
+];
+
 exports.getConfig = async (req, res) => {
     try {
         const { key } = req.params;
+
+        // Security: Only allow public access to non-sensitive keys
+        const userRole = req.user?.role?.toLowerCase();
+        const isAdmin = ['admin', 'superadmin', 'super_admin'].includes(userRole);
+        
+        if (!PUBLIC_KEYS.includes(key) && !isAdmin) {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Access denied. This configuration is not public.' 
+            });
+        }
         
         // Define system defaults
         const defaults = {

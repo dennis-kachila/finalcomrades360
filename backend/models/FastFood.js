@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { normalizeItemName } = require('../utils/itemNamePolicy');
+const { emitRealtimeUpdate } = require('../utils/realtimeEmitter');
 
 module.exports = (sequelize) => {
     const FastFood = sequelize.define('FastFood', {
@@ -401,6 +402,15 @@ module.exports = (sequelize) => {
                         };
                     });
                 }
+            },
+            afterSave: async (fastFood) => {
+                emitRealtimeUpdate('fastfood', { id: fastFood.id });
+            },
+            afterDestroy: async (fastFood) => {
+                emitRealtimeUpdate('fastfood', { id: fastFood.id, deleted: true });
+            },
+            afterBulkUpdate: async (options) => {
+                emitRealtimeUpdate('fastfood');
             }
         }
     });

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FaHistory, FaCheckCircle, FaTimesCircle, FaClock, FaIdCard, FaUserTie } from 'react-icons/fa';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { roleApi } from '../../services/api';
 
@@ -138,6 +139,17 @@ export default function MyApplications() {
                     })}
                 </div>
             )}
+            {/* Work with Us Link at the bottom */}
+            <div className="mt-12 pt-8 border-t border-gray-100 text-center">
+                <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">Want to apply for more roles?</p>
+                <Link 
+                    to="/work-with-us" 
+                    className="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 group"
+                >
+                    <FaUserTie className="group-hover:scale-110 transition-transform" />
+                    Work with Us
+                </Link>
+            </div>
         </div>
     );
 }

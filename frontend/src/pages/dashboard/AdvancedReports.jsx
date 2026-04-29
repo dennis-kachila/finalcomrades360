@@ -105,6 +105,24 @@ export default function AdvancedReports() {
     }
   }, [activeTab, dateRange]);
 
+  const loadTrafficStats = async () => {
+    try {
+      const res = await api.get('/analytics/traffic/stats', { 
+        params: { startDate: dateRange.start, endDate: dateRange.end, period: 'day' } 
+      });
+      setReports(prev => ({
+        ...prev,
+        traffic: res.data
+      }));
+    } catch (err) {
+      console.warn('Failed to load traffic stats:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadTrafficStats();
+  }, [dateRange]);
+
   const exportReport = async (type) => {
     resetAlerts();
     try {
@@ -162,6 +180,7 @@ export default function AdvancedReports() {
 
   const tabs = [
     { id: 'overview', name: 'Overview', icon: '📊' },
+    { id: 'traffic', name: 'Traffic & Performance', icon: '🌐' },
     { id: 'sales', name: 'Sales', icon: '💰' },
     { id: 'users', name: 'Users', icon: '👥' },
     { id: 'growth', name: 'Growth Poster', icon: '🎨' },
@@ -333,6 +352,136 @@ export default function AdvancedReports() {
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Traffic Tab */}
+          {activeTab === 'traffic' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">Traffic & Engagement</h3>
+                <div className="flex gap-2">
+                  <button className="btn-outline btn-sm" onClick={() => exportReport('Traffic Report')}>Export Report</button>
+                </div>
+              </div>
+
+              {/* Traffic Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="card p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-600">{reports.traffic?.summary?.totalVisits || 0}</div>
+                  <div className="text-gray-600">Total Visits</div>
+                </div>
+                <div className="card p-4 text-center">
+                  <div className="text-2xl font-bold text-indigo-600">{reports.traffic?.summary?.totalUniqueVisitors || 0}</div>
+                  <div className="text-gray-600">Unique Visitors</div>
+                </div>
+                <div className="card p-4 text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {reports.traffic?.summary?.totalUniqueVisitors > 0 
+                      ? ((reports.overview?.totalOrders / reports.traffic?.summary?.totalUniqueVisitors) * 100).toFixed(2) 
+                      : 0}%
+                  </div>
+                  <div className="text-gray-600">Site Conversion Rate</div>
+                </div>
+                <div className="card p-4 text-center">
+                  <div className="text-2xl font-bold text-orange-600">{reports.traffic?.topPages?.length || 0}</div>
+                  <div className="text-gray-600">Active Pages</div>
+                </div>
+              </div>
+
+              {/* Traffic Trends */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                  <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span className="text-blue-600">📈</span> Visit Trends
+                  </h4>
+                  <div className="h-72">
+                    {reports.traffic?.trends?.length > 0 ? (
+                      <Line 
+                        data={{
+                          labels: reports.traffic.trends.map(t => t.date),
+                          datasets: [
+                            {
+                              label: 'Total Visits',
+                              data: reports.traffic.trends.map(t => t.visits),
+                              borderColor: 'rgb(59, 130, 246)',
+                              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                              fill: true,
+                              tension: 0.4
+                            },
+                            {
+                              label: 'Unique Visitors',
+                              data: reports.traffic.trends.map(t => t.uniqueVisitors),
+                              borderColor: 'rgb(99, 102, 241)',
+                              backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                              fill: true,
+                              tension: 0.4
+                            }
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: { legend: { position: 'top' } },
+                          scales: { y: { beginAtZero: true } }
+                        }}
+                      />
+                    ) : (
+                      <div className="h-full bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 text-sm italic">
+                        Insufficient traffic data
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="card p-4">
+                  <h4 className="font-semibold mb-4 text-gray-800">🌐 Top Visited Pages</h4>
+                  <div className="space-y-3">
+                    {reports.traffic?.topPages?.length > 0 ? (
+                      reports.traffic.topPages.map((page, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <span className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">{index + 1}</span>
+                            <div className="truncate max-w-[200px]">
+                              <div className="font-medium text-sm truncate">{page.path === '/' ? 'Home Page' : page.path}</div>
+                              <div className="text-[10px] text-gray-500">{page.uniqueVisitors} unique visitors</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-blue-600 text-sm">{page.visits} <span className="text-[10px] font-normal text-gray-400">visits</span></div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center text-gray-400 py-8 text-sm italic">No traffic recorded yet</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Device & Browser Distribution */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="card p-4">
+                    <h4 className="font-semibold mb-4 text-gray-800">📱 Device Distribution</h4>
+                    <div className="h-64">
+                       <Bar 
+                          data={{
+                            labels: reports.traffic?.deviceStats?.map(d => d.deviceType || 'Desktop') || [],
+                            datasets: [{
+                              label: 'Visits',
+                              data: reports.traffic?.deviceStats?.map(d => d.count) || [],
+                              backgroundColor: ['rgba(59, 130, 246, 0.6)', 'rgba(34, 197, 94, 0.6)', 'rgba(168, 85, 247, 0.6)']
+                            }]
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } }
+                          }}
+                       />
+                    </div>
+                 </div>
               </div>
             </div>
           )}

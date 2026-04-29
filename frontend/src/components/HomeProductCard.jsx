@@ -248,8 +248,10 @@ function HomeProductCard({
   const hasDiscount = discountPercent > 0 && finalDisplayPrice < originalPrice;
   const savings = originalPrice - finalDisplayPrice;
 
-  // Check if price is available
   const hasValidPrice = originalPrice > 0;
+
+  // Ensure we only mark as out of stock if stock is EXPLICITLY defined and <= 0
+  const isOutOfStock = product.stock !== undefined && product.stock !== null && Number(product.stock) <= 0;
 
   // If a fixed width is explicitly provided, use it (e.g. from scroll carousels).
   // Otherwise default to w-full so it fills its grid cell properly.
@@ -297,7 +299,7 @@ function HomeProductCard({
         </div>
 
         {/* Out of Stock Overlay */}
-        {product.stock <= 0 && (
+        {isOutOfStock && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
             <span className="text-white font-bold tracking-wide">Out of Stock</span>
           </div>
@@ -345,9 +347,9 @@ function HomeProductCard({
           <div className="flex items-center border-t border-gray-100 gap-1 p-1 h-11 sm:h-12 bg-gray-50/30">
             <button
               onClick={handleAddToCart}
-              disabled={product.stock <= 0 || isAdding}
+              disabled={isOutOfStock || isAdding}
               className={`relative flex-1 h-full min-w-0 rounded-md font-bold transition-all duration-200 text-[10px] sm:text-xs overflow-hidden flex items-center justify-center
-                ${(product.stock <= 0)
+                ${isOutOfStock
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : isAdding
                     ? 'bg-orange-100 text-orange-600'
@@ -358,7 +360,7 @@ function HomeProductCard({
             >
               {/* Stable Content Container */}
               <div className="relative flex items-center justify-center w-full h-full px-1">
-                {product.stock <= 0 ? (
+                {isOutOfStock ? (
                   <span className="truncate">Out of Stock</span>
                 ) : isAdding ? (
                   <FaShoppingCart className="text-lg opacity-50" />

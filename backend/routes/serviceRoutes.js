@@ -317,9 +317,10 @@ router.post('/', authenticateToken, uploadServiceImages.array('images', 5), comp
   try {
     const user = req.user;
 
-    // Only service providers can create services
-    if (!['service_provider', 'admin', 'superadmin', 'super_admin'].includes(user.role)) {
-      return res.status(403).json({ error: 'Only service providers can create services' });
+    // Only service providers or admins can create services
+    const isAdmin = ['admin', 'superadmin', 'super_admin'].includes(user.role);
+    if (!['service_provider', ...['admin', 'superadmin', 'super_admin']].includes(user.role)) {
+      return res.status(403).json({ error: 'Only service providers or admins can create services' });
     }
 
     const {
@@ -396,10 +397,10 @@ router.post('/', authenticateToken, uploadServiceImages.array('images', 5), comp
       availabilityDays: parsedAvailabilityDays,
       displayPrice,
       displayPrice,
-      userId: user.id,
+      userId: (isAdmin && req.body.userId) ? req.body.userId : user.id,
       addedBy: user.id, // Audit trail
       // Status management: super_admin/admin products are approved immediately
-      status: (String(user.role || '').toLowerCase().replace(/[^a-z0-9]/g, '') === 'admin' || String(user.role || '').toLowerCase().replace(/[^a-z0-9]/g, '') === 'superadmin') ? 'approved' : 'pending',
+      status: isAdmin ? 'approved' : 'pending',
       deliveryFeeType: req.body.deliveryFeeType || 'fixed',
       deliveryFee: req.body.deliveryFee || 0,
       deliveryCoverageZones: (function () {

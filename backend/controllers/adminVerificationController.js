@@ -63,18 +63,13 @@ const reviewVerification = async (req, res) => {
         await user.save();
         await user.recalculateIsVerified();
 
-        // Send notification
+        // Send multi-channel notification
         try {
-            console.log(`[Verification] Attempting to notify user ${user.id} about ${action}...`);
-            const notification = await Notification.create({
-                userId: user.id,
-                title: notificationTitle,
-                message: notificationMessage,
-                type: action === 'approve' ? 'success' : 'alert' // Adding type if model supports it (defaults to info if not)
-            });
-            console.log(`[Verification] Notification created successfully: ID ${notification.id}`);
+            const { notifyUserIdStatusUpdate } = require('../utils/notificationHelpers');
+            console.log(`[Verification] Attempting to notify user ${user.id} across channels about ${action}...`);
+            await notifyUserIdStatusUpdate(user, action, user.nationalIdRejectionReason);
         } catch (notifError) {
-            console.error('[Verification] Error creating notification:', notifError);
+            console.error('[Verification] Multi-channel notification failed:', notifError);
         }
 
         res.json({

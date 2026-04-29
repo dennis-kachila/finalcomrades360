@@ -133,7 +133,7 @@ export default function MarketingNavbar() {
     };
 
     return (
-        <nav className="bg-blue-900 border-b border-blue-800 shadow-md fixed top-0 left-0 w-full z-50 text-white">
+        <nav className="bg-blue-900 border-b border-blue-800 shadow-md fixed top-0 left-0 w-full z-[160] text-white">
             <div className="max-w-7xl mx-auto px-1.5 sm:px-4">
                 <div className="flex justify-between items-center h-14 md:h-16 gap-4">
 

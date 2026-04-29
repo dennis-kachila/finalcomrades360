@@ -75,4 +75,10 @@ export const productApi = {
   getSubcategory: (categoryId, subcategoryId) => api.get(`/categories/${categoryId}/subcategories/${subcategoryId}`),
 };
 
+export const orderApi = {
+  parseDirect: (data) => api.post('/orders/direct/parse', data),
+  confirmDirect: (data) => api.post('/orders/direct/confirm', data),
+  listDirect: () => api.get('/orders/direct/list'),
+};
+
 export default api;

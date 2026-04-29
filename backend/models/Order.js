@@ -1,4 +1,5 @@
 const { DataTypes } = require('sequelize');
+const { emitRealtimeUpdate } = require('../utils/realtimeEmitter');
 
 module.exports = (sequelize, DataTypes) => {
 
@@ -96,7 +97,8 @@ module.exports = (sequelize, DataTypes) => {
         model: 'Batches',
         key: 'id'
       }
-    }
+    },
+    originalTextBlock: { type: DataTypes.TEXT, allowNull: true, comment: 'Original text block used to create this direct order' }
   }, {
     freezeTableName: true,  // disables automatic pluralization
     timestamps: true,
@@ -156,6 +158,19 @@ module.exports = (sequelize, DataTypes) => {
         order.paymentConfirmed = true;
       }
     }
+  });
+
+  Order.afterSave(async (order) => {
+    emitRealtimeUpdate('orders', { 
+      id: order.id, 
+      userId: order.userId, 
+      sellerId: order.sellerId,
+      adminOnly: true // Also notify admins
+    });
+  });
+
+  Order.afterBulkUpdate(async (options) => {
+    emitRealtimeUpdate('orders', { adminOnly: true });
   });
 
   return Order;

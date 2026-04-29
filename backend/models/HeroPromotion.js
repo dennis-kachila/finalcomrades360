@@ -1,4 +1,5 @@
 const { DataTypes } = require('sequelize');
+const { emitRealtimeUpdate } = require('../utils/realtimeEmitter');
 
 module.exports = (sequelize, DataTypes) => {
   const HeroPromotion = sequelize.define('HeroPromotion', {
@@ -39,7 +40,14 @@ module.exports = (sequelize, DataTypes) => {
     isSystem: { type: DataTypes.BOOLEAN, defaultValue: false },
     isDefault: { type: DataTypes.BOOLEAN, defaultValue: false },
     priority: { type: DataTypes.INTEGER, defaultValue: 0 },
-  }, { timestamps: true })
+  }, { 
+    timestamps: true,
+    hooks: {
+      afterSave: async () => { emitRealtimeUpdate('marketing'); },
+      afterDestroy: async () => { emitRealtimeUpdate('marketing'); },
+      afterBulkUpdate: async () => { emitRealtimeUpdate('marketing'); }
+    }
+  })
 
   return HeroPromotion;
 };

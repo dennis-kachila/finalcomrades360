@@ -1,4 +1,5 @@
 const express = require('express');
+console.error('🚀 ANALYTICS ROUTES LOADING...');
 const {
   getGeneralOverview,
   getHistoricalTrends,
@@ -6,13 +7,18 @@ const {
   getSellerPerformanceScores,
   getDeliveryEfficiencyMetrics,
   getMarketingCampaignROI,
-  getGrowthPosterData
+  getGrowthPosterData,
+  logSiteVisit,
+  getTrafficStats
 } = require('../controllers/analyticsController');
 const { auth, adminOnly, adminOrFinance } = require('../middleware/auth');
 
 const router = express.Router();
 
-// All analytics routes require admin or finance authorization
+// Public route to log visits
+router.post('/log-visit', logSiteVisit);
+
+// All other analytics routes require admin or finance authorization
 router.use(auth);
 
 // Overview stats - admin/finance only
@@ -35,5 +41,8 @@ router.get('/marketing/roi', adminOrFinance, getMarketingCampaignROI);
 
 // Growth poster data - admin/finance only
 router.get('/growth-poster', adminOrFinance, getGrowthPosterData);
+
+// Traffic stats - admin/finance only
+router.get('/traffic/stats', adminOrFinance, getTrafficStats);
 
 module.exports = router;

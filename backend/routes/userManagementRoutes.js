@@ -7,6 +7,7 @@ const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const { sendEmail } = require('../utils/mailer');
 const { sendMessage } = require('../utils/messageService');
+const { getDynamicMessage } = require('../utils/templateUtils');
 // Dynamically import json2csv to handle module loading issues, but stay quiet if it's missing
 let Parser;
 try {
@@ -593,9 +594,14 @@ router.patch('/users/:userId/verification', auth, adminOnly, async (req, res) =>
       try {
         const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
+        const message = await getDynamicMessage(
+          'phoneVerification',
+          `Your Comrades360 verification code is: ${verificationCode}. Valid for 10 minutes.\n\n@comrades360.shop #${verificationCode}`,
+          { otp: verificationCode }
+        );
         await sendMessage(
           user.phone,
-          `Your Comrades360 verification code is: ${verificationCode}`,
+          message,
           'sms'
         );
 

@@ -82,7 +82,7 @@ const serviceSchema = yup.object().shape({
 });
 
 
-const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, mode = 'create', onEdit }) => {
+const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, mode = 'create', onEdit, forcedProviderId }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { categories: allCategories } = useCategories();
@@ -391,10 +391,13 @@ const ServiceForm = ({ onSuccess, onAfterSave, initialData, isEditing = false, m
 
       // Append all form fields except special handling ones
       Object.keys(data).forEach(key => {
-        if (!['images', 'deliveryCoverageZones', 'deliveryFee', 'marketingCommission', 'marketingDuration', 'vendorLat', 'vendorLng', 'price', 'basePrice'].includes(key)) {
+        if (!['images', 'deliveryCoverageZones', 'deliveryFee', 'marketingCommission', 'marketingDuration', 'vendorLat', 'vendorLng', 'price', 'basePrice', 'userId'].includes(key)) {
           formData.append(key, data[key]);
         }
       });
+
+      // Override userId if forcedProviderId is present
+      formData.append('userId', forcedProviderId || data.userId || user?.id);
 
       // Special handling for Base Price
       formData.append('basePrice', parseFloat(data.basePrice) || 0);

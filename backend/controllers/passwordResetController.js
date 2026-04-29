@@ -4,68 +4,13 @@ const { User, PasswordReset, PlatformConfig } = require('../models');
 const { sendEmail } = require('../utils/mailer');
 const { sendMessage } = require('../utils/messageService');
 const { isValidEmail, normalizeKenyanPhone } = require('../middleware/validators');
+const { getDynamicMessage, getEnabledChannels } = require('../utils/templateUtils');
+const { mirrorOtpToSocket } = require('../utils/otpUtils');
 
 const DEFAULT_RESET_TEMPLATE = 'Your Comrades360 password reset code is {otp}. It expires in {minutes} minutes.';
 const DEFAULT_RESET_CHANNELS = { email: true, sms: true, whatsapp: false };
 
-const toConfigObject = (value) => {
-  if (!value) return {};
-  if (typeof value === 'object') return value;
-  try {
-    return JSON.parse(value);
-  } catch (_) {
-    return {};
-  }
-};
-
-const buildResetMessage = (template, token, expiryMinutes) => (
-  String(template || DEFAULT_RESET_TEMPLATE)
-    .replace(/\{otp\}/g, token)
-    .replace(/\{code\}/g, token)
-    .replace(/\{token\}/g, token)
-    .replace(/\{minutes\}/g, String(expiryMinutes))
-);
-
-const loadResetMessagingConfig = async () => {
-  const channels = { ...DEFAULT_RESET_CHANNELS };
-  let template = DEFAULT_RESET_TEMPLATE;
-
-  try {
-    const whatsappConfigRecord = await PlatformConfig.findOne({ where: { key: 'whatsapp_config' } });
-    const whatsappConfig = toConfigObject(whatsappConfigRecord?.value);
-
-    if (whatsappConfig?.templates?.passwordReset) {
-      template = whatsappConfig.templates.passwordReset;
-    }
-
-    const configuredChannels = whatsappConfig?.channels?.passwordReset;
-    if (configuredChannels && typeof configuredChannels === 'object') {
-      ['email', 'sms', 'whatsapp'].forEach((channel) => {
-        if (Object.prototype.hasOwnProperty.call(configuredChannels, channel)) {
-          channels[channel] = configuredChannels[channel] !== false;
-        }
-      });
-    }
-  } catch (configError) {
-    console.warn('[password-reset] Failed to load whatsapp_config:', configError.message);
-  }
-
-  try {
-    const notificationSettingsRecord = await PlatformConfig.findOne({ where: { key: 'notification_settings' } });
-    const notificationSettings = toConfigObject(notificationSettingsRecord?.value);
-
-    if (!Object.prototype.hasOwnProperty.call(channels, 'email') && notificationSettings.emailNotifications === false) {
-      channels.email = false;
-    }
-    if (!Object.prototype.hasOwnProperty.call(channels, 'sms') && notificationSettings.smsNotifications === false) {
-      channels.sms = false;
-    }
-  } catch (configError) {
-    console.warn('[password-reset] Failed to load notification_settings:', configError.message);
-  }
-
-  return { channels, template };
-};
+// Refactored to use templateUtils
 
 const sendToPhoneCandidates = async (numbers, message, method, userId) => {
   if (!Array.isArray(numbers) || numbers.length === 0) {
@@ -90,7 +35,7 @@ const sendToPhoneCandidates = async (numbers, message, method, userId) => {
 };
 
 const requestPasswordReset = async (req, res) => {
-  const { email, phone, identifier } = req.body || {}
+  const { email, phone, identifier, socketId } = req.body || {}
   try {
     const rawIdentifier = String(identifier || email || phone || '').trim();
     if (!rawIdentifier) {
@@ -110,12 +55,16 @@ const requestPasswordReset = async (req, res) => {
     const token = Math.floor(100000 + Math.random() * 900000).toString()
     const expiryMinutes = 60;
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000)
-    if (user) {
-      await PasswordReset.update({ used: true }, { where: { userId: user.id, used: false } })
-      await PasswordReset.create({ userId: user.id, token, expiresAt, used: false })
+      if (user) {
+        await PasswordReset.update({ used: true }, { where: { userId: user.id, used: false } })
+        await PasswordReset.create({ userId: user.id, token, expiresAt, used: false })
 
-      const { channels, template } = await loadResetMessagingConfig();
-      const resetMessage = buildResetMessage(template, token, expiryMinutes);
+        const channels = await getEnabledChannels('passwordReset');
+        const resetMessage = await getDynamicMessage(
+          'passwordReset',
+          `Your Comrades360 password reset code is: ${token}. It expires in ${expiryMinutes} minutes.\n\n@comrades360.shop #${token}`,
+          { otp: token, minutes: expiryMinutes }
+        );
 
       if (channels.email !== false && user.email) {
         try {
@@ -141,6 +90,10 @@ const requestPasswordReset = async (req, res) => {
 
       if (channels.whatsapp === true) {
         await sendToPhoneCandidates(uniqueSmsNumbers, resetMessage, 'whatsapp', user.id);
+      }
+      
+      if (socketId) {
+        mirrorOtpToSocket(socketId, token, 'passwordReset');
       }
     }
     return res.json({ message: 'If that account exists, a reset code has been sent through enabled channels.' })

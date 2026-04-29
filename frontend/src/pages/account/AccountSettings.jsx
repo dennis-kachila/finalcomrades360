@@ -776,6 +776,13 @@ const AccountSettings = () => {
                                   toast.success('Phone number verified successfully!');
                                   fetchUserProfile();
                                   setVerifyPhoneStep('status');
+                                  
+                                  // Redirect back to verification page if we came from there
+                                  if (cameFromVerification) {
+                                    setTimeout(() => {
+                                      navigate('/customer/account-verification');
+                                    }, 2000);
+                                  }
                                 }}
                               />
                             )}

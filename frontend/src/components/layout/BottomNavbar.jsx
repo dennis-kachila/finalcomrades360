@@ -9,7 +9,7 @@ import { FaBars } from 'react-icons/fa';
  */
 const BottomNavbar = ({ items = [], onMenuClick }) => {
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-200 z-[45] px-2 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-200 z-[160] px-2 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
       <div className="flex items-center justify-around h-16 max-w-md mx-auto">
         {items.map((item, index) => (
           <NavLink

@@ -4,6 +4,7 @@ import api from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { validateKenyanPhone, PHONE_VALIDATION_ERROR, formatKenyanPhoneInput } from '../../utils/validation'
 import SystemFeedbackModal from '../ui/SystemFeedbackModal'
+import { getSocket } from '../../services/socket'
 
 import { Eye, EyeOff } from 'lucide-react'
 
@@ -68,16 +69,71 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
         }).then(credential => {
             if (credential?.code) {
                 const digits = credential.code.replace(/\D/g, '').slice(0, 6).split('')
-                setOtp(prev => {
-                    const next = [...prev]
-                    digits.forEach((d, i) => { next[i] = d })
-                    return next
-                })
+                setOtp(digits)
+                // Automatically trigger verification
+                handleVerifyDirect(digits.join(''))
             }
         }).catch(() => { /* user cancelled or not supported — silent */ })
 
         return () => ac.abort()
     }, [step, otpMethod])
+    // ── Multi-channel OTP monitoring (SMS, WhatsApp, Email) ──────────────────
+    useEffect(() => {
+        if (step !== 'verify') return
+
+        const socket = getSocket()
+        if (!socket) return
+
+        const handleOtpReceived = (data) => {
+            console.log('[OTP-Monitor] Received code via socket:', data)
+            if (data.otp && data.type === 'registration') {
+                const digits = data.otp.toString().split('')
+                setOtp(digits)
+                // Automatically trigger verification
+                handleVerifyDirect(data.otp.toString())
+            }
+        }
+
+        socket.on('otp:received', handleOtpReceived)
+        return () => socket.off('otp:received', handleOtpReceived)
+    }, [step])
+
+    // Helper for direct verification (avoiding stale state issues with handleVerify)
+    const handleVerifyDirect = async (otpString) => {
+        if (otpString.length < 6) return
+        setVerifying(true)
+        setError('')
+        try {
+            const isEmail = contactType === 'email'
+            const payload = {
+                ...(isEmail ? { email: registeredContact } : { phone: registeredContact }),
+                password,
+                otp: otpString,
+                ...(referralCode ? { referralCode } : {})
+            }
+            const res = await api.post('/auth/register', payload)
+            if (res.data.token && res.data.user) {
+                await setSession(res.data.token, res.data.user)
+            }
+            setModalConfig({
+                type: 'success',
+                title: '🎉 Welcome to Comrades360!',
+                description: 'Your account is ready. Complete your profile in Account Settings to unlock all features.',
+                confirmLabel: 'Get Started',
+                onConfirm: () => {
+                    if (onSuccess) onSuccess()
+                    else window.location.href = '/'
+                }
+            })
+            setShowModal(true)
+        } catch (err) {
+            const data = err.response?.data
+            let msg = data?.message || 'Verification failed. Please try again.'
+            setError(msg)
+        } finally {
+            setVerifying(false)
+        }
+    }
 
     // ── Detect whether the user typed an email or phone ───────────────────────
     const detectContactType = (value) => {
@@ -131,7 +187,10 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
 
         setLoading(true)
         try {
-            const payload = type === 'email' ? { email: contact } : { phone: contact }
+            const payload = {
+                ...(type === 'email' ? { email: contact } : { phone: contact }),
+                socketId: getSocket()?.id
+            }
             const { data } = await api.post('/auth/send-registration-otp', payload)
             setRegisteredContact(contact)
             setContactType(type)
@@ -335,6 +394,34 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
 
             {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm">{error}</div>}
 
+            {/* Google Sign-Up — shown first */}
+            <div className="flex justify-center mb-5">
+                <button
+                    type="button"
+                    onClick={() => startGoogleLogin()}
+                    disabled={loading}
+                    className="flex items-center gap-3 px-6 py-2.5 rounded-full bg-[#4285F4] text-white font-medium text-sm hover:bg-[#357abd] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
+                >
+                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#fff"/>
+                        <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#fff" opacity=".9"/>
+                        <path d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#fff" opacity=".8"/>
+                        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#fff" opacity=".7"/>
+                    </svg>
+                    Continue with Google
+                </button>
+            </div>
+
+            {/* Divider */}
+            <div className="relative my-5">
+                <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-white text-gray-500 font-medium">Or sign up with email / phone</span>
+                </div>
+            </div>
+
             <form onSubmit={handleSubmit}>
                 {/* Email OR Phone */}
                 <div className="mb-4">
@@ -455,31 +542,7 @@ export default function RegisterForm({ onSuccess, initialReferralCode, isModal =
                 </button>
             </form>
 
-            <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500 font-medium">Or join with Google</span>
-                </div>
-            </div>
 
-            <div className="flex justify-center mb-6">
-                <button
-                    type="button"
-                    onClick={() => startGoogleLogin()}
-                    disabled={loading}
-                    className="flex items-center gap-3 px-6 py-2.5 rounded-full bg-[#4285F4] text-white font-medium text-sm hover:bg-[#357abd] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
-                >
-                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#fff"/>
-                        <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#fff" opacity=".9"/>
-                        <path d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#fff" opacity=".8"/>
-                        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#fff" opacity=".7"/>
-                    </svg>
-                    Continue with Google
-                </button>
-            </div>
 
             <div className="mt-5 text-center text-sm text-gray-500">
                 <p className="text-xs text-gray-400 mb-3">

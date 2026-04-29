@@ -141,7 +141,8 @@ const ComradesProductForm = ({
   onAfterSave,
   mode = 'create', // New mode prop
   strictMode = false, // Add strictMode prop
-  taxonomyType = 'product' // Add taxonomyType prop
+  taxonomyType = 'product', // Add taxonomyType prop
+  forcedSellerId // Prop for administrative creation on behalf of a seller
 }) => {
   const { id: paramId } = useParams();
   const location = useLocation();
@@ -408,8 +409,10 @@ const ComradesProductForm = ({
           }));
           console.log('[ComradesProductForm] Captured new draft ID and media URLs:', result.id);
           
-          // Silently update the URL so refreshes work correctly
-          navigate(`/dashboard/products/comrades/${result.id}/edit`, { replace: true });
+          // Silently update the URL so refreshes work correctly, unless embedded
+          if (!forcedSellerId) {
+            navigate(`/dashboard/products/comrades/${result.id}/edit`, { replace: true });
+          }
         } else if (id || data.id) {
           // Even in edit mode, update media urls if they changed (e.g. after upload)
           setFormData(prev => ({
@@ -1873,7 +1876,7 @@ const ComradesProductForm = ({
         // Additional fields
         condition: formData.condition || 'Brand New',
         visibilityStatus: formData.visibilityStatus || 'visible',
-        sellerId: formData.sellerId || undefined,
+        sellerId: forcedSellerId || formData.sellerId || undefined,
 
         // Inventory fields
         sku: formData.sku?.trim() || '',
@@ -2282,7 +2285,7 @@ const ComradesProductForm = ({
             {currentComponent === 'comrades' && (
               <form id="product-form" onSubmit={handleSubmit} className="space-y-4 pb-24">
 
-                {isFieldDisabled('vendorInfo') && (
+                {(effectiveIsViewMode || (isAdmin && formData.seller)) && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pb-2">
                     {/* Vendor Information Card */}
                     <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100 shadow-sm">
@@ -2332,29 +2335,7 @@ const ComradesProductForm = ({
                   </div>
                 )}
 
-                {/* Admin-only Seller Selection */}
-                {isAdmin && (
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-                    <Label htmlFor="sellerId" className="text-blue-800 font-semibold flex items-center gap-2">
-                      <Store className="h-4 w-4" />
-                      Assign to Seller (Admin Only)
-                    </Label>
-                    <select
-                      id="sellerId"
-                      value={formData.sellerId || ''}
-                      onChange={(e) => handleFieldChange('sellerId', e.target.value)}
-                      className="w-full h-10 rounded-md border border-blue-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    >
-                      <option value="">Select Seller (Current: {initialProduct?.sellerId || 'Self'})</option>
-                      {sellers.map((seller) => (
-                        <option key={seller.id} value={seller.id}>
-                          {seller.name} ({seller.email})
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-blue-600 italic">Leave as "Select Seller" to keep current owner or assign to yourself.</p>
-                  </div>
-                )}
+
 
                 {/* Product Name */}
                 <div ref={nameRef} className={`p-4 rounded-lg transition-colors ${validationErrors.name ? 'bg-red-50 border-2 border-red-500 shadow-sm' : 'bg-gray-50'}`}>

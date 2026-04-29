@@ -29,7 +29,12 @@ const removeInlineListImages = (item) => {
 };
 
 const createProduct = async (req, res, next) => {
-  const sellerId = req.user.id;
+  const isAdmin = ['admin', 'super_admin', 'superadmin'].includes(req.user.role);
+  let sellerId = req.user.id;
+  if (isAdmin && req.body.sellerId) {
+    sellerId = req.body.sellerId;
+  }
+
   const {
     name,
     description,
@@ -433,6 +438,7 @@ const createProduct = async (req, res, next) => {
       weight: weight ? weight : (updatedLogistics.weight ? updatedLogistics.weight : null),
       keywords: mergedTags.keywords || keywords,
       sellerId,
+      addedBy: req.user.id,
       shareableLink,
       // Additional fields
       sku: sku || null,
@@ -1433,6 +1439,11 @@ const updateProduct = async (req, res, next) => {
   }
 
   try {
+    console.log(`[updateProduct] Starting update for product ID: ${productId} by user: ${sellerId}`);
+    
+    // Prepare update data early to avoid TDZ (Temporal Dead Zone) in production
+    const updateData = {};
+    
     // Find the product
     const product = await Product.findByPk(productId);
 
@@ -1446,19 +1457,6 @@ const updateProduct = async (req, res, next) => {
 
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ message: 'You do not have permission to edit this product' });
-    }
-
-    // CRITICAL: Protect ownership fields
-    if (req.body.sellerId || req.body.addedBy) {
-      if (isAdmin) {
-        console.log(`👤 [updateProduct] Admin/SuperAdmin modifying ownership fields (sellerId: ${req.body.sellerId}, addedBy: ${req.body.addedBy})`);
-        if (req.body.sellerId) updateData.sellerId = parseInt(req.body.sellerId, 10);
-        if (req.body.addedBy) updateData.addedBy = parseInt(req.body.addedBy, 10);
-      } else {
-        console.warn(`⚠️ [updateProduct] Unauthorized attempt to modify ownership fields (sellerId/addedBy) detected! Ignoring.`);
-        delete req.body.sellerId;
-        delete req.body.addedBy;
-      }
     }
 
     // Parse form data - now includes new fields
@@ -1675,7 +1673,18 @@ const updateProduct = async (req, res, next) => {
     }
 
     // Prepare update data - store in direct fields like createProduct does
-    const updateData = {};
+
+    // CRITICAL: Protect ownership fields
+    if (req.body.sellerId || req.body.addedBy) {
+      if (isAdmin) {
+        console.log(`👤 [updateProduct] Admin/SuperAdmin modifying ownership fields (sellerId: ${req.body.sellerId}, addedBy: ${req.body.addedBy})`);
+        if (req.body.sellerId) updateData.sellerId = parseInt(req.body.sellerId, 10);
+        if (req.body.addedBy) updateData.addedBy = parseInt(req.body.addedBy, 10);
+      } else {
+        console.warn(`⚠️ [updateProduct] Unauthorized attempt to modify ownership fields (sellerId/addedBy) detected! Ignoring.`);
+      }
+    }
+
     if (name) updateData.name = name;
     if (shortDescription !== undefined) updateData.shortDescription = shortDescription;
     if (fullDescription !== undefined) updateData.fullDescription = fullDescription;

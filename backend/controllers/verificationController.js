@@ -1,6 +1,8 @@
 const { User, Otp } = require('../models');
 const { sendMessage } = require('../utils/messageService');
 const { normalizeKenyanPhone } = require('../middleware/validators');
+const { getDynamicMessage } = require('../utils/templateUtils');
+const { mirrorOtpToSocket } = require('../utils/otpUtils');
 
 /**
  * Calculate and return user verification status
@@ -121,7 +123,7 @@ const getVerificationStatus = async (req, res, next) => {
  */
 const requestPhoneVerificationOtp = async (req, res, next) => {
     try {
-        const { phone } = req.body;
+        const { phone, socketId } = req.body;
         if (!phone) return res.status(400).json({ message: 'Phone number is required' });
 
         const normalizedPhone = normalizeKenyanPhone(phone);
@@ -143,11 +145,20 @@ const requestPhoneVerificationOtp = async (req, res, next) => {
 
         // Send OTP via SMS
         console.log(`[Verification] 🚀 Sending OTP ${otp} to ${normalizedPhone}`);
+        const message = await getDynamicMessage(
+            'phoneVerification',
+            `Your Comrades360 verification code is: ${otp}. Valid for 10 minutes.\n\n@comrades360.shop #${otp}`,
+            { otp }
+        );
         await sendMessage(
             normalizedPhone,
-            `Your Comrades360 verification code is: ${otp}. Valid for 10 minutes.`,
+            message,
             'sms'
         );
+        
+        if (socketId) {
+            mirrorOtpToSocket(socketId, otp, 'phoneVerification');
+        }
 
         res.json({ success: true, message: 'Verification code sent successfully' });
     } catch (error) {
@@ -209,7 +220,7 @@ const verifyPhoneOtp = async (req, res, next) => {
  */
 const requestGuestPhoneOtp = async (req, res, next) => {
     try {
-        const { phone, method = 'sms' } = req.body;
+        const { phone, method = 'sms', socketId } = req.body;
         if (!phone) return res.status(400).json({ message: 'Phone number is required' });
 
         const normalizedPhone = normalizeKenyanPhone(phone);
@@ -232,11 +243,20 @@ const requestGuestPhoneOtp = async (req, res, next) => {
 
         // Send OTP via chosen method
         console.log(`[GuestVerification] 🚀 Sending OTP ${otp} to ${normalizedPhone} via ${method}`);
+        const message = await getDynamicMessage(
+            'guestCheckoutOtp',
+            `Your Comrades360 guest checkout code is: ${otp}. Valid for 10 minutes.\n\n@comrades360.shop #${otp}`,
+            { otp }
+        );
         await sendMessage(
             normalizedPhone,
-            `Your Comrades360 guest checkout code is: ${otp}. Valid for 10 minutes.`,
+            message,
             method
         );
+
+        if (socketId) {
+            mirrorOtpToSocket(socketId, otp, 'guestCheckout');
+        }
 
         res.json({ success: true, message: 'Verification code sent to your phone' });
     } catch (error) {

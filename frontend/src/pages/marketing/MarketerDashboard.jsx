@@ -1,5 +1,5 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import BottomNavbar from '../../components/layout/BottomNavbar';
 import {
   FaTrophy, FaMoneyBillWave, FaWallet, FaShoppingCart,
@@ -25,8 +25,10 @@ import { QRCodeCanvas } from 'qrcode.react';
 import html2canvas from 'html2canvas';
 
 const MarketerWallet = lazy(() => import('./MarketerWallet'));
+const DirectOrders = lazy(() => import('../dashboard/DirectOrders'));
 
 const MarketerDashboard = () => {
+  const location = useLocation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { addToCart } = useCart();
@@ -48,12 +50,12 @@ const MarketerDashboard = () => {
   });
   // Sync tab with URL parameter changes
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
     if (tabParam && tabParam !== activeTab) {
       setActiveTab(tabParam);
     }
-  }, [window.location.search]);
+  }, [location.search, activeTab]);
 
   
   // Listen for global toggle-marketing-sidebar event
@@ -216,7 +218,7 @@ const MarketerDashboard = () => {
   };
 
   // Fetch social media accounts from backend
-  const fetchSocialMediaAccounts = async () => {
+  const fetchSocialMediaAccounts = useCallback(async () => {
     try {
       setLoadingAccounts(true);
       const response = await productApi.getSocialMediaAccounts();
@@ -229,7 +231,7 @@ const MarketerDashboard = () => {
     } finally {
       setLoadingAccounts(false);
     }
-  };
+  }, []);
 
   // New Order state (marketer creating orders for clients)
   const [newOrderForm, setNewOrderForm] = useState({
@@ -417,7 +419,7 @@ const MarketerDashboard = () => {
   };
 
   // Fetch real data from API
-  const fetchData = async (pageNum = 1, showLoading = true, shouldFetchCatalog = true) => {
+  const fetchData = useCallback(async (pageNum = 1, showLoading = true, shouldFetchCatalog = true) => {
     if (pageNum === 1) {
       if (showLoading) setLoading(true);
     } else {
@@ -555,7 +557,7 @@ const MarketerDashboard = () => {
       setLoading(false);
       setIsLoadingMore(false);
     }
-  };
+  }, [searchQuery]); // searchQuery is the only dependency that affects the data content
 
   useEffect(() => {
     // Initial fetch including catalog
@@ -565,27 +567,21 @@ const MarketerDashboard = () => {
     const interval = setInterval(() => {
       // Only refresh stats/wallet on interval to save database strain
       fetchData(1, false, false);
-      if (activeTab === 'orders') {
-        // Handled by other effect but good to keep synced
-      }
     }, 15000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData, fetchSocialMediaAccounts]);
 
   // Debounced Search Effect
   useEffect(() => {
-    if (searchQuery === '') {
-      fetchData(1, false, true);
-      return;
-    }
+    if (searchQuery === '') return; // Handled by mount effect
 
     const timer = setTimeout(() => {
       fetchData(1, false, true);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, fetchData]);
 
   const handleLoadMore = () => {
     const nextPage = page + 1;
@@ -641,7 +637,8 @@ const MarketerDashboard = () => {
     { id: 'orders', name: 'Orders', icon: <FaBox className="w-4 h-4" /> },
     { id: 'add-user', name: 'Add Customer', icon: <FaUserPlus className="w-4 h-4" /> },
     { id: 'my-customers', name: 'My Customers', icon: <FaUsers className="w-4 h-4" /> },
-    { id: 'leaderboard', name: 'Leaderboard', icon: <FaCrown className="w-4 h-4" /> }
+    { id: 'leaderboard', name: 'Leaderboard', icon: <FaCrown className="w-4 h-4" /> },
+    { id: 'direct-orders', name: 'Direct Orders', icon: <FaShoppingCart className="w-4 h-4" /> }
   ];
 
   // State for selected customer orders expansion
@@ -1366,7 +1363,10 @@ const MarketerDashboard = () => {
 
       {/* Order Details Modal */}
       {showOrderModal && selectedOrder && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[150] p-4 overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[150] p-4 overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowOrderModal(false); }}
+        >
           <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full my-8 relative flex flex-col max-h-[90vh]">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-xl">
@@ -1580,6 +1580,12 @@ const MarketerDashboard = () => {
         return renderOrders();
       case 'leaderboard':
         return renderLeaderboard();
+      case 'direct-orders':
+        return (
+          <Suspense fallback={<div>Loading Direct Orders...</div>}>
+            <DirectOrders />
+          </Suspense>
+        );
 
       case 'add-user':
         return (
@@ -1885,9 +1891,9 @@ const MarketerDashboard = () => {
 
   return (
     <div className="flex flex-col lg:flex-row flex-1 lg:overflow-hidden lg:h-screen bg-gray-100 relative min-h-screen">
-      {/* Backdrop for mobile */}
+      {/* Backdrop for mobile — must be BELOW the sidebar (z-50) so sidebar links remain clickable */}
       <div 
-        className={`fixed inset-0 bg-black/50 z-[105] lg:hidden transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setIsSidebarOpen(false)}
       />
 
@@ -2018,7 +2024,10 @@ const MarketerDashboard = () => {
 
       {/* Modals remain same but use backdrop blur */}
       {showShareModal && sharingItem && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[150] p-4">
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[150] p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}
+        >
           {/* Modal content remains same as before */}
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col relative">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">

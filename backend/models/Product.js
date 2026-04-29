@@ -1,5 +1,6 @@
 const { DataTypes, Model } = require('sequelize');
 const { normalizeItemName } = require('../utils/itemNamePolicy');
+const { emitRealtimeUpdate } = require('../utils/realtimeEmitter');
 
 module.exports = (sequelize, DataTypes) => {
   class Product extends Model {
@@ -448,7 +449,17 @@ module.exports = (sequelize, DataTypes) => {
         paranoid: false
       }
     },
-    hooks: {},
+    hooks: {
+      afterSave: async (product) => {
+        emitRealtimeUpdate('products', { id: product.id });
+      },
+      afterDestroy: async (product) => {
+        emitRealtimeUpdate('products', { id: product.id, deleted: true });
+      },
+      afterBulkUpdate: async (options) => {
+        emitRealtimeUpdate('products');
+      }
+    },
     indexes: [
       {
         fields: ['categoryId'],

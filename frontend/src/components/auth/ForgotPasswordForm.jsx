@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import api from '../../services/api'
+import { getSocket } from '../../services/socket'
 import { formatKenyanPhoneInput } from '../../utils/validation'
 
 function useQuery() {
@@ -31,13 +32,35 @@ export default function ForgotPasswordForm({ isModal = false }) {
         setError('')
     }, [q])
 
+    // ── Multi-channel OTP monitoring (SMS, WhatsApp, Email) ──────────────────
+    useEffect(() => {
+        if (step !== 'confirm') return
+
+        const socket = getSocket()
+        if (!socket) return
+
+        const handleOtpReceived = (data) => {
+            console.log('[OTP-Monitor] Received code via socket:', data)
+            if (data.otp && data.type === 'passwordReset') {
+                setToken(data.otp.toString())
+                // We don't auto-submit here because the user needs to enter the new password
+            }
+        }
+
+        socket.on('otp:received', handleOtpReceived)
+        return () => socket.off('otp:received', handleOtpReceived)
+    }, [step])
+
     const handleRequest = async (e) => {
         e.preventDefault()
         setError('')
         setMessage('')
         setLoading(true)
         try {
-            await api.post('/password-reset/request', { email })
+            await api.post('/password-reset/request', { 
+                email,
+                socketId: getSocket()?.id
+            })
             setMessage('If that account exists, a reset code has been sent to your email and phone.')
             setStep('confirm')
         } catch (err) {

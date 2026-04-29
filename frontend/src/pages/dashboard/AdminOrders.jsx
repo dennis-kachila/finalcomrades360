@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FaBox, FaTruck, FaCheckCircle, FaClock, FaMapMarkerAlt, FaCreditCard, FaLock, FaUserPlus, FaEye, FaTimes, FaEdit, FaSearch, FaFilter, FaDownload, FaUser, FaCalendarAlt, FaMoneyBillWave, FaComments, FaPlus, FaMinus, FaInbox, FaWarehouse, FaStore, FaRoute, FaUndo, FaUserMinus, FaUtensils } from 'react-icons/fa';
+import { FaBox, FaTruck, FaCheckCircle, FaClock, FaMapMarkerAlt, FaCreditCard, FaLock, FaUserPlus, FaEye, FaTimes, FaEdit, FaSearch, FaFilter, FaDownload, FaUser, FaCalendarAlt, FaMoneyBillWave, FaComments, FaPlus, FaMinus, FaInbox, FaWarehouse, FaStore, FaRoute, FaUndo, FaUserMinus, FaUtensils, FaFileAlt } from 'react-icons/fa';
 import api from '../../services/api';
 import { resolveImageUrl, FALLBACK_IMAGE } from '../../utils/imageUtils';
 import { formatPrice } from '../../utils/currency';
@@ -41,6 +41,7 @@ export default function AdminOrders() {
   const [hasMore, setHasMore] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [backendStats, setBackendStats] = useState(null);
+  const [showSourceBlock, setShowSourceBlock] = useState(false);
   // Admin routing state
   const [routingStrategy, setRoutingStrategy] = useState('');
   const [routingWarehouseId, setRoutingWarehouseId] = useState('');
@@ -1660,9 +1661,9 @@ export default function AdminOrders() {
                     Customer Information
                   </h4>
                   <div className="text-sm text-gray-600 space-y-1">
-                    <p><strong>Name:</strong> {(selectedOrder.user?.name || selectedOrder.User?.name) || 'N/A'}</p>
-                    <p><strong>Email:</strong> {(selectedOrder.user?.email || selectedOrder.User?.email) || 'N/A'}</p>
-                    <p><strong>Phone:</strong> {(selectedOrder.user?.phone || selectedOrder.User?.phone) || 'N/A'}</p>
+                    <p><strong>Name:</strong> {selectedOrder.customerName || (selectedOrder.user?.name || selectedOrder.User?.name) || 'N/A'}</p>
+                    <p><strong>Email:</strong> {selectedOrder.customerEmail || (selectedOrder.user?.email || selectedOrder.User?.email) || 'N/A'}</p>
+                    <p><strong>Phone:</strong> {selectedOrder.customerPhone || (selectedOrder.user?.phone || selectedOrder.User?.phone) || 'N/A'}</p>
                   </div>
                 </div>
 
@@ -1678,6 +1679,43 @@ export default function AdminOrders() {
                     <p><strong>Payment:</strong> {selectedOrder.paymentConfirmed ? 'Paid' : 'Pending'}</p>
                     <p><strong>Method:</strong> {selectedOrder.paymentMethod} {selectedOrder.paymentSubType ? `(${selectedOrder.paymentSubType})` : ''}</p>
                     <p><strong>Total:</strong> {formatPrice(selectedOrder.total)}</p>
+                    {/* Always show delivery destination — critical for direct orders */}
+                    {(selectedOrder.deliveryAddress || selectedOrder.PickupStation?.name) && (
+                      <p>
+                        <strong>Delivery To:</strong>{' '}
+                        {selectedOrder.PickupStation?.name
+                          ? <span className="text-purple-700 font-semibold">{selectedOrder.PickupStation.name}</span>
+                          : <span className="text-blue-700 font-semibold">{selectedOrder.deliveryAddress}</span>
+                        }
+                      </p>
+                    )}
+                    {selectedOrder.originalTextBlock && (
+                      <div className="mt-2">
+                        <button 
+                          onClick={() => setShowSourceBlock(!showSourceBlock)}
+                          className="text-[10px] font-bold uppercase tracking-tight bg-amber-50 text-amber-600 px-2 py-1 rounded hover:bg-amber-100 transition-colors flex items-center gap-1.5"
+                        >
+                          <FaFileAlt /> {showSourceBlock ? 'Hide Source Block' : 'View Source Block'}
+                        </button>
+                        {showSourceBlock && (
+                          <div className="mt-2 bg-gray-50 p-3 rounded-lg border border-gray-100 relative group animate-in slide-in-from-top-2 duration-200">
+                            <pre className="text-[10px] text-gray-500 font-mono whitespace-pre-wrap">
+                              {selectedOrder.originalTextBlock}
+                            </pre>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(selectedOrder.originalTextBlock);
+                                toast({ title: 'Copied!', description: 'Source block copied.' });
+                              }}
+                              className="absolute top-2 right-2 p-1.5 bg-white shadow-sm border border-gray-100 rounded text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              <FaBox className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {selectedOrder.paymentProofUrl && (
                       <div className="mt-2 text-xs">
                         <strong>Payment Proof:</strong>
@@ -2047,6 +2085,7 @@ export default function AdminOrders() {
                           {selectedOrder.adminRoutingStrategy === 'pick_station' && (selectedOrder.DestinationPickStation?.name || 'Pick Station')}
                           {selectedOrder.adminRoutingStrategy === 'fastfood_pickup_point' && (selectedOrder.DestinationFastFoodPickupPoint?.name || 'Fastfood Pickup Point')}
                           {selectedOrder.adminRoutingStrategy === 'direct_delivery' && 'Direct to Customer'}
+                          {selectedOrder.adminRoutingStrategy === 'fastfood_direct_delivery' && 'Direct to Customer'}
                         </p>
                         {selectedOrder.adminRoutingStrategy === 'warehouse' && selectedOrder.DestinationWarehouse?.address && (
                           <p className="text-[10px] text-emerald-600">{selectedOrder.DestinationWarehouse.address}</p>
@@ -2056,6 +2095,9 @@ export default function AdminOrders() {
                         )}
                         {selectedOrder.adminRoutingStrategy === 'fastfood_pickup_point' && selectedOrder.DestinationFastFoodPickupPoint?.address && (
                           <p className="text-[10px] text-emerald-600">{selectedOrder.DestinationFastFoodPickupPoint.address}</p>
+                        )}
+                        {['direct_delivery', 'fastfood_direct_delivery'].includes(selectedOrder.adminRoutingStrategy) && selectedOrder.deliveryAddress && (
+                          <p className="text-[10px] text-emerald-600 font-semibold">{selectedOrder.deliveryAddress}</p>
                         )}
                       </div>
                     </div>

@@ -1,4 +1,5 @@
-const { Order, OrderItem, Product, User, Payment, DeliveryTask, Commission, sequelize } = require('../models');
+const { Order, OrderItem, Product, User, Payment, DeliveryTask, Commission, SiteVisit, sequelize } = require('../models');
+console.error('🚀 ANALYTICS CONTROLLER LOADING...');
 const { Op, fn, col, literal } = require('sequelize');
 
 /**
@@ -601,6 +602,111 @@ const getGrowthPosterData = async (req, res) => {
   }
 };
 
+// Log Site Visit
+const logSiteVisit = async (req, res) => {
+  try {
+    const { path, sessionId, userId, deviceType, browser, os, referrer } = req.body;
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+    // Check if this session has visited this path recently to avoid double counting for "unique" in session
+    const existingVisit = await SiteVisit.findOne({
+      where: { sessionId, path }
+    });
+
+    await SiteVisit.create({
+      userId: userId || null,
+      ipAddress,
+      userAgent: req.headers['user-agent'],
+      path,
+      referrer,
+      sessionId,
+      deviceType,
+      browser,
+      os,
+      isUnique: !existingVisit
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error logging site visit:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get Traffic Stats
+const getTrafficStats = async (req, res) => {
+  try {
+    const { period = 'day', startDate, endDate } = req.query;
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate) : new Date();
+    const isSqlite = sequelize.getDialect() === 'sqlite';
+
+    let dateFormat;
+    if (isSqlite) {
+      dateFormat = period === 'month' ? "strftime('%Y-%m', createdAt)" : period === 'year' ? "strftime('%Y', createdAt)" : "strftime('%Y-%m-%d', createdAt)";
+    } else {
+      dateFormat = period === 'month' ? "%Y-%m" : period === 'year' ? "%Y" : "%Y-%m-%d";
+    }
+
+    const trafficTrend = await SiteVisit.findAll({
+      attributes: [
+        [isSqlite ? literal(dateFormat) : fn('DATE_FORMAT', col('createdAt'), dateFormat), 'date'],
+        [fn('COUNT', col('id')), 'visits'],
+        [fn('COUNT', literal('DISTINCT sessionId')), 'uniqueVisitors']
+      ],
+      where: { createdAt: { [Op.between]: [start, end] } },
+      group: [isSqlite ? literal(dateFormat) : fn('DATE_FORMAT', col('createdAt'), dateFormat)],
+      order: [[isSqlite ? literal(dateFormat) : fn('DATE_FORMAT', col('createdAt'), dateFormat), 'ASC']],
+      raw: true
+    });
+
+    // Top Pages
+    const topPages = await SiteVisit.findAll({
+      attributes: [
+        'path',
+        [fn('COUNT', col('id')), 'visits'],
+        [fn('COUNT', literal('DISTINCT sessionId')), 'uniqueVisitors']
+      ],
+      where: { createdAt: { [Op.between]: [start, end] } },
+      group: ['path'],
+      order: [[fn('COUNT', col('id')), 'DESC']],
+      limit: 10,
+      raw: true
+    });
+
+    // Device distribution
+    const deviceStats = await SiteVisit.findAll({
+      attributes: [
+        'deviceType',
+        [fn('COUNT', col('id')), 'count']
+      ],
+      where: { createdAt: { [Op.between]: [start, end] } },
+      group: ['deviceType'],
+      raw: true
+    });
+
+    // Total Orders for conversion rate
+    const totalOrders = await Order.count({
+      where: { createdAt: { [Op.between]: [start, end] } }
+    });
+    
+    res.json({
+      success: true,
+      trends: trafficTrend,
+      topPages,
+      deviceStats,
+      summary: {
+        totalVisits: trafficTrend.reduce((sum, t) => sum + parseInt(t.visits || 0), 0),
+        totalUniqueVisitors: trafficTrend.reduce((sum, t) => sum + parseInt(t.uniqueVisitors || 0), 0),
+        totalOrders
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching traffic stats:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch traffic stats', error: error.message });
+  }
+};
+
 module.exports = {
   getGeneralOverview,
   getHistoricalTrends,
@@ -608,5 +714,7 @@ module.exports = {
   getSellerPerformanceScores,
   getDeliveryEfficiencyMetrics,
   getMarketingCampaignROI,
-  getGrowthPosterData
+  getGrowthPosterData,
+  logSiteVisit,
+  getTrafficStats
 };

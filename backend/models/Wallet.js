@@ -1,4 +1,5 @@
 const { DataTypes } = require('sequelize');
+const { emitRealtimeUpdate } = require('../utils/realtimeEmitter');
 
 module.exports = (sequelize, DataTypes) => {
 
@@ -11,6 +12,10 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     freezeTableName: true,  // disables automatic pluralization
     timestamps: true
+  });
+
+  Wallet.afterSave(async (wallet) => {
+    emitRealtimeUpdate('users', { userId: wallet.userId });
   });
 
   Wallet.associate = (models) => {

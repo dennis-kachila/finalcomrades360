@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import api from '../../services/api'
+import { getSocket } from '../../services/socket'
 
 export default function SecuritySettings({ user }){
   const [securityStep, setSecurityStep] = useState('initiate') // 'initiate' | 'finalize'
@@ -17,6 +18,80 @@ export default function SecuritySettings({ user }){
 
   const resetAlerts = () => { setError(''); setSuccess(''); }
 
+  // ── Web OTP API — auto-capture SMS code on mobile ─────────────────────────
+  useEffect(() => {
+    if (securityStep !== 'finalize') return;
+    if (!('OTPCredential' in window)) return;
+
+    const ac = new AbortController();
+    navigator.credentials.get({
+        otp: { transport: ['sms'] },
+        signal: ac.signal
+    }).then(credential => {
+        if (credential?.code) {
+            const code = credential.code.replace(/\D/g, '').slice(0, 6);
+            setSecurityForm(prev => ({...prev, phoneOtp: code}));
+            // Automatically trigger verification
+            handleVerifyDirect(code);
+        }
+    }).catch(() => { /* user cancelled or not supported — silent */ });
+
+    return () => ac.abort();
+  }, [securityStep]);
+
+  // ── Multi-channel OTP monitoring (SMS, WhatsApp, Email) ──────────────────
+  useEffect(() => {
+    if (securityStep !== 'finalize') return;
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleOtpReceived = (data) => {
+      console.log('[OTP-Monitor] Received code via socket:', data);
+      if (data.otp && data.type === 'securityChange') {
+        const code = data.otp.toString();
+        setSecurityForm(prev => ({ ...prev, phoneOtp: code }));
+        // Automatically trigger verification
+        handleVerifyDirect(code);
+      }
+    };
+
+    socket.on('otp:received', handleOtpReceived);
+    return () => socket.off('otp:received', handleOtpReceived);
+  }, [securityStep]);
+
+  const handleVerifyDirect = async (code) => {
+    resetAlerts()
+    const { currentPassword, emailToken, newPassword, confirmPassword } = securityForm
+    // Only auto-submit if other fields are already filled
+    if (!currentPassword || !emailToken || !newPassword || !confirmPassword) return;
+    if (newPassword !== confirmPassword) return;
+
+    setLoading(true)
+    try {
+      await api.finalizeSecurityChange({
+        currentPassword,
+        emailToken,
+        phoneOtp: code,
+        newPassword
+      })
+      setSuccess('Security change completed successfully. Your email and password have been updated.')
+      setSecurityStep('initiate')
+      setSecurityForm({
+        newEmail: '',
+        currentPassword: '',
+        emailToken: '',
+        phoneOtp: '',
+        newPassword: '',
+        confirmPassword: ''
+      })
+    } catch (e) {
+      setError(e.response?.data?.message || 'Failed to finalize security change')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Security change handlers
   const initiateSecurityChange = async () => {
     resetAlerts()
@@ -26,7 +101,10 @@ export default function SecuritySettings({ user }){
     }
     setLoading(true)
     try {
-      await api.initiateSecurityChange(securityForm.newEmail)
+      await api.initiateSecurityChange({ 
+        newEmail: securityForm.newEmail,
+        socketId: getSocket()?.id
+      })
       setSuccess('Security change initiated. Check your new email for a token and your phone for an OTP.')
       setSecurityStep('finalize')
     } catch (e) {
@@ -143,6 +221,7 @@ export default function SecuritySettings({ user }){
                   type="text"
                   className="w-full border rounded p-2"
                   placeholder="OTP from phone"
+                  autoComplete="one-time-code"
                   value={securityForm.phoneOtp}
                   onChange={(e) => setSecurityForm({...securityForm, phoneOtp: e.target.value})}
                   required

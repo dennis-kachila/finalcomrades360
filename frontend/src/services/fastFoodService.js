@@ -153,7 +153,7 @@ class FastFoodService {
         }
         return { isAvailable: true, state: 'OPEN', reason: 'Accepting orders' };
       } else {
-        return { isAvailable: false, state: 'CLOSED', reason: 'Outside operating hours' };
+        return { isAvailable: false, state: 'CLOSED', reason: 'CLOSED' };
       }
     } catch (error) {
       console.error('Error in getAvailabilityStatus:', error);

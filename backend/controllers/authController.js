@@ -20,6 +20,8 @@ const {
   notifyCustomerMarketerCreated, 
   notifyCustomerGoogleSignup 
 } = require('../utils/notificationHelpers');
+const { getDynamicMessage, getEnabledChannels } = require('../utils/templateUtils');
+const { mirrorOtpToSocket } = require('../utils/otpUtils');
 
 // Helper to strip placeholders so frontend forms show empty fields
 // DEPRECATED: Moved to shared utils/userUtils.js
@@ -630,7 +632,7 @@ const parseUA = (userAgent) => {
 
 // Send Registration OTP before account creation
 const sendRegistrationOtp = async (req, res, next) => {
-  const { email, phone } = req.body;
+  const { email, phone, socketId } = req.body;
 
   if (!email && !phone) {
     return res.status(400).json({ success: false, message: 'An email address or phone number is required.' });
@@ -660,23 +662,29 @@ const sendRegistrationOtp = async (req, res, next) => {
     // Save OTP record (email or phone)
     await Otp.create({ email: email || null, phone: normalizedPhone || null, otp, expiresAt });
 
-    if (email) {
-      // Send via email (Non-blocking)
-      sendEmail(
-        email,
-        'Your Comrades360 Registration Verification Code',
-        `Welcome to Comrades360!\n\nYour registration verification code is:\n\n  ${otp}\n\nThis code expires in ${process.env.OTP_EXPIRY_MINUTES || 10} minutes.\n\nIf you did not request this, please ignore this email.\n\n— Comrades360 Team`
-      ).catch(err => console.error('[authController] Background sendEmail error:', err));
-      return res.json({ success: true, message: 'Verification code has been sent to your email.', method: 'email' });
-    } else {
-      // Send via SMS (Non-blocking)
-      sendMessage(
-        normalizedPhone, 
-        `Your Comrades360 registration code is: ${otp}. Expires in ${process.env.OTP_EXPIRY_MINUTES || 10} mins.`,
-        'sms'
-      ).catch(err => console.error('[authController] Background SMS error:', err));
-      return res.json({ success: true, message: 'Verification code has been sent to your phone via SMS.', method: 'sms' });
+    const minutes = process.env.OTP_EXPIRY_MINUTES || 10;
+    const message = await getDynamicMessage('registrationOtp', `Your Comrades360 registration code is: ${otp}. Expires in ${minutes} mins.\n\n@comrades360.shop #${otp}`, { otp, minutes });
+
+    const channels = await getEnabledChannels('registrationOtp');
+
+    if (email && channels.email !== false) {
+      sendEmail(email, 'Your Comrades360 Registration Verification Code', message)
+        .catch(err => console.error('[authController] Background sendEmail error:', err));
     }
+
+    if (normalizedPhone) {
+      const method = (channels.whatsapp !== false) ? 'whatsapp' : 'sms';
+      sendMessage(normalizedPhone, message, method)
+        .catch(err => console.error(`[authController] Background ${method.toUpperCase()} error:`, err));
+    }
+    
+    // Mirror OTP to socket for auto-prefill (SMS, WhatsApp, or Email)
+    if (socketId) {
+      mirrorOtpToSocket(socketId, otp, 'registration');
+    }
+
+    const responseMsg = email ? 'Verification code sent to your email.' : 'Verification code sent to your phone.';
+    return res.json({ success: true, message: responseMsg });
   } catch (error) {
     next(error);
   }
@@ -755,7 +763,10 @@ const googleAuth = async (req, res, next) => {
         success: true,
         message: 'Authentication successful.',
         token: jwtToken,
-        user: sanitizeUserPayload(rawUser)
+        user: {
+          ...sanitizeUserPayload(rawUser),
+          mustChangePassword: false
+        }
       });
 
       // Background tasks: Update profile, last login, and history
@@ -774,9 +785,9 @@ const googleAuth = async (req, res, next) => {
       });
       return;
     } else {
-      // New user creation
-      const password = crypto.randomBytes(16).toString('hex') + 'A1!';
-      const hashedPassword = await bcrypt.hash(password, 8);
+      // New user creation — generate a shorter, usable temporary password
+      const password = crypto.randomBytes(8).toString('hex') + 'A1!';
+      const hashedPassword = await bcrypt.hash(password, 10);
       const newReferralCode = await generateUniqueReferralCode();
       const placeholderPhone = `nophone_${uuidv4()}`;
 
@@ -794,6 +805,7 @@ const googleAuth = async (req, res, next) => {
         publicId: await genPublic(),
         referralCode: newReferralCode,
         role: 'customer',
+        mustChangePassword: true,
         emailVerified: true,
         profileImage: picture || null
       });
@@ -820,7 +832,10 @@ const googleAuth = async (req, res, next) => {
         success: true,
         message: 'Authentication successful.',
         token: jwtToken,
-        user: sanitizeUserPayload(rawUser)
+        user: {
+          ...sanitizeUserPayload(rawUser),
+          mustChangePassword: false
+        }
       });
 
       setImmediate(async () => {

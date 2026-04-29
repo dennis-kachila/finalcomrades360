@@ -61,7 +61,8 @@ const {
   getRevenueAnalytics,
   verifyAdminPassword,
   getPlatformWalletDetails,
-  withdrawPlatformFunds
+  withdrawPlatformFunds,
+  getAdminCreatedItems
 } = require('../controllers/adminController');
 
 const { auth, adminOnly, adminOrLogistics, adminOrLogisticsOrSeller, adminOrFinance } = require('../middleware/auth');
@@ -161,6 +162,7 @@ router.get('/analytics/users', adminOnly, getUserAnalytics);
 // Advanced inventory management
 router.get('/inventory/overview', adminOrLogisticsOrSeller, getInventoryOverview);
 router.get('/inventory/items', adminOrLogisticsOrSeller, getInventoryItems);
+router.get('/inventory/on-behalf-items', adminOnly, getAdminCreatedItems);
 router.get('/inventory/low-stock-alerts', adminOrLogisticsOrSeller, getLowStockAlerts);
 router.patch('/products/:productId/stock', adminOrLogisticsOrSeller, updateStockLevels);
 router.post('/inventory/bulk-update-stock', adminOrLogistics, bulkUpdateStock);

@@ -50,6 +50,7 @@ const FastFoodForm = ({
   product: initialProduct = null,
   onAfterSave,
   apiType = 'fastfood', // [apiType]: 'fastfood' (default) or 'product' (when used from ProductForm)
+  forcedVendorId // Prop for administrative creation on behalf of a vendor
 }) => {
   const { id: paramId } = useParams();
   // ROBUST FIX: Check propId, paramId, AND initialProduct.id
@@ -134,10 +135,10 @@ const FastFoodForm = ({
       sizeVariants: [],
       isComboOption: false,
       comboOptions: [],
-      kitchenVendor: '',
-      vendorLocation: '',
-      vendorLat: '',
-      vendorLng: '',
+      kitchenVendor: currentUser?.businessName || '',
+      vendorLocation: currentUser?.businessAddress || '',
+      vendorLat: currentUser?.businessLat || '',
+      vendorLng: currentUser?.businessLng || '',
       deliveryFeeType: 'fixed',
       deliveryFee: '',
       deliveryCoverageZones: '',
@@ -844,11 +845,32 @@ const FastFoodForm = ({
         pickupAvailable: false,
         estimatedServings: '',
         availableFrom: '',
-        availableTo: ''
+        availableTo: '',
+        // Pre-populate business name and location from user profile
+        kitchenVendor: prev.kitchenVendor || currentUser?.businessName || '',
+        vendorLocation: prev.vendorLocation || currentUser?.businessAddress || '',
+        vendorLat: prev.vendorLat || currentUser?.businessLat || '',
+        vendorLng: prev.vendorLng || currentUser?.businessLng || ''
       }));
       hasResetNewForm.current = true;
     }
-  }, [id, isEditMode, isViewMode, initialProduct, navigate, toast, foodSubcategories]);
+  }, [id, isEditMode, isViewMode, initialProduct, navigate, toast, foodSubcategories, currentUser]);
+
+  // Pre-populate business info when an Admin selects a seller from the dropdown
+  useEffect(() => {
+    if (isAdmin && formData.vendor && sellers.length > 0) {
+      const selectedSeller = sellers.find(s => String(s.id) === String(formData.vendor));
+      if (selectedSeller) {
+        setFormData(prev => ({
+          ...prev,
+          kitchenVendor: selectedSeller.businessName || prev.kitchenVendor,
+          vendorLocation: selectedSeller.businessAddress || prev.vendorLocation,
+          vendorLat: selectedSeller.businessLat || prev.vendorLat,
+          vendorLng: selectedSeller.businessLng || prev.vendorLng
+        }));
+      }
+    }
+  }, [formData.vendor, isAdmin, sellers]);
 
   // Marketing Duration calculation
   useEffect(() => {
@@ -1397,8 +1419,8 @@ const FastFoodForm = ({
           dietaryTags: formData.dietaryTags || [],
           kitchenVendor: formData.kitchenVendor || 'Main Kitchen',
           vendorLocation: formData.vendorLocation,
-          [apiType === 'product' ? 'sellerId' : 'vendor']: formData.vendor || currentUser?.id || 1,
-          vendor: formData.vendor || currentUser?.id || 1, // Keep vendor for safety if backend expects it
+          [apiType === 'product' ? 'sellerId' : 'vendor']: forcedVendorId || formData.vendor || currentUser?.id || 1,
+          vendor: forcedVendorId || formData.vendor || currentUser?.id || 1, // Keep vendor for safety if backend expects it
           allergens: ['none'],
           isAvailable: true, // Force true to avoid legacy locks since we now use availabilityMode
           isActive: listMode ? true : formData.isActive,
@@ -1479,9 +1501,9 @@ const FastFoodForm = ({
         submitData.append('kitchenVendor', formData.kitchenVendor || 'Main Kitchen');
         submitData.append('vendorLocation', formData.vendorLocation || '');
         if (apiType === 'product') {
-          submitData.append('sellerId', String(formData.vendor || currentUser?.id || '1'));
+          submitData.append('sellerId', String(forcedVendorId || formData.vendor || currentUser?.id || '1'));
         }
-        submitData.append('vendor', String(formData.vendor || currentUser?.id || '1'));
+        submitData.append('vendor', String(forcedVendorId || formData.vendor || currentUser?.id || '1'));
         submitData.append('allergens', JSON.stringify(formData.allergens || []));
         submitData.append('isAvailable', 'true'); // Force true to avoid legacy locks
         submitData.append('availabilityMode', formData.availabilityMode || 'AUTO');
@@ -1730,32 +1752,9 @@ const FastFoodForm = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Admin-only Vendor Selection */}
-        {isAdmin && (
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-            <Label htmlFor="vendor" className="text-blue-800 font-semibold flex items-center gap-2">
-              <span className="mr-1">🏪</span>
-              Assign to Vendor (Admin Only)
-            </Label>
-            <select
-              id="vendor"
-              name="vendor"
-              value={formData.vendor || ''}
-              onChange={handleInputChange}
-              className="w-full h-10 rounded-md border border-blue-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              <option value="">Select Vendor (Current: {initialProduct?.vendor || 'Self'})</option>
-              {sellers.map((seller) => (
-                <option key={seller.id} value={seller.id}>
-                  {seller.name} ({seller.email})
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-blue-600 italic">Leave as "Select Vendor" to keep current owner or assign to yourself.</p>
-          </div>
-        )}
 
-        {isViewMode && (
+
+        {(isViewMode || (isAdmin && vendorInfo)) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Vendor Information Card */}
             <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100 shadow-sm">
@@ -2893,34 +2892,52 @@ const FastFoodForm = ({
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
-              <Label htmlFor="kitchenVendor">Kitchen/Vendor Name *</Label>
+              <Label htmlFor="kitchenVendor" className="flex items-center gap-2">
+                Kitchen/Vendor Name *
+                <span className="text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                  🔒 Auto-filled
+                </span>
+              </Label>
               <Input
                 id="kitchenVendor"
                 name="kitchenVendor"
                 value={formData.kitchenVendor}
-                onChange={handleInputChange}
-                placeholder="Main Kitchen, Student Center Cafe, etc."
-                disabled={isViewMode}
+                readOnly
+                disabled
+                className="bg-amber-50/70 border-amber-200 text-gray-700 cursor-not-allowed"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
-                The brand or outlet name customers will see
+              <p className="text-xs text-amber-700 mt-1 flex items-center gap-1">
+                <span>🏪</span>
+                Synced from your Business/Store Name. To update, go to{' '}
+                <a href="/seller/business-location" className="underline font-medium hover:text-amber-900">
+                  Business Location Settings
+                </a>.
               </p>
             </div>
 
             <div className="md:col-span-2">
-              <Label htmlFor="vendorLocation">Vendor Address / Precise Location *</Label>
+              <Label htmlFor="vendorLocation" className="flex items-center gap-2">
+                Vendor Address / Precise Location *
+                <span className="text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                  🔒 Auto-filled
+                </span>
+              </Label>
               <Input
                 id="vendorLocation"
                 name="vendorLocation"
                 value={formData.vendorLocation}
-                onChange={handleInputChange}
-                placeholder="Specific Room, Building Wing, or Plot Number"
-                disabled={isViewMode}
+                readOnly
+                disabled
+                className="bg-amber-50/70 border-amber-200 text-gray-700 cursor-not-allowed"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Used for distance calculation and smart menu filtering
+              <p className="text-xs text-amber-700 mt-1 flex items-center gap-1">
+                <span>📍</span>
+                Synced from your Business Address. To update, go to{' '}
+                <a href="/seller/business-location" className="underline font-medium hover:text-amber-900">
+                  Business Location Settings
+                </a>.
               </p>
             </div>
 

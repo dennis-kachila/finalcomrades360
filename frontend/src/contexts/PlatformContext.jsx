@@ -33,7 +33,7 @@ export const PlatformProvider = ({ children }) => {
             ];
 
             const results = await Promise.all(
-                keys.map(key => api.get(`/admin/config/${key}`).catch(() => ({ data: { success: false } })))
+                keys.map(key => api.get(`/platform/config/${key}`).catch(() => ({ data: { success: false } })))
             );
 
             setSettings(prev => {

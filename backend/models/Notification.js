@@ -1,4 +1,5 @@
 const { DataTypes } = require('sequelize');
+const { emitRealtimeUpdate } = require('../utils/realtimeEmitter');
 
 module.exports = (sequelize, DataTypes) => {
 
@@ -12,6 +13,10 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     freezeTableName: true,
     timestamps: true,
+  });
+
+  Notification.afterCreate(async (notification) => {
+    emitRealtimeUpdate('notifications', { userId: notification.userId });
   });
 
   Notification.associate = function (models) {

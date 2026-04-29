@@ -37,7 +37,8 @@ const getUltraFastHomepageProducts = async (req, res) => {
       visibilityStatus: 'visible',
       suspended: false,
       isActive: true,
-      status: 'active'
+      status: 'active',
+      stock: { [Op.gt]: 0 }
     };
 
     if (isMarketing) {
@@ -196,7 +197,8 @@ const getHomepageBatchData = async (req, res) => {
           visibilityStatus: 'visible',
           suspended: false,
           isActive: true,
-          status: 'active'
+          status: 'active',
+          stock: { [Op.gt]: 0 }
         };
 
         if (isMarketing) {
@@ -438,7 +440,7 @@ const getHomepageBatchData = async (req, res) => {
               // Default to product
               const ids = p.productIds || [];
               const prods = await Product.findAll({
-                where: { id: { [Op.in]: ids }, approved: true, isActive: true },
+                where: { id: { [Op.in]: ids }, approved: true, isActive: true, stock: { [Op.gt]: 0 } },
                 attributes: [
                   'id', 'name', 'coverImage', 'displayPrice', 'discountPrice', 'basePrice', 'discountPercentage',
                   'marketingCommission', 'marketingEnabled', 'marketingCommissionType'

@@ -28,6 +28,7 @@ export default function Seller() {
     { to: "/seller/inventory", label: "Inventory", icon: "📋" },
     { to: "/seller/fast-food", label: "My Meals", icon: "🍲", color: "orange" },
     { to: "/seller/orders", label: "Orders", icon: "🛒" },
+    { to: "/seller/direct-orders", label: "Direct Orders", icon: "📝" },
     { to: "/seller/business-location", label: "Location", icon: "📍" },
     { to: "/seller/wallet", label: "Wallet", icon: "💰" },
     { to: "/seller/reports", label: "Reports", icon: "📊" },

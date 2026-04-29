@@ -27,11 +27,14 @@ export default function SystemSettings() {
         agentTaskReassigned: 'A delivery task for order #{orderNumber} has been reassigned to you.',
         adminTaskRejected: 'Delivery agent {agentName} rejected task for order #{orderNumber}. Reason: {reason}',
         phoneVerification: 'Your Comrades360 verification OTP is {otp}. It expires in 10 minutes.',
+        registrationOtp: 'Your Comrades360 registration code is: {otp}. It expires in {minutes} minutes.',
         passwordReset: 'Your Comrades360 password reset code is {otp}. It expires in {minutes} minutes.',
         withdrawalStatus: 'Your withdrawal of KES {amount} has been processed successfully! 💰',
         withdrawalSuccessEmailSubject: 'Withdrawal Processed',
         withdrawalSuccessEmailBody: 'Hi {name}, your withdrawal of {amount} has been processed successfully. It should reflect in your account shortly.',
-        WELCOME_MARKETER_CREATED: 'Hello {name}, your account has been created by {marketerName}. Your temporary password is: {tempPassword}. Please login at {loginUrl} and change your password immediately.'
+        WELCOME_MARKETER_CREATED: 'Hello {name}, your account has been created by {marketerName}. Your temporary password is: {tempPassword}. Please login at {loginUrl} and change your password immediately.',
+        idVerificationApproved: `Hello {name},\n\nGreat news! Your identity has been verified and your Comrades360 account is now fully activated.\n\nYou can now access all features including applying for seller, delivery, or service provider roles.\n\nWelcome to the verified community!\n\n— Comrades360 Team`,
+        idVerificationRejected: `Hello {name},\n\nWe regret to inform you that your identity verification was not successful.\n\nReason: {rejectionReason}\n\nPlease log in and re-upload a clear, valid National ID document to try again.\n\nIf you believe this is an error, contact our support team.\n\n— Comrades360 Team`
       }
     },
     finance_settings: { 
@@ -705,8 +708,11 @@ export default function SystemSettings() {
                     { label: 'Withdrawal Status', key: 'withdrawalStatus', tab: 'finance', icon: '💰' },
                     { label: 'In Transit', key: 'orderInTransit', tab: 'logistics', icon: '🚚' },
                     { label: 'Ready for Pickup', key: 'orderReadyPickup', tab: 'logistics', icon: '📦' },
+                    { label: 'Registration Code', key: 'registrationOtp', tab: 'security', icon: '🛡️' },
                     { label: 'OTP Verification', key: 'phoneVerification', tab: 'security', icon: '🔒' },
                     { label: 'Password Reset', key: 'passwordReset', tab: 'security', icon: '🔐' },
+                    { label: 'ID Approved', key: 'idVerificationApproved', tab: 'security', icon: '✅' },
+                    { label: 'ID Rejected', key: 'idVerificationRejected', tab: 'security', icon: '❌' },
                   ].map(item => (
                     <div key={item.key} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-start justify-between gap-4">
                       <div className="flex-1">
@@ -1020,8 +1026,34 @@ export default function SystemSettings() {
                   <TemplateInput label="OTP Verification Template" templateKey="phoneVerification" value={settings.whatsapp_config.templates?.phoneVerification} onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, phoneVerification: v}} }))} channels={settings.whatsapp_config.channels?.phoneVerification || { whatsapp: true, sms: true, email: true, in_app: true }} onChannelChange={(ch) => updateTemplateChannels('phoneVerification', ch)} />
                   <p className="mt-2 text-xs text-blue-600">Placeholders: {"{otp}"}</p>
                   <div className="mt-4" />
+                  <TemplateInput label="Registration Code Template" templateKey="registrationOtp" value={settings.whatsapp_config.templates?.registrationOtp} onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, registrationOtp: v}} }))} channels={settings.whatsapp_config.channels?.registrationOtp || { whatsapp: true, sms: true, email: true, in_app: false }} onChannelChange={(ch) => updateTemplateChannels('registrationOtp', ch)} />
+                  <p className="mt-2 text-xs text-blue-600">Placeholders: {"{otp}, {minutes}"}</p>
+                  <div className="mt-4" />
                   <TemplateInput label="Password Reset Code Template" templateKey="passwordReset" value={settings.whatsapp_config.templates?.passwordReset} onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, passwordReset: v}} }))} channels={settings.whatsapp_config.channels?.passwordReset || { whatsapp: false, sms: true, email: true, in_app: false }} onChannelChange={(ch) => updateTemplateChannels('passwordReset', ch)} />
                   <p className="mt-2 text-xs text-blue-600">Placeholders: {"{otp}, {code}, {token}, {minutes}"}</p>
+                  
+                  <div className="mt-8 pt-8 border-t border-gray-100">
+                    <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Identity Verification</h4>
+                    <div className="space-y-6">
+                      <TemplateInput 
+                        label="ID Approved Template" 
+                        templateKey="idVerificationApproved" 
+                        value={settings.whatsapp_config.templates?.idVerificationApproved} 
+                        onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, idVerificationApproved: v}} }))} 
+                        channels={settings.whatsapp_config.channels?.idVerificationApproved || { whatsapp: true, sms: true, email: true, in_app: true }} 
+                        onChannelChange={(ch) => updateTemplateChannels('idVerificationApproved', ch)} 
+                      />
+                      <TemplateInput 
+                        label="ID Rejected Template" 
+                        templateKey="idVerificationRejected" 
+                        value={settings.whatsapp_config.templates?.idVerificationRejected} 
+                        onChange={(v) => setSettings(p => ({...p, whatsapp_config: {...p.whatsapp_config, templates: {...p.whatsapp_config.templates, idVerificationRejected: v}} }))} 
+                        channels={settings.whatsapp_config.channels?.idVerificationRejected || { whatsapp: true, sms: true, email: true, in_app: true }} 
+                        onChannelChange={(ch) => updateTemplateChannels('idVerificationRejected', ch)} 
+                      />
+                    </div>
+                    <p className="mt-4 text-[10px] text-gray-400 font-medium">Available Placeholders: {"{name}, {rejectionReason}"}</p>
+                  </div>
                 </div>
                 <SaveButton onClick={() => updateSettings('whatsapp_config', settings.whatsapp_config)} loading={loading} />
               </section>
@@ -1117,9 +1149,12 @@ const TemplateInput = ({ label, value, onChange, templateKey, channels, onChanne
     agentTaskReassigned: 'A delivery task for order #{orderNumber} has been reassigned to you.',
     adminTaskRejected: 'Delivery agent {agentName} rejected task for order #{orderNumber}. Reason: {reason}',
     phoneVerification: 'Your Comrades360 verification OTP is {otp}. It expires in 10 minutes.',
+    registrationOtp: 'Your Comrades360 registration code is: {otp}. It expires in {minutes} minutes.',
     passwordReset: 'Your Comrades360 password reset code is {otp}. It expires in {minutes} minutes.',
     withdrawalStatus: 'Your withdrawal of KES {amount} has been processed successfully! 💰',
-    WELCOME_MARKETER_CREATED: 'Hello {name}, your account has been created by {marketerName}. Your temporary password is: {tempPassword}. Please login at {loginUrl} and change your password immediately.'
+    WELCOME_MARKETER_CREATED: 'Hello {name}, your account has been created by {marketerName}. Your temporary password is: {tempPassword}. Please login at {loginUrl} and change your password immediately.',
+    idVerificationApproved: `Hello {name},\n\nGreat news! Your identity has been verified and your Comrades360 account is now fully activated.\n\nYou can now access all features including applying for seller, delivery, or service provider roles.\n\nWelcome to the verified community!\n\n— Comrades360 Team`,
+    idVerificationRejected: `Hello {name},\n\nWe regret to inform you that your identity verification was not successful.\n\nReason: {rejectionReason}\n\nPlease log in and re-upload a clear, valid National ID document to try again.\n\nIf you believe this is an error, contact our support team.\n\n— Comrades360 Team`
   };
 
   return (

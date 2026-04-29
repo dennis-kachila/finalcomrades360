@@ -340,8 +340,9 @@ export const productApi = {
   reject: (id, reason) => api.put(`/products/${id}/reject`, { reason }),
 
   // Super Admin Security Management
-  initiateSecurityChange: (newEmail) => api.post('/admin/security/initiate', { newEmail }),
-  finalizeSecurityChange: (data) => api.post('/admin/security/finalize', data),
+  // Super Admin Security Management
+  initiateSecurityChange: (data) => api.post('/superadmin/security/initiate', data),
+  finalizeSecurityChange: (data) => api.post('/superadmin/security/finalize', data),
 
   // Get a single product by ID
   getById: async (id) => {

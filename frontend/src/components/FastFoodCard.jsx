@@ -162,7 +162,6 @@ export default function FastFoodCard({
   return (
     <div
       className={`flex-shrink-0 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group flex flex-col border border-gray-100 ${!isOpen ? 'opacity-90' : ''} ${cardBase} ${isBannerCard ? 'h-full min-h-0' : ''}`}
-      onClick={clickable ? handleView : undefined}
       style={isBannerCard ? { display: 'flex', flexDirection: 'column', height: '100%' } : {}}
     >
       <div

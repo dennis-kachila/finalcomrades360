@@ -17,6 +17,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import RealtimeSync from './components/RealtimeSync';
 import DashboardGuard from './components/DashboardGuard';
+import useTrafficTracker from './hooks/useTrafficTracker';
 // import VerificationRequired from './components/VerificationRequired'; // Removed as per user request
 import Home from './pages/Home';
 const MaintenancePage = React.lazy(() => import('./pages/MaintenancePage'));
@@ -204,6 +205,9 @@ const BatchSystem = lazy(() => import('./pages/dashboard/BatchSystem'));
 const CustomerReturnsList = lazy(() => import('./pages/customer/CustomerReturnsList'));
 const FastFoodPickupPoints = lazy(() => import('./pages/dashboard/FastFoodPickupPoints'));
 const ContactMessages = lazy(() => import('./pages/dashboard/ContactMessages'));
+const AdminOnBehalfCreation = lazy(() => import('./pages/dashboard/AdminOnBehalfCreation'));
+const DirectOrders = lazy(() => import('./pages/dashboard/DirectOrders'));
+const MarketingNotifications = lazy(() => import('./pages/dashboard/MarketingNotifications'));
 
 // Delivery Agent Sub-components
 const DeliveryAgentOrders = lazy(() => import('./pages/dashboard/delivery/Orders'));
@@ -243,6 +247,7 @@ const AppWithProviders = () => (
 const AppContent = () => {
   const { user, loading, verificationRequired } = useAuth();
   const location = useLocation();
+  useTrafficTracker();
   const isStationUser = user?.role === 'station_manager' || user?.roles?.includes('station_manager') || user?.roles?.includes('warehouse_manager') || user?.roles?.includes('pickup_station_manager');
   const hideNavbar = ['/login', '/register', '/forgot-password', '/menu', '/station/login'].includes(location.pathname);
   const [isMarketingMode, setIsMarketingMode] = useState(localStorage.getItem('marketing_mode') === 'true');
@@ -519,6 +524,7 @@ const AppContent = () => {
                   <Route path="finance/revenue" element={<SystemRevenue />} />
                   <Route path="finance/payouts" element={<PendingPayouts />} />
                   <Route path="marketing/hero-promotions" element={<AdminHeroPromotions />} />
+                  <Route path="marketing/thank-you" element={<MarketingNotifications />} />
                   <Route path="marketing/hero-promotions/create" element={<AdminCreateHeroPromotion />} />
                   <Route path="marketing/fastfood-promotions" element={<AdminFastFoodPromotions />} />
                   <Route path="settings/platform" element={<SystemSettings />} />
@@ -530,6 +536,8 @@ const AppContent = () => {
                   <Route path="support/service" element={<CustomerService />} />
                   <Route path="delivery/live-map" element={<AdminLiveMap />} />
                   <Route path="delivery/auditing" element={<DeliveryAuditing />} />
+                  <Route path="on-behalf-creation" element={<AdminOnBehalfCreation />} />
+                  <Route path="direct-orders" element={<DirectOrders />} />
                   <Route path="other-dashboards" element={<OtherDashboards />} />
                   {/* Logistics Manager entry point */}
                   <Route path="logistics" element={<Navigate to="/dashboard/orders" replace />} />
@@ -550,6 +558,7 @@ const AppContent = () => {
                   <Route path="affiliates" element={<Affiliates />} />
                   <Route path="commissions" element={<Commissions />} />
                   <Route path="wallet" element={<MarketerWallet />} />
+                  <Route path="direct-orders" element={<DirectOrders />} />
                 </Route>
 
                 {/* Seller Dashboard */}
@@ -576,6 +585,7 @@ const AppContent = () => {
                   <Route path="business-location" element={<SellerBusinessLocation />} />
                   <Route path="inventory" element={<InventoryManagement onBack={() => window.history.back()} />} />
                   <Route path="help" element={<SellerHelp />} />
+                  <Route path="direct-orders" element={<DirectOrders />} />
 
                   {/* Fast Food Management Routes for Sellers */}
                   <Route path="fast-food" element={<FastFoodManagement />} />

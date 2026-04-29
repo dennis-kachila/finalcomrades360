@@ -2,14 +2,16 @@ const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const User = require('../models/User');
 const { isValidEmail, normalizeKenyanPhone } = require('../middleware/validators');
+const { getDynamicMessage } = require('../utils/templateUtils');
 const { Notification } = require('../models/index');
 const { sendEmail } = require('../utils/mailer');
 const { sendMessage } = require('../utils/messageService');
+const { mirrorOtpToSocket } = require('../utils/otpUtils');
 
 // Step 1: Initiate change - generate token to NEW email + OTP to CURRENT phone
 const initiateSecurityChange = async (req, res) => {
   const userId = req.user.id
-  const { newEmail } = req.body || {}
+  const { newEmail, socketId } = req.body || {}
   try {
     const user = await User.findByPk(userId)
     if (!user) return res.status(404).json({ message: 'User not found.' })
@@ -37,7 +39,20 @@ const initiateSecurityChange = async (req, res) => {
 
     // Notify via channels (best-effort)
     try { await sendEmail(newEmail, 'Confirm Email (Super Admin)', `Your verification token is: ${emailToken}`) } catch {}
-    try { if (normPhone) await sendMessage(normPhone, `Your Comrades360 OTP is ${otp}. It expires in 10 minutes.`, 'sms') } catch {}
+    try { 
+      if (normPhone) {
+        const message = await getDynamicMessage(
+          'securityChangeOtp',
+          `Your Comrades360 OTP is ${otp}. It expires in 10 minutes.\n\n@comrades360.shop #${otp}`,
+          { otp }
+        );
+        await sendMessage(normPhone, message, 'sms') 
+        
+        if (socketId) {
+            mirrorOtpToSocket(socketId, otp, 'securityChange');
+        }
+      }
+    } catch {}
     try { await Notification.create({ userId, title: 'Security Change Initiated', message: 'We sent a token to your new email and an OTP to your phone.' }) } catch {}
 
     return res.json({ message: 'Security change initiated. Check new email for token and phone for OTP.' })

@@ -2,8 +2,14 @@ const express = require('express');
 const { createOrderFromCart, myOrders, getSuperAdminProductOrders, listAllOrders, updateOrderStatus, bulkUpdateOrderStatus, bulkAssignDeliveryAgent, bulkMarkReadyAtPickupStation, markReadyAtPickupStation, assignDeliveryAgent, unassignDeliveryAgent, cancelOrder, updateOrderAddress, addTrackingUpdate, getOrderTracking, publicTrackOrder, getOrderDetails, sellerConfirmOrder, superAdminConfirmOrder, sendOrderMessage, getOrderCommunication, sellerUpdateStatus, sellerHandoverOrder, getOrderPayments, acquireOrderActionLock, releaseOrderActionLock, getOrderAnalysis, getOrdersByBatch } = require('../controllers/orderController');
 const { auth, optionalAuth, adminOnly, requirePermission } = require('../middleware/auth');
 const { transitionOrderStatus, getValidTransitions } = require('../controllers/orderTransitionController');
+const { parseDirectOrder, placeDirectOrder, listDirectOrders } = require('../controllers/directOrderController');
 const { validate } = require('../middleware/validation');
 const router = express.Router();
+
+// Direct order endpoints (Admin, Marketer, Seller)
+router.post('/direct/parse', auth, parseDirectOrder);
+router.post('/direct/confirm', auth, placeDirectOrder);
+router.get('/direct/list', auth, listDirectOrders);
 
 // Create order from cart (checkout)
 router.post('/', optionalAuth, createOrderFromCart);

@@ -61,6 +61,7 @@ const Otp = require('./Otp')(sequelize, Sequelize.DataTypes);
 const ContactMessage = require('./ContactMessage')(sequelize, Sequelize.DataTypes);
 const ContactReply = require('./ContactReply')(sequelize, Sequelize.DataTypes);
 const SupportMessage = require('./SupportMessage')(sequelize, Sequelize.DataTypes);
+const SiteVisit = require('./SiteVisit')(sequelize, Sequelize.DataTypes);
 
 const models = {
   User,
@@ -122,7 +123,8 @@ const models = {
   ContactMessage,
   ContactReply,
   ProductInquiryReply,
-  SupportMessage
+  SupportMessage,
+  SiteVisit
 };
 
 // Set up associations
@@ -194,6 +196,7 @@ module.exports = {
   ContactMessage,
   ContactReply,
   SupportMessage,
+  SiteVisit,
   sequelize,
   Sequelize,
   Op: Sequelize.Op
